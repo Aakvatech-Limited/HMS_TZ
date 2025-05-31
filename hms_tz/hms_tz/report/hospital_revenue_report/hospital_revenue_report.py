@@ -33,212 +33,90 @@ def validate_filters(filters):
 
 
 def get_columns(filters):
-    """Get report columns based on group_by filter"""
-    group_by = filters.get("group_by", "Date")
-
-    columns = []
-
-    if group_by == "Date":
-        columns = [
-            {
-                "fieldname": "posting_date",
-                "fieldtype": "Date",
-                "label": _("Date"),
-                "width": 100,
-            },
-            {
-                "fieldname": "total_revenue",
-                "fieldtype": "Currency",
-                "label": _("Total Revenue"),
-                "width": 120,
-            },
-            {
-                "fieldname": "cash_revenue",
-                "fieldtype": "Currency",
-                "label": _("Cash Revenue"),
-                "width": 120,
-            },
-            {
-                "fieldname": "insurance_revenue",
-                "fieldtype": "Currency",
-                "label": _("Insurance Revenue"),
-                "width": 120,
-            },
-            {
-                "fieldname": "consultation_revenue",
-                "fieldtype": "Currency",
-                "label": _("Consultation"),
-                "width": 100,
-            },
-            {
-                "fieldname": "lab_revenue",
-                "fieldtype": "Currency",
-                "label": _("Lab Tests"),
-                "width": 100,
-            },
-            {
-                "fieldname": "radiology_revenue",
-                "fieldtype": "Currency",
-                "label": _("Radiology"),
-                "width": 100,
-            },
-            {
-                "fieldname": "procedure_revenue",
-                "fieldtype": "Currency",
-                "label": _("Procedures"),
-                "width": 100,
-            },
-            {
-                "fieldname": "medication_revenue",
-                "fieldtype": "Currency",
-                "label": _("Medication"),
-                "width": 100,
-            },
-            {
-                "fieldname": "therapy_revenue",
-                "fieldtype": "Currency",
-                "label": _("Therapy"),
-                "width": 100,
-            },
-        ]
-    elif group_by == "Service Type":
-        columns = [
-            {
-                "fieldname": "service_type",
-                "fieldtype": "Data",
-                "label": _("Service Type"),
-                "width": 150,
-            },
-            {
-                "fieldname": "total_revenue",
-                "fieldtype": "Currency",
-                "label": _("Total Revenue"),
-                "width": 120,
-            },
-            {
-                "fieldname": "cash_revenue",
-                "fieldtype": "Currency",
-                "label": _("Cash Revenue"),
-                "width": 120,
-            },
-            {
-                "fieldname": "insurance_revenue",
-                "fieldtype": "Currency",
-                "label": _("Insurance Revenue"),
-                "width": 120,
-            },
-            {
-                "fieldname": "total_qty",
-                "fieldtype": "Float",
-                "label": _("Total Quantity"),
-                "width": 100,
-            },
-            {
-                "fieldname": "avg_rate",
-                "fieldtype": "Currency",
-                "label": _("Average Rate"),
-                "width": 100,
-            },
-        ]
-    elif group_by == "Payment Type":
-        columns = [
-            {
-                "fieldname": "payment_type",
-                "fieldtype": "Data",
-                "label": _("Payment Type"),
-                "width": 120,
-            },
-            {
-                "fieldname": "total_revenue",
-                "fieldtype": "Currency",
-                "label": _("Total Revenue"),
-                "width": 120,
-            },
-            {
-                "fieldname": "total_qty",
-                "fieldtype": "Float",
-                "label": _("Total Quantity"),
-                "width": 100,
-            },
-            {
-                "fieldname": "avg_rate",
-                "fieldtype": "Currency",
-                "label": _("Average Rate"),
-                "width": 100,
-            },
-            {
-                "fieldname": "percentage",
-                "fieldtype": "Percent",
-                "label": _("Percentage"),
-                "width": 100,
-            },
-        ]
-    elif group_by == "Department":
-        columns = [
-            {
-                "fieldname": "department",
-                "fieldtype": "Data",
-                "label": _("Department"),
-                "width": 150,
-            },
-            {
-                "fieldname": "total_revenue",
-                "fieldtype": "Currency",
-                "label": _("Total Revenue"),
-                "width": 120,
-            },
-            {
-                "fieldname": "cash_revenue",
-                "fieldtype": "Currency",
-                "label": _("Cash Revenue"),
-                "width": 120,
-            },
-            {
-                "fieldname": "insurance_revenue",
-                "fieldtype": "Currency",
-                "label": _("Insurance Revenue"),
-                "width": 120,
-            },
-            {
-                "fieldname": "total_qty",
-                "fieldtype": "Float",
-                "label": _("Total Quantity"),
-                "width": 100,
-            },
-        ]
-    elif group_by == "Practitioner":
-        columns = [
-            {
-                "fieldname": "healthcare_practitioner",
-                "fieldtype": "Data",
-                "label": _("Healthcare Practitioner"),
-                "width": 180,
-            },
-            {
-                "fieldname": "total_revenue",
-                "fieldtype": "Currency",
-                "label": _("Total Revenue"),
-                "width": 120,
-            },
-            {
-                "fieldname": "cash_revenue",
-                "fieldtype": "Currency",
-                "label": _("Cash Revenue"),
-                "width": 120,
-            },
-            {
-                "fieldname": "insurance_revenue",
-                "fieldtype": "Currency",
-                "label": _("Insurance Revenue"),
-                "width": 120,
-            },
-            {
-                "fieldname": "total_qty",
-                "fieldtype": "Float",
-                "label": _("Total Quantity"),
-                "width": 100,
-            },
-        ]
+    """Get detailed report columns"""
+    columns = [
+        {
+            "fieldname": "posting_date",
+            "fieldtype": "Date",
+            "label": _("Date"),
+            "width": 100,
+        },
+        {
+            "fieldname": "patient",
+            "fieldtype": "Link",
+            "label": _("Patient"),
+            "options": "Patient",
+            "width": 120,
+        },
+        {
+            "fieldname": "patient_name",
+            "fieldtype": "Data",
+            "label": _("Patient Name"),
+            "width": 150,
+        },
+        {
+            "fieldname": "patient_type",
+            "fieldtype": "Data",
+            "label": _("Patient Type"),
+            "width": 100,
+        },
+        {
+            "fieldname": "appointment",
+            "fieldtype": "Link",
+            "label": _("Appointment No"),
+            "options": "Patient Appointment",
+            "width": 120,
+        },
+        {
+            "fieldname": "service_type",
+            "fieldtype": "Data",
+            "label": _("Service Type"),
+            "width": 120,
+        },
+        {
+            "fieldname": "service_name",
+            "fieldtype": "Data",
+            "label": _("Service Name"),
+            "width": 150,
+        },
+        {
+            "fieldname": "payment_type",
+            "fieldtype": "Data",
+            "label": _("Payment Type"),
+            "width": 120,
+        },
+        {
+            "fieldname": "insurance_company",
+            "fieldtype": "Data",
+            "label": _("Insurance Company"),
+            "width": 150,
+        },
+        {
+            "fieldname": "department",
+            "fieldtype": "Data",
+            "label": _("Department"),
+            "width": 120,
+        },
+        {
+            "fieldname": "healthcare_practitioner",
+            "fieldtype": "Data",
+            "label": _("Practitioner"),
+            "width": 150,
+        },
+        {"fieldname": "qty", "fieldtype": "Float", "label": _("Qty"), "width": 80},
+        {
+            "fieldname": "rate",
+            "fieldtype": "Currency",
+            "label": _("Rate"),
+            "width": 100,
+        },
+        {
+            "fieldname": "amount",
+            "fieldtype": "Currency",
+            "label": _("Amount"),
+            "width": 120,
+        },
+    ]
 
     return columns
 
@@ -252,7 +130,11 @@ def get_conditions(filters):
     conditions.append("hre.is_cancelled = 0")
 
     if filters.get("payment_type"):
-        conditions.append("hre.payment_type = %(payment_type)s")
+        if filters.get("payment_type") == "Cash":
+            conditions.append("hre.payment_type = 'Cash'")
+        elif filters.get("payment_type") != "Cash":
+            # For insurance companies
+            conditions.append("hre.insurance_company = %(payment_type)s")
 
     if filters.get("service_type"):
         conditions.append("hre.service_type = %(service_type)s")
@@ -270,21 +152,52 @@ def get_conditions(filters):
 
 
 def get_data(filters):
-    """Get report data based on group_by filter"""
-    group_by = filters.get("group_by", "Date")
+    """Get detailed report data"""
+    return get_detailed_data(filters)
 
-    if group_by == "Date":
-        return get_date_wise_data(filters)
-    elif group_by == "Service Type":
-        return get_service_type_wise_data(filters)
-    elif group_by == "Payment Type":
-        return get_payment_type_wise_data(filters)
-    elif group_by == "Department":
-        return get_department_wise_data(filters)
-    elif group_by == "Practitioner":
-        return get_practitioner_wise_data(filters)
 
-    return []
+def get_detailed_data(filters):
+    """Get detailed revenue data with patient information"""
+    conditions = get_conditions(filters)
+
+    query = """
+        SELECT
+            hre.posting_date,
+            hre.patient,
+            hre.patient_name,
+            CASE
+                WHEN hre.source_doctype = 'Patient Appointment' AND
+                     EXISTS(SELECT 1 FROM `tabPatient Appointment` pa WHERE pa.name = hre.appointment AND pa.appointment_type LIKE '%%Emergency%%')
+                THEN 'In-Patient'
+                WHEN hre.source_doctype = 'Lab Test' AND
+                     EXISTS(SELECT 1 FROM `tabLab Test` lt WHERE lt.name = hre.source_docname AND lt.inpatient_record IS NOT NULL)
+                THEN 'In-Patient'
+                WHEN hre.source_doctype = 'Radiology Examination' AND
+                     EXISTS(SELECT 1 FROM `tabRadiology Examination` re WHERE re.name = hre.source_docname AND re.inpatient_record IS NOT NULL)
+                THEN 'In-Patient'
+                WHEN hre.source_doctype = 'Clinical Procedure' AND
+                     EXISTS(SELECT 1 FROM `tabClinical Procedure` cp WHERE cp.name = hre.source_docname AND cp.inpatient_record IS NOT NULL)
+                THEN 'In-Patient'
+                ELSE 'Out-Patient'
+            END as patient_type,
+            hre.appointment,
+            hre.service_type,
+            hre.service_name,
+            hre.payment_type,
+            hre.insurance_company,
+            hre.department,
+            hre.healthcare_practitioner,
+            hre.qty,
+            hre.rate,
+            hre.amount
+        FROM `tabHospital Revenue Entry` hre
+        WHERE {conditions}
+        ORDER BY hre.posting_date DESC, hre.patient_name
+    """.format(
+        conditions=conditions
+    )
+
+    return frappe.db.sql(query, filters, as_dict=True)
 
 
 def get_date_wise_data(filters):
@@ -411,23 +324,105 @@ def get_practitioner_wise_data(filters):
 
 
 def get_chart_data(data, filters):
-    """Generate chart data based on chart_type filter"""
+    """Generate chart data for detailed report"""
     if not data:
         return None
 
-    chart_type = filters.get("chart_type", "Revenue Trends")
-    group_by = filters.get("group_by", "Date")
+    # Create revenue trends chart from detailed data
+    return get_revenue_trends_from_detailed_data(data)
 
-    if chart_type == "Revenue Trends" and group_by == "Date":
-        return get_revenue_trends_chart(data)
-    elif chart_type == "Service Type Analysis":
-        return get_service_type_chart(data, filters)
-    elif chart_type == "Payment Type Analysis":
-        return get_payment_type_chart(data, filters)
-    elif chart_type == "Department Analysis":
-        return get_department_chart(data, filters)
 
-    return None
+def get_revenue_trends_from_detailed_data(data):
+    """Generate revenue trends chart from detailed data"""
+    # Group data by date
+    date_wise_data = {}
+
+    for row in data:
+        date_key = row.get("posting_date")
+        if isinstance(date_key, str):
+            date_str = date_key
+        else:
+            date_str = date_key.strftime("%Y-%m-%d") if date_key else ""
+
+        if date_str not in date_wise_data:
+            date_wise_data[date_str] = {
+                "total_revenue": 0,
+                "cash_revenue": 0,
+                "insurance_revenue": 0,
+            }
+
+        amount = flt(row.get("amount", 0))
+        date_wise_data[date_str]["total_revenue"] += amount
+
+        if row.get("payment_type") == "Cash":
+            date_wise_data[date_str]["cash_revenue"] += amount
+        else:
+            date_wise_data[date_str]["insurance_revenue"] += amount
+
+    # Sort by date
+    sorted_dates = sorted(date_wise_data.keys())
+
+    labels = sorted_dates
+    total_revenue = [date_wise_data[date]["total_revenue"] for date in sorted_dates]
+    cash_revenue = [date_wise_data[date]["cash_revenue"] for date in sorted_dates]
+    insurance_revenue = [
+        date_wise_data[date]["insurance_revenue"] for date in sorted_dates
+    ]
+
+    chart = {
+        "data": {
+            "labels": labels,
+            "datasets": [
+                {
+                    "name": _("Total Revenue"),
+                    "values": total_revenue,
+                    "chartType": "line",
+                },
+                {"name": _("Cash Revenue"), "values": cash_revenue, "chartType": "bar"},
+                {
+                    "name": _("Insurance Revenue"),
+                    "values": insurance_revenue,
+                    "chartType": "bar",
+                },
+            ],
+        },
+        "type": "axis-mixed",
+        "colors": ["#36A2EB", "#4BC0C0", "#FF6384"],
+        "barOptions": {"stacked": True},
+        "lineOptions": {"regionFill": 1},
+        "height": 350,
+    }
+
+    return chart
+
+
+@frappe.whitelist()
+def get_payment_types():
+    """Get payment type options including insurance companies"""
+    options = [{"value": "", "label": ""}]
+    options.append({"value": "Cash", "label": "Cash"})
+
+    # Get all insurance companies from Healthcare Insurance Company doctype
+    insurance_companies = frappe.db.sql(
+        """
+        SELECT name, insurance_company_name
+        FROM `tabHealthcare Insurance Company`
+        WHERE disabled = 0
+        ORDER BY insurance_company_name
+    """,
+        as_dict=True,
+    )
+
+    for company in insurance_companies:
+        if company.name:
+            options.append(
+                {
+                    "value": company.name,
+                    "label": company.insurance_company_name or company.name,
+                }
+            )
+
+    return options
 
 
 def get_revenue_trends_chart(data):
@@ -580,112 +575,87 @@ def get_department_chart(data, filters):
 
 
 def get_report_summary(data, filters):
-    """Generate report summary"""
+    """Generate report summary from detailed data"""
     if not data:
         return None
 
-    group_by = filters.get("group_by", "Date")
+    # Calculate totals from detailed data
+    total_revenue = sum(flt(row.get("amount", 0), 2) for row in data)
+    cash_revenue = sum(
+        flt(row.get("amount", 0), 2)
+        for row in data
+        if row.get("payment_type") == "Cash"
+    )
+    insurance_revenue = sum(
+        flt(row.get("amount", 0), 2)
+        for row in data
+        if row.get("payment_type") == "Insurance"
+    )
 
-    # Calculate totals based on group_by
-    if group_by == "Date":
-        total_revenue = sum(flt(row.get("total_revenue", 0), 2) for row in data)
-        cash_revenue = sum(flt(row.get("cash_revenue", 0), 2) for row in data)
-        insurance_revenue = sum(flt(row.get("insurance_revenue", 0), 2) for row in data)
+    # Get unique dates for average calculation
+    unique_dates = set()
+    for row in data:
+        date_key = row.get("posting_date")
+        if isinstance(date_key, str):
+            unique_dates.add(date_key)
+        elif date_key:
+            unique_dates.add(date_key.strftime("%Y-%m-%d"))
 
-        # Calculate averages
-        avg_daily_revenue = total_revenue / len(data) if data else 0
+    avg_daily_revenue = total_revenue / len(unique_dates) if unique_dates else 0
 
-        summary = [
-            {
-                "value": total_revenue,
-                "label": _("Total Revenue"),
-                "datatype": "Currency",
-                "indicator": "Green" if total_revenue > 0 else "Red",
-            },
-            {
-                "value": cash_revenue,
-                "label": _("Cash Revenue"),
-                "datatype": "Currency",
-                "indicator": "Blue",
-            },
-            {
-                "value": insurance_revenue,
-                "label": _("Insurance Revenue"),
-                "datatype": "Currency",
-                "indicator": "Orange",
-            },
-            {
-                "value": avg_daily_revenue,
-                "label": _("Average Daily Revenue"),
-                "datatype": "Currency",
-                "indicator": "Purple",
-            },
-        ]
+    summary = [
+        {
+            "value": total_revenue,
+            "label": _("Total Revenue"),
+            "datatype": "Currency",
+            "indicator": "Green" if total_revenue > 0 else "Red",
+        },
+        {
+            "value": cash_revenue,
+            "label": _("Cash Revenue"),
+            "datatype": "Currency",
+            "indicator": "Blue",
+        },
+        {
+            "value": insurance_revenue,
+            "label": _("Insurance Revenue"),
+            "datatype": "Currency",
+            "indicator": "Orange",
+        },
+        {
+            "value": avg_daily_revenue,
+            "label": _("Average Daily Revenue"),
+            "datatype": "Currency",
+            "indicator": "Purple",
+        },
+        {
+            "value": len(data),
+            "label": _("Total Transactions"),
+            "datatype": "Int",
+            "indicator": "Green",
+        },
+    ]
 
-        # Add cash vs insurance percentage
-        if total_revenue > 0:
-            cash_percentage = (cash_revenue / total_revenue) * 100
-            insurance_percentage = (insurance_revenue / total_revenue) * 100
+    # Add cash vs insurance percentage
+    if total_revenue > 0:
+        cash_percentage = (cash_revenue / total_revenue) * 100
+        insurance_percentage = (insurance_revenue / total_revenue) * 100
 
-            summary.extend(
-                [
-                    {
-                        "value": cash_percentage,
-                        "label": _("Cash %"),
-                        "datatype": "Percent",
-                        "indicator": "Green",
-                    },
-                    {
-                        "value": insurance_percentage,
-                        "label": _("Insurance %"),
-                        "datatype": "Percent",
-                        "indicator": "Blue",
-                    },
-                ]
-            )
-
-    else:
-        # For other groupings, show total revenue and count
-        total_revenue = sum(flt(row.get("total_revenue", 0), 2) for row in data)
-        total_qty = sum(
-            flt(row.get("total_qty", 0), 2)
-            for row in data
-            if row.get("total_qty") is not None
+        summary.extend(
+            [
+                {
+                    "value": cash_percentage,
+                    "label": _("Cash %"),
+                    "datatype": "Percent",
+                    "indicator": "Green",
+                },
+                {
+                    "value": insurance_percentage,
+                    "label": _("Insurance %"),
+                    "datatype": "Percent",
+                    "indicator": "Blue",
+                },
+            ]
         )
-
-        summary = [
-            {
-                "value": total_revenue,
-                "label": _("Total Revenue"),
-                "datatype": "Currency",
-                "indicator": "Green",
-            },
-            {
-                "value": len(data),
-                "label": _(f"Total {group_by}s"),
-                "datatype": "Int",
-                "indicator": "Blue",
-            },
-        ]
-
-        if total_qty > 0:
-            summary.append(
-                {
-                    "value": total_qty,
-                    "label": _("Total Quantity"),
-                    "datatype": "Float",
-                    "indicator": "Orange",
-                }
-            )
-
-            avg_rate = total_revenue / total_qty if total_qty > 0 else 0
-            summary.append(
-                {
-                    "value": avg_rate,
-                    "label": _("Average Rate"),
-                    "datatype": "Currency",
-                    "indicator": "Purple",
-                }
-            )
 
     return summary

@@ -3,6 +3,20 @@
 /* eslint-disable */
 
 frappe.query_reports["Hospital Revenue Report"] = {
+  onload: function (report) {
+    // Populate payment type options
+    frappe.call({
+      method: "hms_tz.hms_tz.report.hospital_revenue_report.hospital_revenue_report.get_payment_types",
+      callback: function (r) {
+        if (r.message) {
+          let payment_type_filter = report.get_filter("payment_type");
+          let options = r.message.map(option => option.value).join("\n");
+          payment_type_filter.df.options = options;
+          payment_type_filter.refresh();
+        }
+      }
+    });
+  },
   filters: [
     {
       fieldname: "company",
@@ -30,7 +44,10 @@ frappe.query_reports["Hospital Revenue Report"] = {
       fieldname: "payment_type",
       label: __("Payment Type"),
       fieldtype: "Select",
-      options: "\nCash\nInsurance",
+      options: "",
+      on_change: function () {
+        // This will be populated dynamically from Python
+      }
     },
     {
       fieldname: "service_type",
@@ -55,20 +72,6 @@ frappe.query_reports["Hospital Revenue Report"] = {
       label: __("Healthcare Service Unit"),
       fieldtype: "Link",
       options: "Healthcare Service Unit",
-    },
-    {
-      fieldname: "group_by",
-      label: __("Group By"),
-      fieldtype: "Select",
-      options: "Date\nService Type\nPayment Type\nDepartment\nPractitioner",
-      default: "Date",
-    },
-    {
-      fieldname: "chart_type",
-      label: __("Chart Type"),
-      fieldtype: "Select",
-      options: "Revenue Trends\nService Type Analysis\nPayment Type Analysis\nDepartment Analysis",
-      default: "Revenue Trends",
     },
   ],
 };
