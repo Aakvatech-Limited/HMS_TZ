@@ -27,62 +27,6 @@
         <FeatherIcon name="dollar-sign" class="h-3 w-3 mr-1 flex-shrink-0" />
         <span class="text-xs font-bold">{{ formatAmount(appointment.paid_amount || appointment.item_rate || 0) }}</span>
       </div>
-      
-      <!-- Time Display -->
-      <div class="flex items-center text-xs text-gray-700 mb-2">
-        <FeatherIcon name="clock" class="h-3 w-3 mr-1 flex-shrink-0" />
-        <span class="text-xs font-semibold">{{ formatTime(appointment.time_slot) }}</span>
-      </div>
-      
-      <!-- Status Badge and Actions -->
-      <div class="flex items-center justify-between">
-        <Badge
-          :label="formatStatus(appointment.status)"
-          :theme="getStatusTheme(appointment.status)"
-          size="sm"
-          class="text-xs font-bold"
-        />
-        
-        <!-- Quick Actions -->
-        <div class="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Tooltip 
-            v-if="appointment.status === 'scheduled'"
-            text="Mark as completed"
-            placement="top"
-          >
-            <Button
-              variant="ghost"
-              size="sm"
-              @click.stop="$emit('complete', appointment)"
-              class="p-1"
-            >
-              <FeatherIcon name="check" class="h-3 w-3 text-green-600" />
-            </Button>
-          </Tooltip>
-          
-          <Tooltip 
-            v-if="appointment.status !== 'cancelled'"
-            text="Cancel appointment"
-            placement="top"
-          >
-            <Button
-              variant="ghost"
-              size="sm"
-              @click.stop="$emit('cancel', appointment)"
-              class="p-1"
-            >
-              <FeatherIcon name="x" class="h-3 w-3 text-red-600" />
-            </Button>
-          </Tooltip>
-        </div>
-      </div>
-      
-      <!-- Notes Preview -->
-      <div v-if="appointment.notes" class="mt-1 pt-1 border-t border-gray-400">
-        <p class="text-xs text-gray-800 truncate font-medium" :title="appointment.notes">
-          {{ appointment.notes }}
-        </p>
-      </div>
     </div>
   </div>
 </template>
