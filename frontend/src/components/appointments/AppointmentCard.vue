@@ -4,28 +4,33 @@
     :class="cardStyleClasses"
     @click="$emit('click', appointment)"
   >
-    <div class="p-2 h-full flex flex-col justify-between">
+    <div class="p-1 h-full flex flex-col">
       <!-- Patient Name -->
-      <h4 class="text-sm font-bold text-gray-900 truncate mb-1 leading-tight">
-        {{ appointment.patient_name }}
-      </h4>
-      
-      <!-- Insurance Company -->
-      <div class="flex items-center text-xs text-gray-800 mb-1">
-        <FeatherIcon name="shield" class="h-3 w-3 mr-1 flex-shrink-0" />
-        <span class="truncate text-xs font-semibold">{{ appointment.insurance_company || 'Cash' }}</span>
+      <div class="flex-shrink-0 mb-1">
+        <h4 class="text-xs font-bold leading-tight break-words" :class="textColorClasses">
+          {{ appointment.patient_name || 'Unknown Patient' }}
+        </h4>
       </div>
       
-      <!-- Billing Item -->
-      <div v-if="appointment.billing_item" class="flex items-center text-xs text-gray-800 mb-1">
-        <FeatherIcon name="file-text" class="h-3 w-3 mr-1 flex-shrink-0" />
-        <span class="truncate text-xs font-semibold">{{ appointment.billing_item }}</span>
-      </div>
-      
-      <!-- Paid Amount / Item Rate -->
-      <div class="flex items-center text-xs text-gray-800 mb-1">
-        <FeatherIcon name="dollar-sign" class="h-3 w-3 mr-1 flex-shrink-0" />
-        <span class="text-xs font-bold">{{ formatAmount(appointment.paid_amount || appointment.item_rate || 0) }}</span>
+      <!-- Compact Info Section -->
+      <div class="flex flex-col space-y-0.5">
+        <!-- Insurance Company -->
+        <div class="flex items-start flex-shrink-0" :class="textColorClasses">
+          <FeatherIcon name="shield" class="h-2 w-2 mr-1 flex-shrink-0 mt-0.5" />
+          <span class="text-2xs font-semibold leading-tight break-words" style="font-size: 10px;">{{ appointment.insurance_company || 'Cash' }}</span>
+        </div>
+        
+        <!-- Billing Item -->
+        <div v-if="appointment.billing_item" class="flex items-start flex-shrink-0" :class="textColorClasses">
+          <FeatherIcon name="file-text" class="h-2 w-2 mr-1 flex-shrink-0 mt-0.5" />
+          <span class="text-2xs font-semibold leading-tight break-words" style="font-size: 10px;">{{ appointment.billing_item }}</span>
+        </div>
+        
+        <!-- Paid Amount / Item Rate -->
+        <div class="flex items-start flex-shrink-0" :class="textColorClasses">
+          <FeatherIcon name="dollar-sign" class="h-2 w-2 mr-1 flex-shrink-0 mt-0.5" />
+          <span class="text-2xs font-semibold leading-tight" style="font-size: 10px;">{{ formatAmount(appointment.paid_amount || appointment.item_rate || 0) }}</span>
+        </div>
       </div>
     </div>
   </div>
@@ -61,6 +66,23 @@ const cardStyleClasses = computed(() => {
       return `${baseClasses} bg-red-200 border-red-500 hover:bg-red-300`
     default:
       return `${baseClasses} bg-gray-200 border-gray-400 hover:bg-gray-300`
+  }
+})
+
+// Get text color based on status for better contrast
+const textColorClasses = computed(() => {
+  switch (props.appointment.status) {
+    case 'open':
+      return 'text-yellow-900'
+    case 'completed':
+    case 'closed':
+      return 'text-green-900'
+    case 'scheduled':
+      return 'text-orange-900'
+    case 'cancelled':
+      return 'text-red-900'
+    default:
+      return 'text-gray-900'
   }
 })
 

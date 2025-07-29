@@ -729,7 +729,7 @@ const refreshData = async () => {
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 150ms;
   background-color: #f9fafb;
-  height: 96px; /* Match grid cell height + margin */
+  height: 108px; /* Match grid cell height + margin */
   min-height: 96px;
 }
 
@@ -834,7 +834,8 @@ const refreshData = async () => {
 }
 
 .practitioners-header-fixed {
-  @apply bg-white h-24;
+  background-color: white;
+  height: 6rem; /* h-24 equivalent */
   flex: 1;
   overflow-x: auto;
   overflow-y: hidden;
@@ -900,10 +901,6 @@ const refreshData = async () => {
   background-color: #6b7280;
 }
 
-.grid-content {
-  /* space-y-0 equivalent: direct children have no vertical spacing */
-}
-
 .grid-row {
   display: flex;
   transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
@@ -927,8 +924,8 @@ const refreshData = async () => {
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 150ms;
   background-color: white;
-  height: 88px;
-  min-height: 88px;
+  height: 100px;
+  min-height: 100px;
   margin-bottom: 8px; /* Add space between cards to show bottom borders */
   border-right: 1px dotted #d1d5db;
   border-bottom: 1px dotted #d1d5db;
