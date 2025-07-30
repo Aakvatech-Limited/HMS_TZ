@@ -55,11 +55,11 @@
           </div>
         </div>
         
-        <div class="py-2">
+        <!-- <div class="py-2">
           <div class="text-sm text-gray-500">
             {{ formattedDate }}
           </div>
-        </div>
+        </div> -->
       </div>
     </div>
 
@@ -927,8 +927,8 @@ const refreshData = async () => {
   height: 100px;
   min-height: 100px;
   margin-bottom: 8px; /* Add space between cards to show bottom borders */
-  border-right: 1px dotted #d1d5db;
-  border-bottom: 1px dotted #d1d5db;
+  /* border-right: 1px dotted #d1d5db;
+  border-bottom: 1px dotted #d1d5db; */
 }
 
 .grid-cell:hover {
