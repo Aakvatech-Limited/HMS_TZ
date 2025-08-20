@@ -450,8 +450,9 @@ def get_data(args):
         if len(cash_lrpmt_data) > 0:
             data += cash_lrpmt_data
 
-        # insurance_lrpmt_data = get_insurance_lrpmt_transaction(args)
-        # if insurance_lrpmt_data: data += insurance_lrpmt_data
+        insurance_lrpmt_data = get_insurance_lrpmt_transaction(args)
+        if len(insurance_lrpmt_data) > 0:
+            data += insurance_lrpmt_data
 
         ipd_beds = get_ipd_occupancy_transactions(args)
         if len(ipd_beds) > 0:
@@ -818,172 +819,136 @@ def get_cash_lrpmt_transaction(filters):
     return data
 
 
+def get_hsr_conditions(filters):
+    if filters.get("patient"):
+        conditions = " and hsr.patient = %(patient)s"
+
+    if filters.get("appointment_no"):
+        conditions += " and hsr.appointment = %(appointment_no)s"
+
+    if filters.get("from_date"):
+        conditions += " and hsr.posting_datetime >= %(from_date)s"
+
+    if filters.get("to_date"):
+        conditions += " and hsr.posting_datetime <= %(to_date)s"
+
+    return conditions
+
 def get_insurance_lrpmt_transaction(filters):
-    conditions = get_enc_conditions(filters)
+    conditions = get_hsr_conditions(filters)
 
     data = frappe.db.sql(
         f"""
-		SELECT
-			DATE(lrpmt.creation) AS date,
-			item_template.lab_test_group AS category,
-			lrpmt.lab_test_name AS description,
-			1 AS quantity, lrpmt.amount AS rate,
-			lrpmt.amount AS total_amount,
-			pa.patient AS patient,
-			pa.patient_name AS patient_name,
-			pa.appointment_type AS appointment_type,
-			pa.insurance_company AS insurance_company,
-			pa.coverage_plan_name AS coverage_plan_name,
-			pa.authorization_number AS authorization_number,
-			pa.coverage_plan_card_number AS coverage_plan_card_number,
-			DATE(ipd_rec.admitted_datetime) as admitted_date,
-			ipd_rec.discharge_date as discharge_date
-		FROM `tabLab Prescription` lrpmt
-			INNER JOIN `tabLab Test Template` item_template ON lrpmt.lab_test_code = item_template.name
-			INNER JOIN `tabPatient Encounter` pe ON lrpmt.parent = pe.name
-			INNER JOIN `tabPatient Appointment` pa ON pe.appointment = pa.name
-			LEFT JOIN `tabInpatient Record` ipd_rec ON pa.name = ipd_rec.patient_appointment AND pe.name = ipd_rec.admission_encounter
-		WHERE lrpmt.prescribe = 0
-		AND lrpmt.is_cancelled = 0
-		AND lrpmt.is_not_available_inhouse = 0
-		AND lrpmt.parent IN (
-			SELECT pe.name FROM `tabPatient Encounter` pe
-			WHERE pe.insurance_coverage_plan != ""
-			AND pe.docstatus = 1 {conditions}
-			ORDER BY pe.creation desc
-		)
+        SELECT
+            DATE(hsr.creation) AS date,
+            item_template.service_type AS category,
+            item_template.service_name AS description,
+            1 AS quantity, item_template.amount AS rate,
+            item_template.amount AS total_amount,
+            hsr.patient AS patient,
+            hsr.patient_name AS patient_name,
+            hsr.appointment_type AS appointment_type,
+            hsr.insurance_company AS insurance_company,
+            hsr.insurance_coverage_plan AS coverage_plan_name,
+            item_template.authorization_number AS authorization_number,
+            hsr.card_no AS coverage_plan_card_number,
+            DATE(ipd_rec.admitted_datetime) as admitted_date,
+            ipd_rec.discharge_date as discharge_date
+        FROM `tabHealthcare Service Request` hsr
+            INNER JOIN `tabHealthcare Service Request Payment` item_template ON hsr.name = item_template.parent AND hsr.card_no = item_template.card_no AND item_template.service_type = "Lab Test Template" AND item_template.lrpmt_doc_created = 1
+            LEFT JOIN `tabInpatient Record` ipd_rec ON hsr.patient = ipd_rec.patient
+        WHERE hsr.docstatus = 1 {conditions}
 
-		UNION ALL
+        UNION ALL
 
-		SELECT
-			DATE(lrpmt.creation) AS date,
-			item_template.item_group AS category,
-			lrpmt.radiology_procedure_name AS description,
-			1 AS quantity,
-			lrpmt.amount AS rate,
-			lrpmt.amount AS total_amount,
-			pa.patient AS patient,
-			pa.patient_name AS patient_name,
-			pa.appointment_type AS appointment_type,
-			pa.insurance_company AS insurance_company,
-			pa.coverage_plan_name AS coverage_plan_name,
-			pa.authorization_number AS authorization_number,
-			pa.coverage_plan_card_number AS coverage_plan_card_number,
-			DATE(ipd_rec.admitted_datetime) as admitted_date,
-			ipd_rec.discharge_date as discharge_date
-		FROM `tabRadiology Procedure Prescription` lrpmt
-			INNER JOIN `tabRadiology Examination Template` item_template ON lrpmt.radiology_examination_template = item_template.name
-			INNER JOIN `tabPatient Encounter` pe ON lrpmt.parent = pe.name
-			INNER JOIN `tabPatient Appointment` pa ON pe.appointment = pa.name
-			LEFT JOIN `tabInpatient Record` ipd_rec ON pa.name = ipd_rec.patient_appointment AND pe.name = ipd_rec.admission_encounter
-		WHERE lrpmt.prescribe = 0
-		AND lrpmt.is_cancelled = 0
-		AND lrpmt.is_not_available_inhouse = 0
-		AND lrpmt.parent IN (
-			SELECT pe.name FROM `tabPatient Encounter` pe
-			WHERE pe.insurance_coverage_plan != ""
-			AND pe.docstatus = 1 {conditions}
-			ORDER BY pe.creation desc
-		)
+        SELECT
+            DATE(hsr.creation) AS date,
+            item_template.service_type AS category,
+            item_template.service_name AS description,
+            1 AS quantity, item_template.amount AS rate,
+            item_template.amount AS total_amount,
+            hsr.patient AS patient,
+            hsr.patient_name AS patient_name,
+            hsr.appointment_type AS appointment_type,
+            hsr.insurance_company AS insurance_company,
+            hsr.insurance_coverage_plan AS coverage_plan_name,
+            item_template.authorization_number AS authorization_number,
+            hsr.card_no AS coverage_plan_card_number,
+            DATE(ipd_rec.admitted_datetime) as admitted_date,
+            ipd_rec.discharge_date as discharge_date
+        FROM `tabHealthcare Service Request` hsr
+            INNER JOIN `tabHealthcare Service Request Payment` item_template ON hsr.name = item_template.parent AND hsr.card_no = item_template.card_no AND item_template.service_type = "Radiology Examination Template" AND item_template.lrpmt_doc_created = 1
+            LEFT JOIN `tabInpatient Record` ipd_rec ON hsr.patient = ipd_rec.patient
+        WHERE hsr.docstatus = 1 {conditions}
 
-		UNION ALL
+        UNION ALL
 
-		SELECT
-			DATE(lrpmt.creation) AS date,
-			item_template.item_group AS category,
-			lrpmt.procedure_name AS description,
-			1 AS quantity,
-			lrpmt.amount AS rate,
-			lrpmt.amount AS total_amount, pa.patient AS patient,
-			pa.patient_name AS patient_name,
-			pa.appointment_type AS appointment_type,
-			pa.insurance_company AS insurance_company,
-			pa.coverage_plan_name AS coverage_plan_name,
-			pa.authorization_number AS authorization_number,
-			pa.coverage_plan_card_number AS coverage_plan_card_number,
-			DATE(ipd_rec.admitted_datetime) as admitted_date,
-			ipd_rec.discharge_date as discharge_date
-		FROM `tabProcedure Prescription` lrpmt
-			INNER JOIN `tabClinical Procedure Template` item_template ON lrpmt.procedure = item_template.name
-			INNER JOIN `tabPatient Encounter` pe ON lrpmt.parent = pe.name
-			INNER JOIN `tabPatient Appointment` pa ON pe.appointment = pa.name
-			LEFT JOIN `tabInpatient Record` ipd_rec ON pa.name = ipd_rec.patient_appointment AND pe.name = ipd_rec.admission_encounter
-		WHERE lrpmt.prescribe = 0
-		AND lrpmt.is_cancelled = 0
-		AND lrpmt.is_not_available_inhouse = 0
-		AND lrpmt.parent IN (
-			SELECT pe.name FROM `tabPatient Encounter` pe
-			WHERE pe.insurance_coverage_plan != ""
-			AND pe.docstatus = 1 {conditions}
-			ORDER BY pe.creation desc
-		)
+        SELECT
+            DATE(hsr.creation) AS date,
+            item_template.service_type AS category,
+            item_template.service_name AS description,
+            1 AS quantity, item_template.amount AS rate,
+            item_template.amount AS total_amount,
+            hsr.patient AS patient,
+            hsr.patient_name AS patient_name,
+            hsr.appointment_type AS appointment_type,
+            hsr.insurance_company AS insurance_company,
+            hsr.insurance_coverage_plan AS coverage_plan_name,
+            item_template.authorization_number AS authorization_number,
+            hsr.card_no AS coverage_plan_card_number,
+            DATE(ipd_rec.admitted_datetime) as admitted_date,
+            ipd_rec.discharge_date as discharge_date
+        FROM `tabHealthcare Service Request` hsr
+            INNER JOIN `tabHealthcare Service Request Payment` item_template ON hsr.name = item_template.parent AND hsr.card_no = item_template.card_no AND item_template.service_type = "Clinical Procedure Template" AND item_template.lrpmt_doc_created = 1
+            LEFT JOIN `tabInpatient Record` ipd_rec ON hsr.patient = ipd_rec.patient
+        WHERE hsr.docstatus = 1 {conditions}
 
-		UNION ALL
+        UNION ALL
 
-		SELECT
-			DATE(lrpmt.creation) AS date,
-			item_template.item_group AS category,
-			lrpmt.drug_name AS description,
-			(lrpmt.quantity - lrpmt.quantity_returned) AS quantity,
-			lrpmt.amount AS rate,
-			((lrpmt.quantity - lrpmt.quantity_returned) * lrpmt.amount) AS total_amount,
-			pa.patient AS patient,
-			pa.patient_name AS patient_name,
-			pa.appointment_type AS appointment_type,
-			pa.insurance_company AS insurance_company,
-			pa.coverage_plan_name AS coverage_plan_name,
-			pa.authorization_number AS authorization_number,
-			pa.coverage_plan_card_number AS coverage_plan_card_number,
-			DATE(ipd_rec.admitted_datetime) as admitted_date,
-			ipd_rec.discharge_date as discharge_date
-		FROM `tabDrug Prescription` lrpmt
-			INNER JOIN `tabMedication` item_template ON lrpmt.drug_code = item_template.name
-			INNER JOIN `tabPatient Encounter` pe ON lrpmt.parent = pe.name
-			INNER JOIN `tabPatient Appointment` pa ON pe.appointment = pa.name
-			LEFT JOIN `tabInpatient Record` ipd_rec ON pa.name = ipd_rec.patient_appointment AND pe.name = ipd_rec.admission_encounter
-		WHERE lrpmt.prescribe = 0
-		AND lrpmt.is_cancelled = 0
-		AND lrpmt.is_not_available_inhouse = 0
-		AND lrpmt.parent IN (
-			SELECT pe.name FROM `tabPatient Encounter` pe
-			WHERE pe.insurance_coverage_plan != ""
-			AND pe.docstatus = 1 {conditions}
-			ORDER BY pe.creation desc
-		)
+        SELECT
+            DATE(hsr.creation) AS date,
+            item_template.service_type AS category,
+            item_template.service_name AS description,
+            1 AS quantity, item_template.amount AS rate,
+            item_template.amount AS total_amount,
+            hsr.patient AS patient,
+            hsr.patient_name AS patient_name,
+            hsr.appointment_type AS appointment_type,
+            hsr.insurance_company AS insurance_company,
+            hsr.insurance_coverage_plan AS coverage_plan_name,
+            item_template.authorization_number AS authorization_number,
+            hsr.card_no AS coverage_plan_card_number,
+            DATE(ipd_rec.admitted_datetime) as admitted_date,
+            ipd_rec.discharge_date as discharge_date
+        FROM `tabHealthcare Service Request` hsr
+            INNER JOIN `tabHealthcare Service Request Payment` item_template ON hsr.name = item_template.parent AND hsr.card_no = item_template.card_no AND item_template.service_type = "Medication" AND item_template.lrpmt_doc_created = 1
+            LEFT JOIN `tabInpatient Record` ipd_rec ON hsr.patient = ipd_rec.patient
+        WHERE hsr.docstatus = 1 {conditions}
 
-		UNION ALL
+        UNION ALL
 
-		SELECT
-			DATE(lrpmt.creation) AS date,
-			item_template.item_group AS category,
-			lrpmt.therapy_type AS description,
-			(lrpmt.no_of_sessions - lrpmt.sessions_cancelled) AS quantity,
-			lrpmt.amount AS rate,
-			((lrpmt.no_of_sessions - lrpmt.sessions_cancelled) * lrpmt.amount) AS total_amount,
-			pa.patient AS patient,
-			pa.patient_name AS patient_name,
-			pa.appointment_type AS appointment_type,
-			pa.insurance_company AS insurance_company,
-			pa.coverage_plan_name AS coverage_plan_name,
-			pa.authorization_number AS authorization_number,
-			pa.coverage_plan_card_number AS coverage_plan_card_number,
-			DATE(ipd_rec.admitted_datetime) as admitted_date,
-			ipd_rec.discharge_date as discharge_date
-		FROM `tabTherapy Plan Detail` lrpmt
-			INNER JOIN `tabTherapy Type` item_template ON lrpmt.therapy_type = item_template.name
-			INNER JOIN `tabPatient Encounter` pe ON lrpmt.parent = pe.name
-			INNER JOIN `tabPatient Appointment` pa ON pe.appointment = pa.name
-			LEFT JOIN `tabInpatient Record` ipd_rec ON pa.name = ipd_rec.patient_appointment AND pe.name = ipd_rec.admission_encounter
-		WHERE lrpmt.prescribe = 0
-		AND lrpmt.is_cancelled = 0
-		AND lrpmt.is_not_available_inhouse = 0
-		AND lrpmt.parent IN (
-			SELECT pe.name FROM `tabPatient Encounter` pe
-			WHERE pe.insurance_coverage_plan != ""
-			AND pe.docstatus = 1 {conditions}
-			ORDER BY pe.creation desc
-		)
-	""",
+        SELECT
+            DATE(hsr.creation) AS date,
+            item_template.service_type AS category,
+            item_template.service_name AS description,
+            1 AS quantity, item_template.amount AS rate,
+            item_template.amount AS total_amount,
+            hsr.patient AS patient,
+            hsr.patient_name AS patient_name,
+            hsr.appointment_type AS appointment_type,
+            hsr.insurance_company AS insurance_company,
+            hsr.insurance_coverage_plan AS coverage_plan_name,
+            item_template.authorization_number AS authorization_number,
+            hsr.card_no AS coverage_plan_card_number,
+            DATE(ipd_rec.admitted_datetime) as admitted_date,
+            ipd_rec.discharge_date as discharge_date
+        FROM `tabHealthcare Service Request` hsr
+            INNER JOIN `tabHealthcare Service Request Payment` item_template ON hsr.name = item_template.parent AND hsr.card_no = item_template.card_no AND item_template.service_type = "Therapy Type" AND item_template.lrpmt_doc_created = 1
+            LEFT JOIN `tabInpatient Record` ipd_rec ON hsr.patient = ipd_rec.patient
+        WHERE hsr.docstatus = 1 {conditions}
+
+        ORDER BY date desc
+        """,
         filters,
         as_dict=1,
     )

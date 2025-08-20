@@ -16,6 +16,7 @@
   "company",
   "appointment",
   "posting_datetime",
+  "appointment_type",
   "column_break_ajyuv",
   "practitioner",
   "source_doctype",
@@ -253,13 +254,20 @@
    "fieldtype": "Int",
    "label": "Years of Insurance",
    "read_only": 1
+  },
+  {
+   "fetch_from": "appointment.appointment_type",
+   "fieldname": "appointment_type",
+   "fieldtype": "Data",
+   "label": "Appointment Type"
   }
  ],
+ "grid_page_length": 50,
  "in_create": 1,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-03-30 19:58:01.593554",
+ "modified": "2025-07-01 16:17:55.711521",
  "modified_by": "Administrator",
  "module": "Hms Tz",
  "name": "Healthcare Service Request",
@@ -279,6 +287,7 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
