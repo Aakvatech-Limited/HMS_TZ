@@ -33,7 +33,29 @@
   "section_break_16",
   "submit_claim_month",
   "column_break_10",
-  "submit_claim_year"
+  "submit_claim_year",
+  "nhif_settings_section",
+  "hms_tz_has_cash_limit_alert",
+  "hms_tz_minimum_cash_limit_percent",
+  "column_break_qsun",
+  "hms_tz_limit_under_minimum_percent_action",
+  "hms_tz_limit_exceed_action",
+  "validate_medication_class",
+  "auto_set_pharmacy_on_patient_encounter",
+  "opd_cash_pharmacy",
+  "opd_insurance_pharmacy",
+  "ipd_insurance_pharmacy",
+  "auto_finalize_patient_encounter",
+  "valid_days_to_auto_finalize_encounter",
+  "allow_send_sms_for_multiple_labs",
+  "lab_result_sms_template",
+  "auto_create_sales_order_from_encounter",
+  "sales_order_opd_pharmacy",
+  "auto_prescribe_items_on_patient_encounter",
+  "allow_filtered_medication_on_patient_encounter",
+  "stop_change_of_lrpmt_items_after_claim_submission",
+  "allow_discharge_patient_with_pending_unbilled_invoices",
+  "parent_company"
  ],
  "fields": [
   {
@@ -191,14 +213,176 @@
    "fieldname": "validate_service_approval_number_on_lrpm_documents",
    "fieldtype": "Check",
    "label": "Validate Service Approval number on LRPM Documents"
+  },
+  {
+   "default": "0",
+   "fieldname": "hms_tz_has_cash_limit_alert",
+   "fieldtype": "Check",
+   "label": "Has Cash Limit Alert"
+  },
+  {
+   "default": "10",
+   "description": "Minimum cash limit percent to warn/stop doctor.",
+   "fieldname": "hms_tz_minimum_cash_limit_percent",
+   "fieldtype": "Int",
+   "label": "Minimum Cash Limit Percent",
+   "mandatory_depends_on": "eval:doc.hms_tz_has_cash_limit_alert == 1"
+  },
+  {
+   "default": "Warn",
+   "description": "Action to take on doctor level when cash limit is under minimum percent.",
+   "fieldname": "hms_tz_limit_under_minimum_percent_action",
+   "fieldtype": "Select",
+   "label": "Limit Under Minimum Percent Action",
+   "mandatory_depends_on": "eval:doc.hms_tz_has_cash_limit_alert == 1",
+   "options": "\nWarn\nStop\nIgnore",
+   "translatable": 1
+  },
+  {
+   "fieldname": "column_break_qsun",
+   "fieldtype": "Column Break"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "nhif_settings_section",
+   "fieldtype": "Section Break",
+   "label": "NHIF Settings"
+  },
+  {
+   "default": "Stop",
+   "description": "Action to take on doctor level when cash limit is exceeded.",
+   "fieldname": "hms_tz_limit_exceed_action",
+   "fieldtype": "Select",
+   "label": "Limit Exceed Action",
+   "mandatory_depends_on": "eval:doc.hms_tz_has_cash_limit_alert == 1",
+   "options": "\nWarn\nStop\nIgnore",
+   "translatable": 1
+  },
+  {
+   "default": "0",
+   "description": "If checked, medication class will be validated on patient encounter",
+   "fieldname": "validate_medication_class",
+   "fieldtype": "Check",
+   "label": "Validate Medication Class"
+  },
+  {
+   "default": "0",
+   "description": "If ticked then pharmacy will be auto set on patient encounter, depending on cash, insurance or inpatient",
+   "fieldname": "auto_set_pharmacy_on_patient_encounter",
+   "fieldtype": "Check",
+   "label": "Auto Set Pharmacy on Patient Encounter"
+  },
+  {
+   "fieldname": "opd_cash_pharmacy",
+   "fieldtype": "Link",
+   "label": "OPD Cash Pharmacy",
+   "mandatory_depends_on": "eval:doc.auto_set_pharmacy_on_patient_encounter == 1",
+   "options": "Healthcare Service Unit"
+  },
+  {
+   "fieldname": "opd_insurance_pharmacy",
+   "fieldtype": "Link",
+   "label": "OPD Insurance Pharmacy",
+   "mandatory_depends_on": "eval:doc.auto_set_pharmacy_on_patient_encounter == 1",
+   "options": "Healthcare Service Unit"
+  },
+  {
+   "depends_on": "eval: doc.auto_set_pharmacy_on_patient_encounter == 1",
+   "fieldname": "ipd_insurance_pharmacy",
+   "fieldtype": "Link",
+   "label": "IPD Insurance Pharmacy",
+   "mandatory_depends_on": "eval: doc.auto_set_pharmacy_on_patient_encounter == 1",
+   "options": "Healthcare Service Unit"
+  },
+  {
+   "default": "0",
+   "description": "if ticked, patient encounter will be finalized automatically after the number of days set in the field below",
+   "fieldname": "auto_finalize_patient_encounter",
+   "fieldtype": "Check",
+   "label": "Auto Finalize Patient Encounter"
+  },
+  {
+   "depends_on": "eval:doc.auto_finalize_patient_encounter == 1",
+   "description": "Number of days to finalize patient encounter",
+   "fieldname": "valid_days_to_auto_finalize_encounter",
+   "fieldtype": "Int",
+   "label": "valid days to finalize patient encounter",
+   "mandatory_depends_on": "eval:doc.auto_finalize_patient_encounter == 1"
+  },
+  {
+   "default": "0",
+   "description": "Allow sending SMS for all lab results per single encounter",
+   "fieldname": "allow_send_sms_for_multiple_labs",
+   "fieldtype": "Check",
+   "label": "Allow Send SMS for Multiple Labs"
+  },
+  {
+   "default": "Dear {{doc.patient_name}}, your lab results are ready. Please visit the hospital to collect them.",
+   "depends_on": "eval:doc.allow_send_sms_for_multiple_labs == 1",
+   "description": "This sms SMS template will be a message sent to patient",
+   "fieldname": "lab_result_sms_template",
+   "fieldtype": "Small Text",
+   "label": "Lab Result SMS Template",
+   "mandatory_depends_on": "eval:doc.allow_send_sms_for_multiple_labs == 1",
+   "translatable": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "auto_create_sales_order_from_encounter",
+   "fieldtype": "Check",
+   "label": "Auto Create Sales Order from Encounter"
+  },
+  {
+   "depends_on": "eval: doc.auto_create_sales_order_from_encounter == 1",
+   "fieldname": "sales_order_opd_pharmacy",
+   "fieldtype": "Link",
+   "label": "Sales Order OPD Pharmacy",
+   "mandatory_depends_on": "eval: doc.auto_create_sales_order_from_encounter == 1",
+   "options": "Warehouse"
+  },
+  {
+   "default": "0",
+   "description": "If ticked, Uncovered items will be marked as prescribed and required to be paid in cash on patient encounter",
+   "fieldname": "auto_prescribe_items_on_patient_encounter",
+   "fieldtype": "Check",
+   "label": "Auto Prescribe Items on Patient Encounter"
+  },
+  {
+   "default": "0",
+   "description": "Allow to filter medication on Patient Encounter based on allowed price list settled on each medication record",
+   "fieldname": "allow_filtered_medication_on_patient_encounter",
+   "fieldtype": "Check",
+   "label": "Allow Filtered Medication on Patient Encounter"
+  },
+  {
+   "default": "0",
+   "description": "If checked, user will not be able to Change/Cancel/Return LRPMT items after NHIF Claim submission.",
+   "fieldname": "stop_change_of_lrpmt_items_after_claim_submission",
+   "fieldtype": "Check",
+   "label": "Stop Change/Cancel/Return of LRPMT Items After Claim Submission"
+  },
+  {
+   "default": "0",
+   "description": "If ticked, Cash patient can be discharged even if there are unbilled invoices",
+   "fieldname": "allow_discharge_patient_with_pending_unbilled_invoices",
+   "fieldtype": "Check",
+   "label": "Allow Discharge Patient With Pending Unbilled Invoices"
+  },
+  {
+   "fieldname": "parent_company",
+   "fieldtype": "Link",
+   "ignore_user_permissions": 1,
+   "label": "Parent Company",
+   "options": "Company"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2023-09-28 23:11:07.972344",
+ "modified": "2025-09-07 23:05:35.472798",
  "modified_by": "Administrator",
  "module": "NHIF",
  "name": "Company NHIF Settings",
+ "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
   {
@@ -214,7 +398,9 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
+ "states": [],
  "track_changes": 1
 }
