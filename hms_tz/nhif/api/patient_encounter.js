@@ -1102,7 +1102,7 @@ frappe.ui.form.on("Drug Prescription", {
     let row = frappe.get_doc(cdt, cdn);
     if (row.prescribe == 1) {
       frappe.db
-        .get_value("Company", frm.doc.company, [
+        .get_value("Company NHIF Settings", frm.doc.company, [
           "auto_set_pharmacy_on_patient_encounter",
           "opd_cash_pharmacy",
           "ipd_cash_pharmacy",
@@ -1893,7 +1893,7 @@ var validate_healthcare_package_order_items = (frm) => {
 var filter_drug_prescriptions = (frm) => {
   frappe.db
     .get_value(
-      "Company",
+      "Company NHIF Settings",
       frm.doc.company,
       "allow_filtered_medication_on_patient_encounter"
     )

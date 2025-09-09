@@ -197,7 +197,7 @@ class MedicationChangeRequest(Document):
 
     def set_drugs(self, row, inpatient_record=None):
         is_so_from_encounter = frappe.get_cached_value(
-            "Company", self.company, "auto_create_sales_order_from_encounter"
+            "Company NHIF Settings", self.company, "auto_create_sales_order_from_encounter"
         )
         if self.insurance_subscription:
             # add only covered items unser insurance coverage, means items that

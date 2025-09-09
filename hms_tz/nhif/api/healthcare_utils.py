@@ -2271,9 +2271,9 @@ def auto_finalize_patient_encounters():
                 continue
 
     companies = frappe.get_all(
-        "Company",
+        "Company NHIF Settings",
         {"auto_finalize_patient_encounter": 1},
-        ["name", "valid_days_to_auto_finalize_encounter"],
+        ["company", "valid_days_to_auto_finalize_encounter"],
     )
 
     for row in companies:
@@ -2288,7 +2288,7 @@ def auto_finalize_patient_encounters():
                 "duplicated": 0,
                 "finalized": 0,
                 "encounter_date": ["<=", date],
-                "company": row.name,
+                "company": row.company,
             },
             ["name", "reference_encounter", "inpatient_record"],
             order_by="modified desc",
@@ -2308,7 +2308,7 @@ def validate_nhif_patient_claim_status(doctype_name, company, appointment, insur
     """
     if (
         frappe.get_cached_value(
-            "Company",
+            "Company NHIF Settings",
             company,
             "stop_change_of_lrpmt_items_after_claim_submission",
         )

@@ -266,7 +266,7 @@ def validate_invoiced_inpatient(inpatient_record):
         return
     if (
         frappe.get_cached_value(
-            "Company",
+            "Company NHIF Settings",
             inpatient_record.company,
             "allow_discharge_patient_with_pending_unbilled_invoices",
         )

@@ -140,7 +140,7 @@ def validate_medication_class(doc, row):
         row (dict): Delivery Note Item
     """
 
-    validate_medication_class = frappe.get_cached_value("Company", doc.company, "validate_medication_class")
+    validate_medication_class = frappe.get_cached_value("Company NHIF Settings", doc.company, "validate_medication_class")
     if int(validate_medication_class) == 0:
         return
 

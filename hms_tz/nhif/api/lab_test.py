@@ -266,7 +266,7 @@ def send_sms_for_lab_results(doc):
             allow_send_sms_for_multiple_labs,
             lab_result_sms_template,
         ) = frappe.get_cached_value(
-            "Company",
+            "Company NHIF Settings",
             doc.company,
             ["allow_send_sms_for_multiple_labs", "lab_result_sms_template"],
         )
