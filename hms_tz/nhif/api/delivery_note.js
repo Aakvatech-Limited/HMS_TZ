@@ -267,7 +267,7 @@ frappe.ui.form.on("Delivery Note Item", {
         ref_docname: frm.docname,
         service_type: "Medication",
         service_name: "",
-        qty: 1,
+        qty: row.qty,
         item_code: row.item_code,
         reference_name: row.reference_name,
         reference_doctype: row.reference_doctype,

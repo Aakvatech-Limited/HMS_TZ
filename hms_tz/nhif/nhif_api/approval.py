@@ -11,13 +11,42 @@ from hms_tz.nhif.doctype.nhif_response_log.nhif_response_log import add_log
 from hms_tz.nhif.nhif_api.referral import get_disease_code
 
 
+def get_item_qty(doc, qty=None, item_code=None, reference_name=None, reference_doctype=None, item_row=None):
+    """Resolve quantity from provided value, item row or parent document."""
+
+    if qty:
+        return qty
+
+    if item_row:
+        row_qty = item_row.get("qty") or item_row.get("stock_qty") or item_row.get("quantity")
+        if row_qty:
+            return row_qty
+
+    if doc.doctype == "Delivery Note":
+        for row in doc.get("items", []):
+            if item_code and row.item_code != item_code:
+                continue
+            if reference_name and row.reference_name != reference_name:
+                continue
+            if reference_doctype and row.reference_doctype != reference_doctype:
+                continue
+
+            return row.qty or row.get("stock_qty") or 1
+
+    for field in ("qty", "quantity", "stock_qty"):
+        if doc.get(field):
+            return doc.get(field)
+
+    return 1
+
+
 @frappe.whitelist()
 def get_service_approval(
     ref_doctype,
     ref_docname,
     service_type,
     service_name,
-    qty=1,
+    qty=None,
     item_code=None,
     reference_name=None,
     reference_doctype=None,
@@ -35,12 +64,20 @@ def get_service_approval(
             "status": "error",
         }
 
+    resolved_qty = get_item_qty(
+        doc,
+        qty,
+        item_code=item_code,
+        reference_name=reference_name,
+        reference_doctype=reference_doctype,
+    )
+
     payload = get_request_approval_payload(
         doc,
         settings_doc.facility_code,
         service_type,
         service_name,
-        qty,
+        qty=resolved_qty,
         item_code=item_code,
         reference_name=reference_name,
         reference_doctype=reference_doctype,
@@ -209,7 +246,7 @@ def update_service_approval(
     ref_docname,
     service_type,
     service_name,
-    qty=1,
+    qty=None,
     item_row=None
 ):
     if not ref_doctype or not ref_docname:
@@ -225,13 +262,22 @@ def update_service_approval(
     
     appointment = doc.get("appointment") or doc.get("hms_tz_appointment_no")
 
+    resolved_qty = get_item_qty(
+        doc,
+        qty,
+        item_code=item_row.get("item_code") if item_row else None,
+        reference_name=item_row.get("reference_name") if item_row else None,
+        reference_doctype=item_row.get("reference_doctype") if item_row else None,
+        item_row=item_row,
+    )
+
     payload = get_update_approval_payload(
         doc,
         settings_doc.facility_code,
         service_type,
         service_name,
         appointment,
-        qty,
+        resolved_qty,
         item_row=item_row,
     )
 
@@ -293,11 +339,13 @@ def issue_approved_service(
     service_name,
     fingerprint,
     fpcode,
-    qty=1,
+    qty=None,
     rate=0,
     settings_doc=None,
     biometric_method="NONE",
 ):
+    resolved_qty = get_item_qty(doc, qty)
+
     item = ""
     item_rate = 0
     if doc.doctype == "Delivery Note":
@@ -323,7 +371,7 @@ def issue_approved_service(
         "fpCode": fpcode,
         "imageData": fingerprint,
         "description": service_name,
-        "quantity": qty,
+        "quantity": resolved_qty,
         "unitPrice": item_rate or 0,
         "createdBy": doc.get("practitioner") or doc.get("healthcare_practitioner"),
     }
@@ -384,11 +432,19 @@ def get_request_approval_payload(
     facility_code,
     service_type,
     service_name,
-    qty=1,
+    qty=None,
     item_code=None,
     reference_name=None,
     reference_doctype=None,
 ):
+    resolved_qty = get_item_qty(
+        doc,
+        qty,
+        item_code=item_code,
+        reference_name=reference_name,
+        reference_doctype=reference_doctype,
+    )
+
     patient_doc = frappe.get_cached_doc("Patient", doc.patient)
 
     appointment = doc.get("appointment") or doc.get("hms_tz_appointment_no")
@@ -426,7 +482,7 @@ def get_request_approval_payload(
             appointment_info.years_of_insurance,
             appointment,
             practitioner,
-            qty=qty,
+            qty=resolved_qty,
             item_code=item_code,
             reference_name=reference_name,
             reference_doctype=reference_doctype,
@@ -472,11 +528,19 @@ def get_authorized_items(
     years_of_insurance,
     appointment,
     practitioner,
-    qty=1,
+    qty=None,
     item_code=None,
     reference_name=None,
     reference_doctype=None,
 ):
+    actual_qty = get_item_qty(
+        doc,
+        qty,
+        item_code=item_code,
+        reference_name=reference_name,
+        reference_doctype=reference_doctype,
+    )
+
     items = []
 
     item = ""
@@ -520,7 +584,7 @@ def get_authorized_items(
             "serviceTypeID": service_type_id,
             "itemCode": ref_code,
             "description": service_name,
-            "quantityRequested": qty,
+            "quantityRequested": actual_qty,
             "unitPrice": item_rate or 0,
             "percentCovered": percent_covered or 100,
             "createdBy": practitioner,
@@ -537,9 +601,18 @@ def get_update_approval_payload(
     service_type,
     service_name,
     appointment,
-    qty=1,
+    qty=None,
     item_row=None,
 ):
+    actual_qty = get_item_qty(
+        doc,
+        qty,
+        item_code=item_row.get("item_code") if item_row else None,
+        reference_name=item_row.get("reference_name") if item_row else None,
+        reference_doctype=item_row.get("reference_doctype") if item_row else None,
+        item_row=item_row,
+    )
+
     patient_doc = frappe.get_cached_doc("Patient", doc.patient)
     appointment_info = get_appointment_details(appointment)
 
@@ -634,8 +707,8 @@ def get_update_approval_payload(
                 "serviceTypeID": service_type_id,
                 "itemCode": ref_code,
                 "description": service_name,
-                "quantity": qty,
-                "quantityRequested": qty,
+                "quantity": actual_qty,
+                "quantityRequested": actual_qty,
                 "unitPrice": item_rate or 0,
                 "percentCovered": percent_covered,
                 "createdBy": practitioner,
