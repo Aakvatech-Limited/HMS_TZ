@@ -44,7 +44,7 @@ def execute(filters=None):
 def get_columns():
     columns = [
         {
-            "label": _("Temlate Name"),
+            "label": _("Template Name"),
             "fieldname": "template_name",
             "width": 250,
         },
@@ -67,75 +67,88 @@ def get_columns():
 
 
 def get_item_prices(filters):
+    item_group_condition = ""
+    price_list_condition = ""
+    values = {}
+
+    if filters.get("item_group"):
+        values["item_group"] = filters["item_group"]
+
+    if filters.get("price_list"):
+        price_list_condition = " AND ip.price_list = %(price_list)s"
+        values["price_list"] = filters["price_list"]
+
+    lab_group_condition = " AND temp.lab_test_group = %(item_group)s" if filters.get("item_group") else ""
+    if filters.get("item_group"):
+        item_group_condition = " AND temp.item_group = %(item_group)s"
+
     return frappe.db.sql(
         """
-		SELECT  distinct temp.lab_test_name as template_name,
-				temp.lab_test_code as item_code,
-				if(temp.disabled = 0, "Active", "Disabled") as status,
-				temp.lab_test_group as item_group,
-				IF(ip.price_list IS NULL, "NO PRICE", ip.price_list) as price_list,
-				IF(ip.price_list IS NULL, 0, ip.price_list_rate) as price_list_rate,
-				IF(ip.price_list IS NULL, "2020-01-01", ip.valid_from) as valid_from
-		FROM `tabLab Test Template` temp LEFT JOIN `tabItem Price` ip ON temp.item = ip.item_code
-		UNION
-		SELECT  distinct temp.name as template_name,
-				temp.item_code as item_code,
-				if(temp.disabled = 0, "Active", "Disabled") as status,
-				temp.item_group as item_group,
-				IF(ip.price_list IS NULL, "NO PRICE", ip.price_list) as price_list,
-				IF(ip.price_list IS NULL, 0, ip.price_list_rate) as price_list_rate,
-				IF(ip.price_list IS NULL, "2020-01-01", ip.valid_from) as valid_from
-		FROM `tabRadiology Examination Template` temp LEFT JOIN `tabItem Price` ip ON temp.item = ip.item_code
-		UNION
-		SELECT  distinct temp.medication_name as template_name,
-				temp.item_code as item_code,
-				if(temp.disabled = 0, "Active", "Disabled") as status,
-				temp.item_group as item_group,
-				IF(ip.price_list IS NULL, "NO PRICE", ip.price_list) as price_list,
-				IF(ip.price_list IS NULL, 0, ip.price_list_rate) as price_list_rate,
-				IF(ip.price_list IS NULL, "2020-01-01", ip.valid_from) as valid_from
-		FROM `tabMedication` temp LEFT JOIN `tabItem Price` ip ON temp.item = ip.item_code
-		UNION
-		SELECT  distinct temp.therapy_type as template_name,
-				temp.item_code as item_code,
-				if(temp.disabled = 0, "Active", "Disabled") as status,
-				temp.item_group as item_group,
-				IF(ip.price_list IS NULL, "NO PRICE", ip.price_list) as price_list,
-				IF(ip.price_list IS NULL, 0, ip.price_list_rate) as price_list_rate,
-				IF(ip.price_list IS NULL, "2020-01-01", ip.valid_from) as valid_from
-		FROM `tabTherapy Type` temp LEFT JOIN `tabItem Price` ip ON temp.item = ip.item_code
-		UNION
-		SELECT  distinct temp.template as template_name,
-				temp.item_code as item_code,
-				if(temp.disabled = 0, "Active", "Disabled") as status,
-				temp.item_group as item_group,
-				IF(ip.price_list IS NULL, "NO PRICE", ip.price_list) as price_list,
-				IF(ip.price_list IS NULL, 0, ip.price_list_rate) as price_list_rate,
-				IF(ip.price_list IS NULL, "2020-01-01", ip.valid_from) as valid_from
-		FROM `tabClinical Procedure Template` temp LEFT JOIN `tabItem Price` ip ON temp.item = ip.item_code
-		UNION
-		SELECT  distinct temp.service_unit_type as template_name,
-				temp.item_code as item_code,
-				if(temp.disabled = 0, "Active", "Disabled") as status,
-				temp.item_group as item_group,
-				IF(ip.price_list IS NULL, "NO PRICE", ip.price_list) as price_list,
-				IF(ip.price_list IS NULL, 0, ip.price_list_rate) as price_list_rate,
-				IF(ip.price_list IS NULL, "2020-01-01", ip.valid_from) as valid_from
-		FROM `tabHealthcare Service Unit Type` temp LEFT JOIN `tabItem Price` ip ON temp.item = ip.item_code
-		ORDER BY item_group, template_name ASC
-	""",
+        SELECT DISTINCT temp.lab_test_name as template_name,
+                temp.lab_test_code as item_code,
+                IF(temp.disabled = 0, "Active", "Disabled") as status,
+                temp.lab_test_group as item_group,
+                IF(ip.price_list IS NULL, "NO PRICE", ip.price_list) as price_list,
+                IF(ip.price_list IS NULL, 0, ip.price_list_rate) as price_list_rate,
+                IF(ip.price_list IS NULL, "2020-01-01", ip.valid_from) as valid_from
+        FROM `tabLab Test Template` temp LEFT JOIN `tabItem Price` ip ON temp.item = ip.item_code
+        WHERE 1=1 {lab_group_condition} {price_list_condition}
+        UNION
+        SELECT DISTINCT temp.name as template_name,
+                temp.item_code as item_code,
+                IF(temp.disabled = 0, "Active", "Disabled") as status,
+                temp.item_group as item_group,
+                IF(ip.price_list IS NULL, "NO PRICE", ip.price_list) as price_list,
+                IF(ip.price_list IS NULL, 0, ip.price_list_rate) as price_list_rate,
+                IF(ip.price_list IS NULL, "2020-01-01", ip.valid_from) as valid_from
+        FROM `tabRadiology Examination Template` temp LEFT JOIN `tabItem Price` ip ON temp.item = ip.item_code
+        WHERE 1=1 {item_group_condition} {price_list_condition}
+        UNION
+        SELECT DISTINCT temp.medication_name as template_name,
+                temp.item_code as item_code,
+                IF(temp.disabled = 0, "Active", "Disabled") as status,
+                temp.item_group as item_group,
+                IF(ip.price_list IS NULL, "NO PRICE", ip.price_list) as price_list,
+                IF(ip.price_list IS NULL, 0, ip.price_list_rate) as price_list_rate,
+                IF(ip.price_list IS NULL, "2020-01-01", ip.valid_from) as valid_from
+        FROM `tabMedication` temp LEFT JOIN `tabItem Price` ip ON temp.item = ip.item_code
+        WHERE 1=1 {item_group_condition} {price_list_condition}
+        UNION
+        SELECT DISTINCT temp.therapy_type as template_name,
+                temp.item_code as item_code,
+                IF(temp.disabled = 0, "Active", "Disabled") as status,
+                temp.item_group as item_group,
+                IF(ip.price_list IS NULL, "NO PRICE", ip.price_list) as price_list,
+                IF(ip.price_list IS NULL, 0, ip.price_list_rate) as price_list_rate,
+                IF(ip.price_list IS NULL, "2020-01-01", ip.valid_from) as valid_from
+        FROM `tabTherapy Type` temp LEFT JOIN `tabItem Price` ip ON temp.item = ip.item_code
+        WHERE 1=1 {item_group_condition} {price_list_condition}
+        UNION
+        SELECT DISTINCT temp.template as template_name,
+                temp.item_code as item_code,
+                IF(temp.disabled = 0, "Active", "Disabled") as status,
+                temp.item_group as item_group,
+                IF(ip.price_list IS NULL, "NO PRICE", ip.price_list) as price_list,
+                IF(ip.price_list IS NULL, 0, ip.price_list_rate) as price_list_rate,
+                IF(ip.price_list IS NULL, "2020-01-01", ip.valid_from) as valid_from
+        FROM `tabClinical Procedure Template` temp LEFT JOIN `tabItem Price` ip ON temp.item = ip.item_code
+        WHERE 1=1 {item_group_condition} {price_list_condition}
+        UNION
+        SELECT DISTINCT temp.service_unit_type as template_name,
+                temp.item_code as item_code,
+                IF(temp.disabled = 0, "Active", "Disabled") as status,
+                temp.item_group as item_group,
+                IF(ip.price_list IS NULL, "NO PRICE", ip.price_list) as price_list,
+                IF(ip.price_list IS NULL, 0, ip.price_list_rate) as price_list_rate,
+                IF(ip.price_list IS NULL, "2020-01-01", ip.valid_from) as valid_from
+        FROM `tabHealthcare Service Unit Type` temp LEFT JOIN `tabItem Price` ip ON temp.item = ip.item_code
+        WHERE 1=1 {item_group_condition} {price_list_condition}
+        ORDER BY item_group, template_name ASC
+    """.format(
+            lab_group_condition=lab_group_condition,
+            item_group_condition=item_group_condition,
+            price_list_condition=price_list_condition,
+        ),
+        values,
         as_dict=1,
     )
-
-
-# def get_item_prices(filters):
-# 	return frappe.db.sql("""
-# 		SELECT 	i.name as item_code,
-# 				i.item_name,
-# 				if(i.disabled = 0, "Active", "Disabled") as status,
-# 				i.item_group,
-# 				ip.price_list,
-# 				ip.price_list_rate
-# 		FROM `tabItem` i LEFT JOIN `tabItem Price` ip ON i.name = ip.item_code
-# 		ORDER BY i.item_group, i.item_name ASC
-# 	""", as_dict = 1)
