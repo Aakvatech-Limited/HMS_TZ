@@ -67,20 +67,17 @@ def get_columns():
 
 
 def get_item_prices(filters):
-    item_group_condition = ""
+    item_code_condition = ""
     price_list_condition = ""
     values = {}
 
-    if filters.get("item_group"):
-        values["item_group"] = filters["item_group"]
+    if filters.get("item_code"):
+        item_code_condition = " AND ip.item_code = %(item_code)s"
+        values["item_code"] = filters["item_code"]
 
     if filters.get("price_list"):
         price_list_condition = " AND ip.price_list = %(price_list)s"
         values["price_list"] = filters["price_list"]
-
-    lab_group_condition = " AND temp.lab_test_group = %(item_group)s" if filters.get("item_group") else ""
-    if filters.get("item_group"):
-        item_group_condition = " AND temp.item_group = %(item_group)s"
 
     return frappe.db.sql(
         """
@@ -92,7 +89,7 @@ def get_item_prices(filters):
                 IF(ip.price_list IS NULL, 0, ip.price_list_rate) as price_list_rate,
                 IF(ip.price_list IS NULL, "2020-01-01", ip.valid_from) as valid_from
         FROM `tabLab Test Template` temp LEFT JOIN `tabItem Price` ip ON temp.item = ip.item_code
-        WHERE 1=1 {lab_group_condition} {price_list_condition}
+        WHERE 1=1 {item_code_condition} {price_list_condition}
         UNION
         SELECT DISTINCT temp.name as template_name,
                 temp.item_code as item_code,
@@ -102,7 +99,7 @@ def get_item_prices(filters):
                 IF(ip.price_list IS NULL, 0, ip.price_list_rate) as price_list_rate,
                 IF(ip.price_list IS NULL, "2020-01-01", ip.valid_from) as valid_from
         FROM `tabRadiology Examination Template` temp LEFT JOIN `tabItem Price` ip ON temp.item = ip.item_code
-        WHERE 1=1 {item_group_condition} {price_list_condition}
+        WHERE 1=1 {item_code_condition} {price_list_condition}
         UNION
         SELECT DISTINCT temp.medication_name as template_name,
                 temp.item_code as item_code,
@@ -112,7 +109,7 @@ def get_item_prices(filters):
                 IF(ip.price_list IS NULL, 0, ip.price_list_rate) as price_list_rate,
                 IF(ip.price_list IS NULL, "2020-01-01", ip.valid_from) as valid_from
         FROM `tabMedication` temp LEFT JOIN `tabItem Price` ip ON temp.item = ip.item_code
-        WHERE 1=1 {item_group_condition} {price_list_condition}
+        WHERE 1=1 {item_code_condition} {price_list_condition}
         UNION
         SELECT DISTINCT temp.therapy_type as template_name,
                 temp.item_code as item_code,
@@ -122,7 +119,7 @@ def get_item_prices(filters):
                 IF(ip.price_list IS NULL, 0, ip.price_list_rate) as price_list_rate,
                 IF(ip.price_list IS NULL, "2020-01-01", ip.valid_from) as valid_from
         FROM `tabTherapy Type` temp LEFT JOIN `tabItem Price` ip ON temp.item = ip.item_code
-        WHERE 1=1 {item_group_condition} {price_list_condition}
+        WHERE 1=1 {item_code_condition} {price_list_condition}
         UNION
         SELECT DISTINCT temp.template as template_name,
                 temp.item_code as item_code,
@@ -132,7 +129,7 @@ def get_item_prices(filters):
                 IF(ip.price_list IS NULL, 0, ip.price_list_rate) as price_list_rate,
                 IF(ip.price_list IS NULL, "2020-01-01", ip.valid_from) as valid_from
         FROM `tabClinical Procedure Template` temp LEFT JOIN `tabItem Price` ip ON temp.item = ip.item_code
-        WHERE 1=1 {item_group_condition} {price_list_condition}
+        WHERE 1=1 {item_code_condition} {price_list_condition}
         UNION
         SELECT DISTINCT temp.service_unit_type as template_name,
                 temp.item_code as item_code,
@@ -142,11 +139,10 @@ def get_item_prices(filters):
                 IF(ip.price_list IS NULL, 0, ip.price_list_rate) as price_list_rate,
                 IF(ip.price_list IS NULL, "2020-01-01", ip.valid_from) as valid_from
         FROM `tabHealthcare Service Unit Type` temp LEFT JOIN `tabItem Price` ip ON temp.item = ip.item_code
-        WHERE 1=1 {item_group_condition} {price_list_condition}
+        WHERE 1=1 {item_code_condition} {price_list_condition}
         ORDER BY item_group, template_name ASC
     """.format(
-            lab_group_condition=lab_group_condition,
-            item_group_condition=item_group_condition,
+            item_code_condition=item_code_condition,
             price_list_condition=price_list_condition,
         ),
         values,

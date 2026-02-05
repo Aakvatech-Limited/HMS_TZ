@@ -11,10 +11,10 @@ frappe.query_reports["Item Prices by Price List"] = {
       options: "Price List",
     },
     {
-      fieldname: "item_group",
-      label: __("Item Group"),
+      fieldname: "item_code",
+      label: __("Item Code"),
       fieldtype: "Link",
-      options: "Item Group",
+      options: "Item",
     }
   ],
 };
