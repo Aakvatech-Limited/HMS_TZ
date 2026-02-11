@@ -6,6 +6,8 @@ from __future__ import unicode_literals
 import frappe
 import pandas as pd
 from frappe import _
+from frappe.query_builder import Case
+from frappe.query_builder.functions import IfNull
 
 
 def execute(filters=None):
@@ -44,7 +46,7 @@ def execute(filters=None):
 def get_columns():
     columns = [
         {
-            "label": _("Temlate Name"),
+            "label": _("Template Name"),
             "fieldname": "template_name",
             "width": 250,
         },
@@ -67,75 +69,98 @@ def get_columns():
 
 
 def get_item_prices(filters):
-    return frappe.db.sql(
-        """
-		SELECT  distinct temp.lab_test_name as template_name,
-				temp.lab_test_code as item_code,
-				if(temp.disabled = 0, "Active", "Disabled") as status,
-				temp.lab_test_group as item_group,
-				IF(ip.price_list IS NULL, "NO PRICE", ip.price_list) as price_list,
-				IF(ip.price_list IS NULL, 0, ip.price_list_rate) as price_list_rate,
-				IF(ip.price_list IS NULL, "2020-01-01", ip.valid_from) as valid_from
-		FROM `tabLab Test Template` temp LEFT JOIN `tabItem Price` ip ON temp.item = ip.item_code
-		UNION
-		SELECT  distinct temp.name as template_name,
-				temp.item_code as item_code,
-				if(temp.disabled = 0, "Active", "Disabled") as status,
-				temp.item_group as item_group,
-				IF(ip.price_list IS NULL, "NO PRICE", ip.price_list) as price_list,
-				IF(ip.price_list IS NULL, 0, ip.price_list_rate) as price_list_rate,
-				IF(ip.price_list IS NULL, "2020-01-01", ip.valid_from) as valid_from
-		FROM `tabRadiology Examination Template` temp LEFT JOIN `tabItem Price` ip ON temp.item = ip.item_code
-		UNION
-		SELECT  distinct temp.medication_name as template_name,
-				temp.item_code as item_code,
-				if(temp.disabled = 0, "Active", "Disabled") as status,
-				temp.item_group as item_group,
-				IF(ip.price_list IS NULL, "NO PRICE", ip.price_list) as price_list,
-				IF(ip.price_list IS NULL, 0, ip.price_list_rate) as price_list_rate,
-				IF(ip.price_list IS NULL, "2020-01-01", ip.valid_from) as valid_from
-		FROM `tabMedication` temp LEFT JOIN `tabItem Price` ip ON temp.item = ip.item_code
-		UNION
-		SELECT  distinct temp.therapy_type as template_name,
-				temp.item_code as item_code,
-				if(temp.disabled = 0, "Active", "Disabled") as status,
-				temp.item_group as item_group,
-				IF(ip.price_list IS NULL, "NO PRICE", ip.price_list) as price_list,
-				IF(ip.price_list IS NULL, 0, ip.price_list_rate) as price_list_rate,
-				IF(ip.price_list IS NULL, "2020-01-01", ip.valid_from) as valid_from
-		FROM `tabTherapy Type` temp LEFT JOIN `tabItem Price` ip ON temp.item = ip.item_code
-		UNION
-		SELECT  distinct temp.template as template_name,
-				temp.item_code as item_code,
-				if(temp.disabled = 0, "Active", "Disabled") as status,
-				temp.item_group as item_group,
-				IF(ip.price_list IS NULL, "NO PRICE", ip.price_list) as price_list,
-				IF(ip.price_list IS NULL, 0, ip.price_list_rate) as price_list_rate,
-				IF(ip.price_list IS NULL, "2020-01-01", ip.valid_from) as valid_from
-		FROM `tabClinical Procedure Template` temp LEFT JOIN `tabItem Price` ip ON temp.item = ip.item_code
-		UNION
-		SELECT  distinct temp.service_unit_type as template_name,
-				temp.item_code as item_code,
-				if(temp.disabled = 0, "Active", "Disabled") as status,
-				temp.item_group as item_group,
-				IF(ip.price_list IS NULL, "NO PRICE", ip.price_list) as price_list,
-				IF(ip.price_list IS NULL, 0, ip.price_list_rate) as price_list_rate,
-				IF(ip.price_list IS NULL, "2020-01-01", ip.valid_from) as valid_from
-		FROM `tabHealthcare Service Unit Type` temp LEFT JOIN `tabItem Price` ip ON temp.item = ip.item_code
-		ORDER BY item_group, template_name ASC
-	""",
-        as_dict=1,
+    """Get item prices from various healthcare templates using query builder"""
+
+    # Define the healthcare templates with their specific field mappings
+    templates = [
+        {
+            "doctype": "Lab Test Template",
+            "template_name_field": "lab_test_name",
+            "item_code_field": "lab_test_code",
+            "item_group_field": "lab_test_group"
+        },
+        {
+            "doctype": "Radiology Examination Template",
+            "template_name_field": "name",
+            "item_code_field": "item_code",
+            "item_group_field": "item_group"
+        },
+        {
+            "doctype": "Medication",
+            "template_name_field": "medication_name",
+            "item_code_field": "item_code",
+            "item_group_field": "item_group"
+        },
+        {
+            "doctype": "Therapy Type",
+            "template_name_field": "therapy_type",
+            "item_code_field": "item_code",
+            "item_group_field": "item_group"
+        },
+        {
+            "doctype": "Clinical Procedure Template",
+            "template_name_field": "template",
+            "item_code_field": "item_code",
+            "item_group_field": "item_group"
+        },
+        {
+            "doctype": "Healthcare Service Unit Type",
+            "template_name_field": "service_unit_type",
+            "item_code_field": "item_code",
+            "item_group_field": "item_group"
+        }
+    ]
+
+    queries = []
+
+    for template_config in templates:
+        query = build_template_query(template_config, filters)
+        queries.append(query)
+
+    # Union all queries
+    final_query = queries[0]
+    for query in queries[1:]:
+        final_query = final_query.union(query)
+
+    # Order by item_group and template_name
+    final_query = final_query.orderby("item_group").orderby("template_name")
+
+    return final_query.run(as_dict=True)
+
+
+def build_template_query(template_config, filters):
+    """Build a query for a specific template doctype"""
+    qb = frappe.qb
+
+    # Get table references
+    temp = qb.DocType(template_config["doctype"])
+    ip = qb.DocType("Item Price")
+
+    # Build the select query with LEFT JOIN
+    query = (
+        qb.from_(temp)
+        .left_join(ip)
+        .on(temp.item == ip.item_code)
+        .select(
+            temp[template_config["template_name_field"]].as_("template_name"),
+            temp[template_config["item_code_field"]].as_("item_code"),
+            Case()
+                .when(temp.disabled == 0, "Active")
+                .else_("Disabled")
+                .as_("status"),
+            temp[template_config["item_group_field"]].as_("item_group"),
+            IfNull(ip.price_list, "NO PRICE").as_("price_list"),
+            IfNull(ip.price_list_rate, 0).as_("price_list_rate"),
+            IfNull(ip.valid_from, "2020-01-01").as_("valid_from")
+        )
+        .distinct()
     )
 
+    # Apply filters
+    if filters.get("item_code"):
+        query = query.where(ip.item_code == filters.get("item_code"))
 
-# def get_item_prices(filters):
-# 	return frappe.db.sql("""
-# 		SELECT 	i.name as item_code,
-# 				i.item_name,
-# 				if(i.disabled = 0, "Active", "Disabled") as status,
-# 				i.item_group,
-# 				ip.price_list,
-# 				ip.price_list_rate
-# 		FROM `tabItem` i LEFT JOIN `tabItem Price` ip ON i.name = ip.item_code
-# 		ORDER BY i.item_group, i.item_name ASC
-# 	""", as_dict = 1)
+    if filters.get("price_list"):
+        query = query.where(ip.price_list == filters.get("price_list"))
+
+    return query
