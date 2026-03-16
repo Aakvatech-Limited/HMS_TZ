@@ -111,10 +111,9 @@ def get_columns():
 
 def process_merged_items(raw_data):
     """
-    Process NHIF claim items to handle merged items and add practitioner information.
-    When items are merged, ref_docname contains comma-separated values.
-    This function splits such items into separate rows and fetches the actual quantity and
-    amount for each item from the Healthcare Service Request.
+    Add practitioner information without altering the original claim item
+    quantity or amount. When ref_docname contains multiple values, all
+    matching practitioners are shown in a single cell.
     """
     processed_data = []
 
@@ -127,40 +126,29 @@ def process_merged_items(raw_data):
         ref_doctype = row.get("service_type")
         coverage_plan_name = row.get("coverage_plan_name") or ""
         item_code = row.get("item_code") or ""
-        details_map = get_hsr_details_batch(
+        practitioners_map = get_practitioners_batch(
             ref_docname_list, ref_doctype, coverage_plan_name, item_code
         )
 
-        if len(ref_docname_list) > 1:
-            # Merged items - create a separate row for each ref_docname
-            for ref_docname in ref_docname_list:
-                hsr_details = details_map.get(ref_docname, {})
-                new_row = row.copy()
-                new_row["qty"] = hsr_details.get("qty", 0)
-                new_row["amount_claimed"] = hsr_details.get("amount", 0)
-                new_row["practitioner"] = hsr_details.get("practitioner")
-                new_row.pop("ref_docname", None)
-                new_row.pop("item_code", None)
-                new_row.pop("coverage_plan_name", None)
-                processed_data.append(new_row)
-        else:
-            # Single item - get practitioner from Healthcare Service Request
-            ref_docname = ref_docname_list[0] if ref_docname_list else ""
-            hsr_details = details_map.get(ref_docname, {})
-            row["practitioner"] = hsr_details.get("practitioner")
-            row.pop("ref_docname", None)
-            row.pop("item_code", None)
-            row.pop("coverage_plan_name", None)
-            processed_data.append(row)
+        practitioners = []
+        for ref_docname in ref_docname_list:
+            for practitioner in practitioners_map.get(ref_docname, []):
+                if practitioner and practitioner not in practitioners:
+                    practitioners.append(practitioner)
+
+        row["practitioner"] = ", ".join(practitioners) if practitioners else None
+        row.pop("ref_docname", None)
+        row.pop("item_code", None)
+        row.pop("coverage_plan_name", None)
+        processed_data.append(row)
 
     return processed_data
 
 
-def get_hsr_details_batch(ref_docname_list, ref_doctype, coverage_plan_name, item_code):
+def get_practitioners_batch(ref_docname_list, ref_doctype, coverage_plan_name, item_code):
     """
-    Fetch qty, amount, and practitioner for multiple ref_docnames in a single query
-    by joining Healthcare Service Request Payment with its parent.
-    Returns a dict keyed by ref_docname.
+    Fetch practitioners for multiple ref_docnames without altering claim values.
+    Returns a dict keyed by ref_docname with a list of practitioner names.
     """
     if not ref_docname_list:
         return {}
@@ -174,8 +162,6 @@ def get_hsr_details_batch(ref_docname_list, ref_doctype, coverage_plan_name, ite
         .on(hsrp.parent == hsr.name)
         .select(
             hsrp.ref_docname,
-            (hsrp.qty - hsrp.qty_returned).as_("qty"),
-            hsrp.amount,
             hsr.practitioner,
         )
         .where(
@@ -189,11 +175,11 @@ def get_hsr_details_batch(ref_docname_list, ref_doctype, coverage_plan_name, ite
 
     details_map = {}
     for r in results:
-        details_map[r.ref_docname] = {
-            "qty": r.get("qty", 0),
-            "amount": r.get("amount", 0),
-            "practitioner": r.get("practitioner"),
-        }
+        if not r.get("practitioner"):
+            continue
+        practitioners = details_map.setdefault(r.ref_docname, [])
+        if r.practitioner not in practitioners:
+            practitioners.append(r.practitioner)
 
     # For Patient Appointment, batch fetch practitioners from the appointments
     if ref_doctype == "Patient Appointment":
@@ -206,15 +192,17 @@ def get_hsr_details_batch(ref_docname_list, ref_doctype, coverage_plan_name, ite
         )
         pa_map = {r.name: r.practitioner for r in pa_results}
         for name in ref_docname_list:
-            if name in details_map:
-                details_map[name]["practitioner"] = pa_map.get(name) or details_map[name]["practitioner"]
-            else:
-                details_map[name] = {"qty": 1, "amount": 0, "practitioner": pa_map.get(name)}
+            practitioner = pa_map.get(name)
+            if not practitioner:
+                continue
+            practitioners = details_map.setdefault(name, [])
+            if practitioner not in practitioners:
+                practitioners.append(practitioner)
 
     # Fill defaults for any ref_docnames not found
     for name in ref_docname_list:
         if name not in details_map:
-            details_map[name] = {"qty": 1, "amount": 0, "practitioner": None}
+            details_map[name] = []
 
     return details_map
 
