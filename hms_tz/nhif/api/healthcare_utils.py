@@ -2597,7 +2597,7 @@ def auto_create_nhif_patient_claims():
     pe = DocType("Patient Encounter")
     ip = DocType("Inpatient Record")
 
-    def get_appointments(appointment_date):
+    def get_appointments(from_date, to_date):
         appointments = (
             frappe.qb.from_(pa)
             .inner_join(pe)
@@ -2610,7 +2610,7 @@ def auto_create_nhif_patient_claims():
                 # (pa.insurance_company.like("NHIF"))
                 & (pa.insurance_company == "NHIF")
                 & (pa.company == "Shree Hindu Mandal Hospital - Dar es Salaam")
-                & (pa.appointment_date == appointment_date)
+                & (pa.appointment_date.between(from_date, to_date))
                 & (pa.nhif_patient_claim.isnull() | (pa.nhif_patient_claim == ""))
                 & (pe.docstatus == 1)
                 & (pe.duplicated == 0)
@@ -2637,7 +2637,7 @@ def auto_create_nhif_patient_claims():
 
         return ongoing_inpatients
 
-    def get_discharged_inpatients(discharge_date):
+    def get_discharged_inpatients(from_date, to_date):
         inpatient_appointments = (
             frappe.qb.from_(ip)
             .inner_join(pa)
@@ -2651,7 +2651,7 @@ def auto_create_nhif_patient_claims():
                 & (ip.company == "Shree Hindu Mandal Hospital - Dar es Salaam")
                 & (ip.patient_appointment.isnotnull())
                 & (ip.status == "Discharged")
-                & (ip.discharge_date == discharge_date)
+                & (ip.discharge_date.between(from_date, to_date))
                 & (pa.status == "Closed")
                 & (pa.nhif_patient_claim.isnull() | (pa.nhif_patient_claim == ""))
                 & (pe.docstatus == 1)
@@ -2679,9 +2679,10 @@ def auto_create_nhif_patient_claims():
                 continue
 
     before_1_day = add_days(nowdate(), -1)
-    appointment_names = get_appointments(before_1_day)
+    first_of_month = get_first_day(nowdate())
+    appointment_names = get_appointments(first_of_month, before_1_day)
     ongoing_inpatients = get_ongoiong_inpatients()
-    discharged_appointments = get_discharged_inpatients(before_1_day)
+    discharged_appointments = get_discharged_inpatients(first_of_month, before_1_day)
     appointment_ids = list(
         set(list(set(appointment_names) - set(ongoing_inpatients)) + list(set(discharged_appointments)))
     )
