@@ -578,20 +578,24 @@ def get_upcoming_medications(nurse, within_minutes=60):
             continue
 
         posting = str(nr.posting_date)
+
+        shift_start_str = str(shift_start).split(".")[0]
+        shift_end_str = str(shift_end).split(".")[0]
+
         # Build shift start/end datetimes
         shift_start_dt = datetime.strptime(
-            f"{posting} {shift_start}", "%Y-%m-%d %H:%M:%S"
+            f"{posting} {shift_start_str}", "%Y-%m-%d %H:%M:%S"
         )
 
         if shift_end <= shift_start:
             # Overnight shift — shift_end is on the next day
             next_day = add_days(posting, 1)
             shift_end_dt = datetime.strptime(
-                f"{next_day} {shift_end}", "%Y-%m-%d %H:%M:%S"
+                f"{next_day} {shift_end_str}", "%Y-%m-%d %H:%M:%S"
             )
         else:
             shift_end_dt = datetime.strptime(
-                f"{posting} {shift_end}", "%Y-%m-%d %H:%M:%S"
+                f"{posting} {shift_end_str}", "%Y-%m-%d %H:%M:%S"
             )
 
         if shift_start_dt <= now <= shift_end_dt:
