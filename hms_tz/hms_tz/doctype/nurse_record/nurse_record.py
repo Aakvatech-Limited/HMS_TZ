@@ -858,6 +858,8 @@ def create_medication_schedule(
             imo.end_date = max(str(e.date) for e in imo.medication_orders)
 
         imo.flags.ignore_validate_update_after_submit = True
+        imo.set_total_orders()
+        imo.set_status()
         imo.save(ignore_permissions=True)
     else:
         # Create new IMO and submit it
@@ -878,6 +880,7 @@ def create_medication_schedule(
         imo.end_date = entries[-1]["date"] if entries else start_date
 
         imo.insert(ignore_permissions=True)
+        imo.set_status()
         imo.submit()
         imo_name = imo.name
 
