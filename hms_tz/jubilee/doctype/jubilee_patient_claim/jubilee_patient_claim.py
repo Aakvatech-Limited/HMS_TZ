@@ -1322,7 +1322,7 @@ def download_multi_pdf(doctype, name, print_format=None, no_letterhead=0):
                         title="Jubilee Claim's PDF Error",
                         message=frappe.get_traceback(),
                         reference_doctype=doctype_name,
-                        reference_docname=doc_name,
+                        reference_name=doc_name,
                     )
 
     return read_multi_pdf(output)
