@@ -1,16 +1,29 @@
 # Copyright (c) 2025, Aakvatech and contributors
 # See license.txt
+from unittest.mock import patch
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from hms_tz.jubilee.api.preauthorization import (
+    get_jubilee_payment_rows,
     get_normalized_disease_code,
     get_preauth_entities,
     get_service_request_items,
     get_source_encounters,
     get_source_from_approval_request,
 )
+
+
+def _insert_hsr(appointment, payments):
+    """Real Healthcare Service Request, saved with just enough to hold payment rows."""
+    hsr = frappe.new_doc("Healthcare Service Request")
+    hsr.appointment = appointment
+    hsr.payment_type = "Insurance"
+    for row in payments:
+        hsr.append("payments", row)
+    hsr.insert(ignore_permissions=True, ignore_mandatory=True, ignore_links=True)
+    return hsr
 
 
 def make_source(**overrides):
@@ -120,25 +133,21 @@ class TestJubileePreauthorization(FrappeTestCase):
         self.assertIsNone(get_preauth_entities(make_source()).get("QualificationID"))
 
     def test_service_request_items_map_from_payment_rows(self):
-        """HSR payment rows already carry the insurer ref code, qty, rate and amount."""
-        hsr = frappe._dict({
-            "payments": [
-                frappe._dict({
-                    "idx": 1,
-                    "payment_type": "Insurance",
-                    "insurance_company": "Jubilee Insurance",
-                    "is_cancelled": 0,
-                    "item_code": "REF-1",
-                    "service_name": "Full Blood Picture",
-                    "qty": 2,
-                    "rate": 5000,
-                    "amount": 10000,
-                })
-            ]
-        })
+        """Payment rows from get_jubilee_payment_rows carry the insurer ref code, qty, rate, amount."""
+        hsr = frappe._dict({"appointment": "APT-1"})
+        rows = [
+            frappe._dict({
+                "parent": "HSR-1", "idx": 1, "item_code": "REF-1",
+                "service_name": "Full Blood Picture", "qty": 2, "rate": 5000, "amount": 10000,
+            })
+        ]
 
-        items = get_service_request_items(hsr)
+        with patch(
+            "hms_tz.jubilee.api.preauthorization.get_jubilee_payment_rows", return_value=rows
+        ) as get_rows:
+            items = get_service_request_items(hsr)
 
+        get_rows.assert_called_once_with("APT-1")
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0].item_code, "REF-1")
         self.assertEqual(items[0].item_name, "Full Blood Picture")
@@ -146,43 +155,45 @@ class TestJubileePreauthorization(FrappeTestCase):
         self.assertEqual(items[0].unit_price, 5000)
         self.assertEqual(items[0].amount_claimed, 10000)
 
-    def test_service_request_items_claims_only_the_jubilee_share(self):
-        """A co-paid service can be split across insurers; only Jubilee's row is claimed."""
-        hsr = frappe._dict({
-            "payments": [
-                frappe._dict({
-                    "idx": 1, "payment_type": "Insurance", "is_cancelled": 0,
-                    "insurance_company": "Jubilee Insurance",
-                    "item_code": "REF-1", "service_name": "Full Blood Picture",
-                    "qty": 1, "rate": 10000, "amount": 6000,
-                }),
-                frappe._dict({
-                    "idx": 2, "payment_type": "Insurance", "is_cancelled": 0,
-                    "insurance_company": "NHIF",
-                    "item_code": "REF-1", "service_name": "Full Blood Picture",
-                    "qty": 1, "rate": 10000, "amount": 4000,
-                }),
-            ]
-        })
+    def test_jubilee_payment_rows_span_multiple_service_requests(self):
+        """The Jubilee claim spans every HSR on the appointment; other insurers, cash,
+        and cancelled rows do not count against it."""
+        # service_name is left unset: before_save's set_service_price_rate() only
+        # recomputes rate/amount when service_name is set, which would otherwise
+        # require a price_list and full rate lookup unrelated to this test.
+        appointment = "TEST-APT-JUBILEE-ROWS"
+        _insert_hsr(appointment, [{
+            "payor_plan": "P1", "qty": 1,
+            "payment_type": "Insurance", "insurance_company": "Jubilee Insurance",
+            "is_cancelled": 0, "item_code": "REF-1", "rate": 6000, "amount": 6000,
+        }])
+        _insert_hsr(appointment, [
+            {
+                "payor_plan": "P1", "qty": 1,
+                "payment_type": "Insurance", "insurance_company": "Jubilee Insurance",
+                "is_cancelled": 0, "item_code": "REF-2", "rate": 4000, "amount": 4000,
+            },
+            {
+                "payor_plan": "P1", "qty": 1,
+                "payment_type": "Insurance", "insurance_company": "Jubilee Insurance",
+                "is_cancelled": 1, "item_code": "REF-3", "rate": 9999, "amount": 9999,
+            },
+            {
+                "payor_plan": "P1", "qty": 1,
+                "payment_type": "Insurance", "insurance_company": "NHIF",
+                "is_cancelled": 0, "item_code": "REF-4", "rate": 9999, "amount": 9999,
+            },
+            {
+                "payor_plan": "P1", "qty": 1,
+                "payment_type": "Cash", "insurance_company": "",
+                "is_cancelled": 0, "item_code": "REF-5", "rate": 9999, "amount": 9999,
+            },
+        ])
 
-        items = get_service_request_items(hsr)
+        rows = get_jubilee_payment_rows(appointment)
 
-        self.assertEqual(len(items), 1)
-        self.assertEqual(items[0].amount_claimed, 6000)
-
-    def test_service_request_items_skips_rows_without_insurance_company(self):
-        hsr = frappe._dict({
-            "payments": [
-                frappe._dict({
-                    "idx": 1, "payment_type": "Insurance", "is_cancelled": 0,
-                    "insurance_company": None,
-                    "item_code": "REF-1", "service_name": "X",
-                    "qty": 1, "rate": 100, "amount": 100,
-                })
-            ]
-        })
-
-        self.assertEqual(get_service_request_items(hsr), [])
+        self.assertEqual({row.item_code for row in rows}, {"REF-1", "REF-2"})
+        self.assertEqual(sum(row.amount for row in rows), 10000)
 
     def test_amount_claimed_sums_only_the_items_being_sent(self):
         """The claimed total is derived from folio_items, so it cannot drift."""
@@ -202,39 +213,20 @@ class TestJubileePreauthorization(FrappeTestCase):
 
         self.assertEqual(get_preauth_entities(source).AmountClaimed, 0)
 
-    def test_service_request_items_skips_cash_and_cancelled_rows(self):
-        hsr = frappe._dict({
-            "payments": [
-                frappe._dict({
-                    "idx": 1, "payment_type": "Cash", "is_cancelled": 0,
-                    "item_code": "REF-1", "service_name": "X", "qty": 1,
-                    "rate": 100, "amount": 100,
-                }),
-                frappe._dict({
-                    "idx": 2, "payment_type": "Insurance", "is_cancelled": 1,
-                    "insurance_company": "Jubilee Insurance",
-                    "item_code": "REF-2", "service_name": "Y", "qty": 1,
-                    "rate": 100, "amount": 100,
-                }),
-            ]
-        })
-
-        self.assertEqual(get_service_request_items(hsr), [])
-
     def test_service_request_items_throws_on_missing_ref_code(self):
         """Sending a blank ItemCode would fail confusingly at the insurer instead."""
-        hsr = frappe._dict({
-            "payments": [
-                frappe._dict({
-                    "idx": 1, "payment_type": "Insurance", "is_cancelled": 0,
-                    "insurance_company": "Jubilee Insurance",
-                    "item_code": "", "service_name": "Full Blood Picture",
-                    "qty": 1, "rate": 100, "amount": 100,
-                })
-            ]
-        })
+        hsr = frappe._dict({"appointment": "APT-1"})
+        rows = [
+            frappe._dict({
+                "parent": "HSR-1", "idx": 1, "item_code": "",
+                "service_name": "Full Blood Picture", "qty": 1, "rate": 100, "amount": 100,
+            })
+        ]
 
-        self.assertRaises(frappe.ValidationError, get_service_request_items, hsr)
+        with patch(
+            "hms_tz.jubilee.api.preauthorization.get_jubilee_payment_rows", return_value=rows
+        ):
+            self.assertRaises(frappe.ValidationError, get_service_request_items, hsr)
 
     def test_source_encounters_only_for_patient_encounter(self):
         hsr = frappe._dict({"source_doctype": "Patient Encounter", "source_docname": "PE-1"})
@@ -273,19 +265,20 @@ class TestJubileePreauthorization(FrappeTestCase):
         }
         jar_items = get_preauth_entities(make_source(folio_items=[frappe._dict(row)])).FolioItems
 
-        hsr = frappe._dict({
-            "payments": [
-                frappe._dict({
-                    "idx": 1, "payment_type": "Insurance", "is_cancelled": 0,
-                    "insurance_company": "Jubilee Insurance",
-                    "item_code": "REF-1", "service_name": "Full Blood Picture",
-                    "qty": 2, "rate": 5000, "amount": 10000,
-                })
-            ]
-        })
-        hsr_items = get_preauth_entities(
-            make_source(folio_items=get_service_request_items(hsr))
-        ).FolioItems
+        hsr = frappe._dict({"appointment": "APT-1"})
+        payment_rows = [
+            frappe._dict({
+                "parent": "HSR-1", "idx": 1, "item_code": "REF-1",
+                "service_name": "Full Blood Picture", "qty": 2, "rate": 5000, "amount": 10000,
+            })
+        ]
+        with patch(
+            "hms_tz.jubilee.api.preauthorization.get_jubilee_payment_rows",
+            return_value=payment_rows,
+        ):
+            hsr_items = get_preauth_entities(
+                make_source(folio_items=get_service_request_items(hsr))
+            ).FolioItems
 
         for field in ("ItemCode", "OtherDetails", "ItemQuantity", "UnitPrice", "AmountClaimed"):
             self.assertEqual(jar_items[0][field], hsr_items[0][field])
