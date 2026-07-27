@@ -11,6 +11,40 @@ frappe.ui.form.on("Healthcare Service Request", {
     set_filters(frm);
     frm.trigger("get_services");
     control_add_remove_btns(frm);
+    set_preauth_headline(frm);
+    frm.trigger("send_approval_request");
+    frm.trigger("get_approval_status");
+  },
+  send_approval_request: (frm) => {
+    if (
+      frm.is_new() ||
+      frm.doc.docstatus !== 0 ||
+      !frm.doc.requires_approval ||
+      frm.doc.submission_id
+    ) {
+      return;
+    }
+
+    frm.add_custom_button(__("Request Pre-Authorization"), () => {
+      call_approval_check(
+        frm,
+        "send_approval_request",
+        __("Sending Pre-Auth Request...")
+      );
+    });
+  },
+  get_approval_status: (frm) => {
+    if (frm.is_new() || !frm.doc.submission_id) {
+      return;
+    }
+
+    frm.add_custom_button(__("Get Pre-Auth Status"), () => {
+      call_approval_check(
+        frm,
+        "get_approval_status",
+        __("Checking Pre-Auth Status...")
+      );
+    });
   },
   onload: (frm) => {
     set_filters(frm);
@@ -124,7 +158,12 @@ frappe.ui.form.on("Healthcare Service Request Payment", {
       frappe.model.set_value(cdt, cdn, "authorization_number", "");
 
       frappe.model.set_value(cdt, cdn, "payor_plan", "Cash");
-      frappe.model.set_value(cdt, cdn, "percent_covered", 0);
+      frappe.model.set_value(
+        cdt,
+        cdn,
+        "percent_covered",
+        get_uncovered_percent(frm, row)
+      );
       frappe.model.set_value(cdt, cdn, "price_list", "");
     }
   },
@@ -162,6 +201,77 @@ frappe.ui.form.on("Healthcare Service Request Payment", {
     }
   },
 });
+
+// Percent left to cover for a service, so a cash row fills the gap the
+// insurer did not approve. Server side validate_service_percentage is the
+// authority; this only pre-fills a sensible value.
+var get_uncovered_percent = (frm, row) => {
+  let covered = frm.doc.payments
+    .filter(
+      (d) =>
+        d.name !== row.name &&
+        d.service_name === row.service_name &&
+        d.ref_docname === row.ref_docname
+    )
+    .reduce((total, d) => total + (d.percent_covered || 0), 0);
+
+  return Math.max(100 - covered, 0);
+};
+
+var call_approval_check = (frm, method, freeze_message) => {
+  frappe.call({
+    method: method,
+    doc: frm.doc,
+    freeze: true,
+    freeze_message: freeze_message,
+    callback: (r) => {
+      let data = r.message || {};
+
+      if (data.status && data.status !== "ERROR") {
+        frappe.utils.play_sound("success");
+        frappe.show_alert({
+          message: __(data.description || data.status),
+          indicator: "green",
+        });
+      } else {
+        frappe.utils.play_sound("error");
+        frappe.msgprint({
+          title: __("Pre-Authorization"),
+          indicator: "red",
+          message: __(data.description || "Unknown error"),
+        });
+      }
+
+      frm.reload_doc();
+    },
+  });
+};
+
+var set_preauth_headline = (frm) => {
+  if (!frm.doc.requires_approval) {
+    return;
+  }
+
+  let color = "orange";
+  let text = __("Pre-Authorization not yet sent to {0}", [
+    frm.doc.insurance_company,
+  ]);
+
+  if (frm.doc.approval_status === "ERROR") {
+    color = "red";
+    text = __("Pre-Auth Failed: {0}", [frm.doc.approval_description || ""]);
+  } else if (frm.doc.approval_status) {
+    color = "green";
+    text = __("Pre-Auth {0} — Submission ID: {1}", [
+      frm.doc.approval_status,
+      frm.doc.submission_id || "",
+    ]);
+  }
+
+  frm.dashboard.set_headline(
+    `<span class="indicator whitespace-nowrap ${color}">${text}</span>`
+  );
+};
 
 var control_add_remove_btns = (frm, for_child = false) => {
   if (!for_child) {
