@@ -970,6 +970,8 @@ class JubileePatientClaim(Document):
                             company=self.company,
                         )
 
+                        self.submission_id = data.get("submissionID")
+
                     frappe.msgprint(
                         _("The claim has been sent successfully"), alert=True
                     )
