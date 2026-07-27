@@ -2580,19 +2580,22 @@ function show_preauth_dialog(frm, data) {
               The total amount of the services exceeds the patient's daily balance.
             </p>
             <p style="font-size: 14px;">
-              Click <b>"Request Pre-Authorization"</b> to send a pre-authorization
-              request to Jubilee. The screen will freeze until a response is received.
+              Click <b>"Request Pre-Auth"</b> to submit this encounter and send a
+              pre-authorization request to Jubilee.
+            </p>
+            <p style="font-size: 14px;">
+              Please tell the patient to proceed to the <b>Billing Team</b>.
+              Jubilee usually responds within <b>15 minutes</b>.
             </p>
           </div>
         `,
       },
     ],
-    primary_action_label: __("Request Pre-Authorization"),
+    primary_action_label: __("Request Pre-Auth"),
     primary_action: () => {
       d.hide();
       frappe.call({
-        method:
-          "hms_tz.jubilee.doctype.jubilee_approval_request.jubilee_approval_request.create_preauthorization_doc",
+        method: "hms_tz.jubilee.api.preauthorization.request_preauthorization",
         args: {
           source_doctype: data.source_doctype,
           source_docname: data.source_docname,
@@ -2602,27 +2605,31 @@ function show_preauth_dialog(frm, data) {
         freeze_message: __(
           '<div style="text-align:center;">' +
             '<i class="fa fa-spinner fa-spin fa-4x"></i>' +
-            "<p style='margin-top:15px; font-size:16px;'>Sending Pre-Authorization to Jubilee…</p>" +
+            "<p style='margin-top:15px; font-size:16px;'>Submitting encounter and sending Pre-Authorization to Jubilee…</p>" +
             "</div>"
         ),
         callback: (r) => {
           const result = r.message || {};
-          console.log(result);
+          const service_request_link = result.service_request
+            ? `<a href="/app/healthcare-service-request/${result.service_request}">${result.service_request}</a>`
+            : "N/A";
 
           if (result.status === "OK") {
             frappe.utils.play_sound("submit");
             frappe.msgprint({
-              title: __("Pre-Authorization Successful"),
+              title: __("Pre-Authorization Request Sent"),
               indicator: "green",
               message: `
                 <div style="border-left: 4px solid #28a745; background-color: #d4edda;
                             padding: 15px; border-radius: 10px;
                             box-shadow: 0 2px 6px rgba(0,0,0,0.1); margin: 10px 0;">
-                  <p style="font-size: 16px; font-weight: bold;">✅ Pre-Authorization Approved</p>
+                  <p style="font-size: 16px; font-weight: bold;">✅ Pre-Authorization Request Sent</p>
                   <p style="font-size: 14px;">Submission ID: <b>${
                     result.submission_id || "N/A"
                   }</b></p>
+                  <p style="font-size: 14px;">Service Request: <b>${service_request_link}</b></p>
                   <p style="font-size: 14px;">${result.description || ""}</p>
+                  <p style="font-size: 14px;">Please send the patient to the <b>Billing Team</b>.</p>
                 </div>
               `,
             });
@@ -2642,9 +2649,11 @@ function show_preauth_dialog(frm, data) {
                   <p style="font-size: 14px;">Response: <b>${
                     result.description || "Unknown error"
                   }</b></p>
-                  <p style="font-size: 14px;">Service Request: <b>${
-                    result.service_request || ""
-                  }</b></p>
+                  <p style="font-size: 14px;">Service Request: <b>${service_request_link}</b></p>
+                  <p style="font-size: 14px;">
+                    The encounter was submitted and the Service Request was created.
+                    Open it and click <b>Send Pre-Auth</b> to retry.
+                  </p>
                 </div>
               `,
             });
