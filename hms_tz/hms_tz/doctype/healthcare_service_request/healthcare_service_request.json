@@ -23,22 +23,33 @@
   "section_break_ozjxj",
   "payment_type",
   "insurance_subscription",
+  "jubilee_procedure",
   "column_break_nrm8z",
   "insurance_company",
   "insurance_coverage_plan",
+  "jubilee_benefit",
   "column_break_omjjl",
   "card_no",
   "national_id",
   "years_of_insurance",
+  "benefit_code",
+  "benefit_name",
+  "approval_section",
+  "requires_approval",
+  "submission_id",
+  "naming_series",
+  "amended_from",
+  "column_break_preauth",
+  "has_copayment",
+  "approval_status",
+  "approved_amount",
+  "column_break_preauth_2",
+  "approval_description",
+  "service_tab",
   "service_detail_section",
   "services",
   "payment_details_section",
-  "payments",
-  "section_break_xjev8",
-  "naming_series",
-  "amended_from",
-  "column_break_qgsi",
-  "has_copayment"
+  "payments"
  ],
  "fields": [
   {
@@ -231,10 +242,6 @@
    "options": "Healthcare Service Request Payment"
   },
   {
-   "fieldname": "section_break_xjev8",
-   "fieldtype": "Section Break"
-  },
-  {
    "fieldname": "naming_series",
    "fieldtype": "Select",
    "label": "Naming Series",
@@ -260,10 +267,6 @@
    "read_only": 1
   },
   {
-   "fieldname": "column_break_qgsi",
-   "fieldtype": "Column Break"
-  },
-  {
    "default": "0",
    "fieldname": "has_copayment",
    "fieldtype": "Check",
@@ -271,6 +274,93 @@
    "label": "Has Copayment",
    "read_only": 1,
    "search_index": 1
+  },
+  {
+   "depends_on": "eval: doc.payment_type == 'Insurance' && doc.insurance_company && doc.insurance_company.includes('Jubilee')",
+   "fieldname": "jubilee_procedure",
+   "fieldtype": "Link",
+   "label": "Jubilee Procedure",
+   "options": "Jubilee Procedure",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval: doc.payment_type == 'Insurance' && doc.insurance_company && doc.insurance_company.includes('Jubilee')",
+   "fieldname": "jubilee_benefit",
+   "fieldtype": "Link",
+   "label": "Jubilee Benefit",
+   "options": "Jubilee Benefit",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval: doc.payment_type == 'Insurance' && doc.insurance_company && doc.insurance_company.includes('Jubilee')",
+   "fetch_from": "jubilee_benefit.benefit_code",
+   "fetch_if_empty": 1,
+   "fieldname": "benefit_code",
+   "fieldtype": "Data",
+   "label": "Benefit Code",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval: doc.payment_type == 'Insurance' && doc.insurance_company && doc.insurance_company.includes('Jubilee')",
+   "fetch_from": "jubilee_benefit.benefit_name",
+   "fetch_if_empty": 1,
+   "fieldname": "benefit_name",
+   "fieldtype": "Data",
+   "label": "Benefit Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_preauth",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "approved_amount",
+   "fieldtype": "Currency",
+   "label": "Approved Amount",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_preauth_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "service_tab",
+   "fieldtype": "Tab Break",
+   "label": "Services"
+  },
+  {
+   "collapsible": 1,
+   "depends_on": "eval: doc.requires_approval || doc.submission_id || doc.has_copayment",
+   "fieldname": "approval_section",
+   "fieldtype": "Section Break",
+   "label": "Approval Detail"
+  },
+  {
+   "default": "0",
+   "fieldname": "requires_approval",
+   "fieldtype": "Check",
+   "label": "Requires Approval",
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "submission_id",
+   "fieldtype": "Data",
+   "label": "Approval Submission ID",
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "approval_status",
+   "fieldtype": "Data",
+   "label": "Approval Status",
+   "read_only": 1
+  },
+  {
+   "fieldname": "approval_description",
+   "fieldtype": "Small Text",
+   "label": "Approval Description",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
@@ -278,7 +368,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-02-25 15:21:30.352743",
+ "modified": "2026-07-27 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Hms Tz",
  "name": "Healthcare Service Request",
