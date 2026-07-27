@@ -199,27 +199,52 @@ def get_source_encounters(hsr_doc):
     return []
 
 
-def get_service_request_items(hsr_doc):
-    """FolioItems source rows from the Jubilee payment rows of the HSR.
+def get_jubilee_payment_rows(appointment):
+    """Live Jubilee insurance payment rows from every Healthcare Service Request on this appointment.
 
-    A co-paid service can be split across several insurers, so the insurer is
-    matched per row: only Jubilee's share is claimed from Jubilee.
+    A patient's Jubilee claim spans all Service Requests raised for the same
+    appointment (e.g. one per encounter), not just a single HSR.
+    """
+    hsr = DocType("Healthcare Service Request")
+    hsrp = DocType("Healthcare Service Request Payment")
+
+    return (
+        frappe.qb.from_(hsrp)
+        .join(hsr)
+        .on(hsrp.parent == hsr.name)
+        .select(
+            hsrp.parent,
+            hsrp.idx,
+            hsrp.item_code,
+            hsrp.service_name,
+            hsrp.qty,
+            hsrp.rate,
+            hsrp.amount,
+        )
+        .where(
+            (hsr.appointment == appointment)
+            & (hsrp.payment_type == "Insurance")
+            & (hsrp.is_cancelled == 0)
+            & (hsrp.insurance_company.like("%Jubilee%"))
+        )
+    ).run(as_dict=True)
+
+
+def get_service_request_items(hsr_doc):
+    """FolioItems source rows for every Jubilee payment row across this appointment's HSRs.
+
+    A co-paid service can be split across several insurers, so only rows
+    already scoped to Jubilee (see get_jubilee_payment_rows) are claimed.
     """
     items = []
     created_by = get_fullname(frappe.session.user)
 
-    for row in hsr_doc.payments:
-        if row.payment_type != "Insurance" or row.is_cancelled:
-            continue
-
-        if "Jubilee" not in (row.insurance_company or ""):
-            continue
-
+    for row in get_jubilee_payment_rows(hsr_doc.appointment):
         if not row.item_code:
             frappe.throw(
                 _(
                     f"Insurance item code is missing for <b>{row.service_name}</b> "
-                    f"in payment row {row.idx}.<br>"
+                    f"in payment row {row.idx} of {row.parent}.<br>"
                     "Please set the Item Customer Detail ref code for this item."
                 )
             )
@@ -413,6 +438,7 @@ def get_service_request_preauth_status(service_request_name):
 
     result = {"status": "ERROR", "description": "", "service_request": hsr_doc.name}
     approval_status, approval_description, approved_amount = "", "", 0
+    requested_amount = 0
     response = None
 
     try:
@@ -432,14 +458,24 @@ def get_service_request_preauth_status(service_request_name):
         description = data.get("Description") or data.get("description") or ""
 
         if isinstance(description, dict):
-            approval_status = description.get("PreauthorizationStatus") or ""
+            approval_status = (
+                description.get("PreauthorizationStatus")
+                or description.get("preathorizationStatus")
+                or ""
+            )
             approval_description = str(description.get("details") or "")
+            requested_amount = flt(description.get("amount") or 0)
             approved_amount = flt(description.get("approvedAmount") or 0)
         else:
             approval_status = status
             approval_description = str(description)
 
-        result.update({"status": status, "description": approval_description or approval_status})
+        result.update({
+            "status": status,
+            "description": approval_description or approval_status,
+            "amount": requested_amount,
+            "approved_amount": approved_amount,
+        })
     except Exception:
         error_text = (
             response.text if response and response.text else "NO RESPONSE - Timeout or connection error"
