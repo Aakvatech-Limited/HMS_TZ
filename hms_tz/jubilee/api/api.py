@@ -4,12 +4,16 @@ import frappe
 import requests
 from erpnext import get_default_company
 from frappe import _
-from frappe.utils import date_diff, get_fullname, now_datetime, nowdate, nowtime
+from frappe.utils import now_datetime, nowdate, nowtime
 
 from hms_tz.hms_tz.doctype.healthcare_service_request.healthcare_service_request import (
     get_childs_map,
     get_item_rate,
     get_item_refcode,
+)
+from hms_tz.jubilee.api.preauthorization import (
+    get_preauth_entities,
+    get_source_from_approval_request,
 )
 from hms_tz.jubilee.doctype.jubilee_response_log.jubilee_response_log import add_jubilee_log
 
@@ -19,20 +23,7 @@ def get_member_card_detials(card_no, insurance_provider=None):
     if not card_no or insurance_provider != "Jubilee":
         return
 
-    company = get_default_company()
-    if not company:
-        company = frappe.defaults.get_user_default("Company")
-
-    if not company:
-        hms_tz_records = frappe.get_list(
-            "HMS TZ Setting",
-            fields=["company"],
-            filters={"enable_jubilee_api": 1},
-            limit=1,
-        )
-
-        if len(hms_tz_records) > 0:
-            company = hms_tz_records[0].company
+    company = get_default_company() or frappe.defaults.get_user_default("Company")
 
     if not company:
         frappe.throw(_("No companies found to connect to Jubilee"))
@@ -92,7 +83,7 @@ def create_jubilee_subscription(patient_id, card_no, insurance_provider):
         filters={
             "patient": patient_id,
             "is_active": 1,
-            "insurance_company": ["like", "Jubilee%"],
+            "insurance_company": ["like", "%Jubilee%"],
         },
     )
     if len(subscription_list) > 0:
@@ -103,9 +94,11 @@ def create_jubilee_subscription(patient_id, card_no, insurance_provider):
         )
         return
 
+    company = get_default_company() or frappe.defaults.get_user_default("Company")
+
     plan_filters = {
         "is_active": 1,
-        "insurance_company": ["like", "Jubilee%"],
+        "insurance_company": ["like", "%Jubilee%"],
     }
     company = get_default_company()
     if company:
@@ -213,7 +206,6 @@ def get_authorization_number(
             card_no=card_no,
             authorization_no=data.get("AuthorizationNo", ""),
         )
-
 
         if not data.get("AuthorizationNo"):
             frappe.throw(title=data.get("Status"), msg=data["Description"])
@@ -665,7 +657,7 @@ def send_preauthorization(approval_request_name, request_type="SendPreauthorizat
     if not setting_doc.enable_jubilee_api:
         frappe.throw(_("Jubilee API is not enabled for this company"))
 
-    entities = get_preauth_payload(jar_doc)
+    entities = get_preauth_entities(get_source_from_approval_request(jar_doc))
     payload = json.dumps({"entities": [entities]})
 
     token = setting_doc.get_jubilee_token()
@@ -753,85 +745,6 @@ def send_preauthorization(approval_request_name, request_type="SendPreauthorizat
         result["description"] = str(error_text)
 
     return result
-
-
-def get_preauth_payload(jar_doc):
-    """Get the preauth payload from the Jubilee Approval Request."""
-    entities = frappe._dict()
-
-    entities.ClaimYear = jar_doc.claim_year
-    entities.ClaimMonth = jar_doc.claim_month
-    entities.CardNo = (jar_doc.card_no or "").strip()
-    entities.FirstName = jar_doc.first_name or ""
-    entities.LastName = jar_doc.last_name or ""
-    entities.Gender = jar_doc.gender or ""
-    entities.DateOfBirth = str(jar_doc.date_of_birth) if jar_doc.date_of_birth else ""
-    entities.Age = str(date_diff(nowdate(), jar_doc.date_of_birth) // 365) if jar_doc.date_of_birth else "0"
-    entities.TelephoneNo = jar_doc.telephone_no or ""
-    entities.PatientFileNo = jar_doc.patient or ""
-    entities.AuthorizationNo = jar_doc.authorization_no or ""
-    entities.AttendanceDate = str(jar_doc.attendance_date) if jar_doc.attendance_date else ""
-    entities.PatientTypeCode = jar_doc.patient_type_code or "OP"
-    entities.DateAdmitted = str(jar_doc.admitted_date) if jar_doc.admitted_date else ""
-    entities.DateDischarged = str(jar_doc.discharge_date) if jar_doc.discharge_date else ""
-    entities.PractitionerNo = jar_doc.practitioner_no or ""
-    entities.ProviderID = jar_doc.provider_id or ""
-    entities.CreatedBy = get_fullname(frappe.session.user)
-    entities.DateCreated = str(jar_doc.posting_date) if jar_doc.posting_date else str(nowdate())
-    entities.LastModifiedBy = get_fullname(frappe.session.user)
-    entities.LastModified = str(nowdate())
-    entities.AmountClaimed = jar_doc.total_amount or 0
-    entities.jubileeProcedure = jar_doc.jubilee_procedure
-    entities.jubileeBenefits = jar_doc.benefit_code or ""
-    entities.BillNo = jar_doc.bill_no
-
-    # Get Practitioner Qualification ID
-    if jar_doc.practitioner:
-        qualification = frappe.get_cached_value(
-            "Healthcare Practitioner", jar_doc.practitioner, "nhif_physician_qualification"
-        ) or ""
-
-        if not qualification:
-            frappe.throw(_(f"Practitioner {jar_doc.practitioner} has no Physician Qualification, Set it on Healthcare Practitioner master."))
-
-        if qualification:
-            qualification_id = frappe.get_cached_value(
-                "NHIF Physician Qualification",
-                qualification,
-                "physicianqualificationid"
-            ) or ""
-
-            entities.QualificationID = qualification_id
-
-    # Build FolioDiseases
-    entities.FolioDiseases = []
-    for disease in jar_doc.diseases:
-        entities.FolioDiseases.append({
-            "DiseaseCode": disease.disease_code or "",
-            "Status": disease.status or "Provisional",
-            "Remarks": disease.description or "",
-            "CreatedBy": disease.created_by or get_fullname(frappe.session.user),
-            "DateCreated": str(disease.date_created) if disease.date_created else str(nowdate()),
-            "LastModifiedBy": get_fullname(frappe.session.user),
-            "LastModified": str(nowdate()),
-        })
-
-    # Build FolioItems
-    entities.FolioItems = []
-    for item in jar_doc.items:
-        entities.FolioItems.append({
-            "ItemCode": item.item_code or "",
-            "OtherDetails": item.item_name or "",
-            "ItemQuantity": item.item_quantity or 1,
-            "UnitPrice": item.unit_price or 0,
-            "AmountClaimed": item.amount_claimed or 0,
-            "CreatedBy": item.created_by or get_fullname(frappe.session.user),
-            "DateCreated": str(item.date_created) if item.date_created else str(nowdate()),
-            "LastModifiedBy": get_fullname(frappe.session.user),
-            "LastModified": str(nowdate()),
-        })
-
-    return entities
 
 
 @frappe.whitelist()
