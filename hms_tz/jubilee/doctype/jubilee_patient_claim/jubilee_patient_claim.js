@@ -7,7 +7,7 @@ frappe.ui.form.on("Jubilee Patient Claim", {
       return {
         filters: {
           jubilee_patient_claim: ["in", ["", "None"]],
-          insurance_company: ["like", "Jubilee%"],
+          insurance_company: ["like", "%Jubilee%"],
           insurance_subscription: ["not in", ["", "None"]],
         },
       };
