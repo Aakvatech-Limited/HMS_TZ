@@ -5,7 +5,6 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.query_builder import DocType
 from frappe.utils import get_datetime, get_fullname, get_link_to_form, get_time, getdate, nowdate, nowtime
 
 from hms_tz.hms_tz.doctype.healthcare_service_request.healthcare_service_request import (
@@ -14,9 +13,7 @@ from hms_tz.hms_tz.doctype.healthcare_service_request.healthcare_service_request
     get_item_refcode,
 )
 from hms_tz.jubilee.api.api import send_preauthorization
-
-ct = DocType("Codification Table")
-pe = DocType("Patient Encounter")
+from hms_tz.jubilee.api.preauthorization import get_encounter_diseases
 
 
 class JubileeApprovalRequest(Document):
@@ -111,51 +108,8 @@ class JubileeApprovalRequest(Document):
         """Populate disease child table from encounter's preliminary and final diagnoses."""
 
         self.diseases = []
-        encounter_names = [row.name for row in encounters]
-
-        diagnosis_list = (
-            frappe.qb.from_(ct)
-            .join(pe)
-            .on(ct.parent == pe.name)
-            .select(
-                ct.name,
-                ct.parent,
-                ct.code_value,
-                ct.code_value.as_("medical_code"),
-                ct.code.as_("code"),
-                ct.definition,
-                ct.modified,
-                ct.parentfield,
-                pe.practitioner,
-            )
-            .where(
-                (ct.parenttype == "Patient Encounter")
-                & (ct.parent.isin(encounter_names))
-            )
-            .groupby(ct.code_value, ct.parentfield)
-            .orderby(ct.parentfield, order=frappe.qb.desc)
-        ).run(as_dict=True)
-
-        for row in diagnosis_list:
-            new_row = self.append("diseases", {})
-            new_row.medical_code = row.code_value
-
-            if row.parentfield == "patient_encounter_preliminary_diagnosis":
-                new_row.status = "Provisional"
-            elif row.parentfield == "patient_encounter_final_diagnosis":
-                new_row.status = "Final"
-
-            # Convert ICD code format (CDC to NHIF style)
-            if row.code and len(row.code) > 3 and "." not in row.code:
-                new_row.disease_code = row.code[:3] + "." + (row.code[3:4] or "0")
-            elif row.code and len(row.code) <= 5 and "." in row.code:
-                new_row.disease_code = row.code
-            else:
-                new_row.disease_code = row.code[:3] if row.code else ""
-
-            new_row.description = (row.definition or "")[:139]
-            new_row.created_by = row.practitioner
-            new_row.date_created = row.modified
+        for row in get_encounter_diseases([d.name for d in encounters]):
+            self.append("diseases", row)
 
     def set_items(self, encounters):
         """Populate item child table from encounter's service items."""

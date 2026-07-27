@@ -6,9 +6,11 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 from frappe.query_builder import DocType
-from frappe.utils import get_link_to_form
+from frappe.utils import flt, fmt_money, get_link_to_form
 
 from hms_tz.nhif.api.healthcare_utils import *
+
+UNRESOLVED_PREAUTH_STATUSES = ("", "ERROR", "PENDING")
 
 
 class HealthcareServiceRequest(Document):
@@ -23,6 +25,8 @@ class HealthcareServiceRequest(Document):
         self.validate_duplicate()
 
     def before_submit(self):
+        self.validate_approval_status()
+        self.validate_approved_amount()
         self.validate_service_percentage()
 
     def on_submit(self):
@@ -248,6 +252,76 @@ class HealthcareServiceRequest(Document):
 
         return service_payment_map
 
+    def validate_approval_status(self):
+        """Block submission while an insurer Approval is still unresolved.
+
+        A rejected Approval does not block: the billing team moves the
+        rejected services to cash payment rows and submits.
+        """
+        if not self.requires_approval:
+            return
+
+        if not self.submission_id:
+            frappe.throw(
+                _(
+                    f"Approval has not been sent to {self.insurance_company} for this Service Request."
+                    "<br>Please send it before submitting."
+                )
+            )
+
+        if (self.approval_status or "").upper() in UNRESOLVED_PREAUTH_STATUSES:
+            frappe.throw(
+                _(
+                    f"Pre-authorization status from {self.insurance_company} is "
+                    f"<b>{self.approval_status or 'not yet received'}</b>.<br>"
+                    "Please click <b>Get Pre-Auth Status</b> and wait for a resolved "
+                    "response before submitting."
+                )
+            )
+
+    def validate_approved_amount(self):
+        """Block submission when the Jubilee insurance rows, across every Service
+        Request on this appointment, exceed the approved amount."""
+
+        if not self.requires_approval:
+            return
+
+        if not self.approved_amount:
+            return
+
+        from hms_tz.jubilee.api.preauthorization import get_jubilee_payment_rows
+
+        total_amount = sum(flt(row.amount) for row in get_jubilee_payment_rows(self.appointment))
+
+        if total_amount > flt(self.approved_amount):
+            frappe.throw(
+                _(
+                    f"Total amount of Jubilee services <b>{fmt_money(total_amount)}</b> exceeds "
+                    f"the approved amount <b>{fmt_money(self.approved_amount)}</b>.<br>"
+                    "Please move the extra services to cash payment or cancel them before submitting."
+                )
+            )
+
+    @frappe.whitelist()
+    def send_approval_request(self):
+        """Send this Approval Request to the insurer."""
+        from hms_tz.jubilee.api.preauthorization import send_service_request_preauthorization
+
+        result = send_service_request_preauthorization(self.name)
+        self.reload()
+
+        return result
+
+    @frappe.whitelist()
+    def get_approval_status(self):
+        """Fetch this Service Request's pre-authorization status from the insurer."""
+        from hms_tz.jubilee.api.preauthorization import get_service_request_preauth_status
+
+        result = get_service_request_preauth_status(self.name)
+        self.reload()
+
+        return result
+
     def create_healthcare_service_docs(self):
         """
         Create healthcare service documents based on the Healthcare Service Request
@@ -392,7 +466,7 @@ def create_service_request(doc_obj=None, data=None):
 
     if data:
         data = json.loads(data)
-        doc = frappe.get_cached_doc(data.get("source_doctype"), data.get("source_docname"))
+        doc = frappe.get_doc(data.get("source_doctype"), data.get("source_docname"))
     else:
         doc = doc_obj
 
@@ -404,8 +478,8 @@ def create_service_request(doc_obj=None, data=None):
 
     hsr = frappe.new_doc("Healthcare Service Request")
     hsr.patient = doc.patient
-    hsr.appointment = (doc.appointment,)
-    hsr.company = (doc.company,)
+    hsr.appointment = doc.appointment
+    hsr.company = doc.company
     hsr.practitioner = doc.practitioner
     hsr.source_doctype = doc.doctype
     hsr.source_docname = doc.name
@@ -452,6 +526,9 @@ def create_service_request(doc_obj=None, data=None):
     hsr.db_update_all()
     hsr.reload()
 
+    if set_approval_state(hsr, doc.get("jubilee_procedure")):
+        return hsr.name
+
     if hsr.has_copayment == 1:
         frappe.msgprint(
             _(
@@ -468,6 +545,29 @@ def create_service_request(doc_obj=None, data=None):
         hsr.submit()
 
     return hsr.name
+
+
+def set_approval_state(hsr, jubilee_procedure):
+    """Stamp pre-auth request fields from the active flag.
+
+    Returns True when a pre-authorization is pending, in which case the request
+    must stay in draft until the insurer responds and the billing team agrees
+    the payment split with the patient.
+    """
+    approval = frappe.flags.get("hsr_requires_approval") or {}
+    if not approval:
+        return False
+
+    hsr.requires_approval = 1
+    hsr.jubilee_benefit = approval.get("jubilee_benefit")
+    hsr.benefit_code = approval.get("benefit_code")
+    hsr.benefit_name = frappe.db.get_value(
+        "Jubilee Benefit", approval.get("jubilee_benefit"), "benefit_name"
+    )
+    hsr.jubilee_procedure = jubilee_procedure
+    hsr.db_update()
+
+    return True
 
 
 def get_encounter_services(doc):
