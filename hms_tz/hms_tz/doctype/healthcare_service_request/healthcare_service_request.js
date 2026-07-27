@@ -226,11 +226,12 @@ var call_approval_check = (frm, method, freeze_message) => {
     freeze_message: freeze_message,
     callback: (r) => {
       let data = r.message || {};
+      let amount_note = get_amount_note(data);
 
       if (data.status && data.status !== "ERROR") {
         frappe.utils.play_sound("success");
         frappe.show_alert({
-          message: __(data.description || data.status),
+          message: __(data.description || data.status) + amount_note,
           indicator: "green",
         });
       } else {
@@ -238,13 +239,26 @@ var call_approval_check = (frm, method, freeze_message) => {
         frappe.msgprint({
           title: __("Pre-Authorization"),
           indicator: "red",
-          message: __(data.description || "Unknown error"),
+          message: (data.description || __("Unknown error")) + amount_note,
         });
       }
 
       frm.reload_doc();
     },
   });
+};
+
+var get_amount_note = (data) => {
+  if (!data.amount && !data.approved_amount) {
+    return "";
+  }
+
+  let requested = format_currency(data.amount || 0);
+  let approved = format_currency(data.approved_amount || 0);
+
+  return `<br>${__("Requested Amount")}: <b>${requested}</b> | ${__(
+    "Approved Amount"
+  )}: <b>${approved}</b>`;
 };
 
 var set_preauth_headline = (frm) => {
