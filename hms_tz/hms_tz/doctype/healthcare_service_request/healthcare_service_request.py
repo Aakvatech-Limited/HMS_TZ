@@ -6,7 +6,7 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 from frappe.query_builder import DocType
-from frappe.utils import get_link_to_form
+from frappe.utils import flt, fmt_money, get_link_to_form
 
 from hms_tz.nhif.api.healthcare_utils import *
 
@@ -26,6 +26,7 @@ class HealthcareServiceRequest(Document):
 
     def before_submit(self):
         self.validate_approval_status()
+        self.validate_approved_amount()
         self.validate_service_percentage()
 
     def on_submit(self):
@@ -275,6 +276,29 @@ class HealthcareServiceRequest(Document):
                     f"<b>{self.approval_status or 'not yet received'}</b>.<br>"
                     "Please click <b>Get Pre-Auth Status</b> and wait for a resolved "
                     "response before submitting."
+                )
+            )
+
+    def validate_approved_amount(self):
+        """Block submission when the Jubilee insurance rows, across every Service
+        Request on this appointment, exceed the approved amount."""
+
+        if not self.requires_approval:
+            return
+
+        if not self.approved_amount:
+            return
+
+        from hms_tz.jubilee.api.preauthorization import get_jubilee_payment_rows
+
+        total_amount = sum(flt(row.amount) for row in get_jubilee_payment_rows(self.appointment))
+
+        if total_amount > flt(self.approved_amount):
+            frappe.throw(
+                _(
+                    f"Total amount of Jubilee services <b>{fmt_money(total_amount)}</b> exceeds "
+                    f"the approved amount <b>{fmt_money(self.approved_amount)}</b>.<br>"
+                    "Please move the extra services to cash payment or cancel them before submitting."
                 )
             )
 
