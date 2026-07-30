@@ -1,5 +1,5 @@
-exclude: "node_modules|.git|hms_tz/public/frontend"
-default_stages: [commit, manual]
+exclude: "node_modules|.git|hms_tz/public/frontend|frappe-semgrep-rules"
+default_stages: [pre-commit, manual]
 fail_fast: false
 
 repos:
@@ -117,7 +117,19 @@ repos:
         # Make autopep8 report issues but not block the commit
         stages: [manual]
 
+  - repo: local
+    hooks:
+      - id: frappe-semgrep-rules
+        name: "Frappe Semgrep Security Rules"
+        entry: bash -c 'if [ ! -d frappe-semgrep-rules/.git ]; then rm -rf frappe-semgrep-rules && GIT_TEMPLATE_DIR="" git clone --depth 1 https://github.com/frappe/semgrep-rules.git frappe-semgrep-rules; fi && semgrep scan --config ./frappe-semgrep-rules/rules --config r/python.lang.security --severity=ERROR --error --quiet "$@"' --
+        language: python
+        additional_dependencies: ["semgrep"]
+        types: [python]
+        files: "^hms_tz/.*\\.py$"
+        pass_filenames: true
+        require_serial: true
+
 ci:
   autoupdate_schedule: weekly
-  skip: []
+  skip: [frappe-semgrep-rules]
   submodules: false
