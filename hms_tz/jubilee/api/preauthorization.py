@@ -264,17 +264,50 @@ def get_service_request_items(hsr_doc):
     return items
 
 
-def get_source_from_service_request(hsr_doc):
+def get_bill_no(service_request_name):
+    """BillNo Jubilee expects: the Service Request name without its naming series prefix."""
+    return "".join(service_request_name.split("-")[1:])
+
+
+def get_preauth_cycle_reference(appointment):
+    """The Service Request that opened this appointment's pre-authorization cycle.
+
+    Jubilee treats one appointment as a single pre-authorization: the first
+    Service Request sends, every later one updates against that same BillNo.
+    Returns None until a send has actually succeeded, so a failed first attempt
+    still sends rather than updating a submission that does not exist.
+    """
+    return frappe.db.get_value(
+        "Healthcare Service Request",
+        {
+            "appointment": appointment,
+            "requires_approval": 1,
+            "submission_id": ["is", "set"],
+            "docstatus": ["<", 2],
+        },
+        ["name", "submission_id"],
+        order_by="creation asc",
+        as_dict=True,
+    )
+
+
+def get_source_from_service_request(hsr_doc, cycle_reference=None):
     """Normalize a Healthcare Service Request into pre-auth source fields.
 
     Patient demographics come from Patient and Patient Appointment; items come
     from the Jubilee payment rows, whose item_code already holds the insurer
     ref code. The claimed total is summed from those same rows, so it can never
     drift from what is actually sent.
+
+    BillNo comes from the Service Request that opened the cycle, since
+    UpdatePreauthorization must reuse the BillNo of the original send.
     """
     appointment_doc = frappe.get_cached_doc("Patient Appointment", hsr_doc.appointment)
     patient_doc = frappe.get_cached_doc("Patient", hsr_doc.patient)
     posting = getdate(hsr_doc.posting_datetime)
+
+    if cycle_reference is None:
+        cycle_reference = get_preauth_cycle_reference(hsr_doc.appointment)
 
     folio_items = get_service_request_items(hsr_doc)
 
@@ -308,7 +341,7 @@ def get_source_from_service_request(hsr_doc):
         "total_amount": sum(d.amount_claimed or 0 for d in folio_items),
         "jubilee_procedure": hsr_doc.jubilee_procedure or "",
         "benefit_code": hsr_doc.benefit_code or "",
-        "bill_no": "".join(hsr_doc.name.split("-")[1:]),
+        "bill_no": get_bill_no(cycle_reference.name if cycle_reference else hsr_doc.name),
         "folio_diseases": get_encounter_diseases(get_source_encounters(hsr_doc)),
         "folio_items": folio_items,
     })
@@ -365,14 +398,23 @@ def add_service_request_comment(hsr_doc, title, result):
 
 
 def send_service_request_preauthorization(service_request_name):
-    """Send SendPreauthorization for a Healthcare Service Request and persist the result."""
+    """Send the pre-authorization for a Healthcare Service Request and persist the result.
+
+    The appointment, not the Service Request, is the pre-authorization cycle:
+    the first Service Request sends, and every later one Jubilee sees for that
+    appointment updates the same submission.
+    """
 
     hsr_doc = frappe.get_doc("Healthcare Service Request", service_request_name)
     setting_doc = get_jubilee_setting(hsr_doc.company)
 
-    entities = get_preauth_entities(get_source_from_service_request(hsr_doc))
+    cycle_reference = get_preauth_cycle_reference(hsr_doc.appointment)
+
+    entities = get_preauth_entities(get_source_from_service_request(hsr_doc, cycle_reference))
     payload = json.dumps({"entities": [entities]})
-    request_type, url, headers = get_preauth_endpoint(setting_doc, hsr_doc.submission_id)
+    request_type, url, headers = get_preauth_endpoint(
+        setting_doc, cycle_reference.submission_id if cycle_reference else None
+    )
 
     result = {"status": "ERROR", "submission_id": "", "description": ""}
     response = None
@@ -399,6 +441,13 @@ def send_service_request_preauthorization(service_request_name):
             response.status_code if response else "NO STATUS CODE",
         )
         result["description"] = str(error_text)
+
+    # An update response need not repeat the submission id, so fall back to the
+    # cycle's own: the status check reads it from whichever Service Request the
+    # billing team has open.
+    result["submission_id"] = result["submission_id"] or (
+        cycle_reference.submission_id if cycle_reference else ""
+    )
 
     frappe.db.set_value(
         "Healthcare Service Request",
@@ -492,12 +541,18 @@ def get_service_request_preauth_status(service_request_name):
         result["description"] = str(error_text)
         approval_status, approval_description = "ERROR", str(error_text)
 
+    desc = ""
+    if approval_status != "ERROR":
+        desc = "Requested Amount: <b>{0}</b> | Approved Amount: <b>{1}</b>".format(requested_amount, approved_amount)
+    else:
+        desc = approval_description
+
     frappe.db.set_value(
         "Healthcare Service Request",
         hsr_doc.name,
         {
             "approval_status": approval_status,
-            "approval_description": approval_description[:1000],
+            "approval_description": desc,
             "approved_amount": approved_amount,
         },
         update_modified=False,
@@ -506,7 +561,7 @@ def get_service_request_preauth_status(service_request_name):
     add_service_request_comment(
         hsr_doc,
         "Jubilee approval status checked",
-        {"status": approval_status, "description": approval_description},
+        {"status": approval_status, "description": desc},
     )
 
     return result
