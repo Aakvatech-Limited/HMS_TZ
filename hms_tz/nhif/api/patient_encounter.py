@@ -1913,9 +1913,14 @@ def set_admission_service_type(doc):
 
 
 def validate_preapproval_services(doc):
-    if not doc.insurance_company or "NHIF" not in doc.insurance_company:
-        return
+    if doc.insurance_company and "NHIF" in doc.insurance_company:
+        validate_nhif_pre_approval(doc)
 
+    if doc.insurance_company and "Jubilee" in doc.insurance_company:
+        validate_jubilee_pre_approval(doc)
+
+
+def validate_nhif_pre_approval(doc):
     if not frappe.get_cached_value(
         "HMS TZ Setting",
         doc.company,
@@ -1930,8 +1935,41 @@ def validate_preapproval_services(doc):
                 row.get("prescribe")
                 or row.get("is_not_available_inhouse")
                 or row.get("is_cancelled")
-                or row.get("is_restricted")
+                # or row.get("is_restricted")
                 or row.get("preapproval_status") in ["Accepted", "REJECTED"]
+                or row.get("preapproval_no")
+            ):
+                continue
+
+            eligible_pre_approval_services.append(row.get(child.get("item")))
+
+    if len(eligible_pre_approval_services) > 0:
+        frappe.throw(
+            f"Pre-Approval is required for the <b>{len(eligible_pre_approval_services)}</b> service(s)\
+              before submitting this encounter <br>Please request pre-approval"
+        )
+
+
+def validate_jubilee_pre_approval(doc):
+    if not frappe.get_cached_value(
+        "HMS TZ Setting",
+        doc.company,
+        "enable_jubilee_api"
+    ):
+        return
+
+    if frappe.flags.hsr_requires_approval:
+        return
+
+    eligible_pre_approval_services = []
+    for child in get_childs_map():
+        for row in doc.get(child.get("table")):
+            if (
+                row.get("prescribe")
+                or row.get("is_not_available_inhouse")
+                or row.get("is_cancelled")
+                # or row.get("is_restricted")
+                or row.get("preapproval_status") in ["Accepted", "REJECTED", "OK"]
                 or row.get("preapproval_no")
             ):
                 continue
