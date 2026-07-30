@@ -290,7 +290,8 @@ class LRPMTReturns(Document):
                 sales_doc = frappe.get_doc("Delivery Note", dn)
 
                 for item in sales_doc.items:
-                    for dd_n in self.drug_items:
+                    # appends to sales_items, a different table
+                    for dd_n in self.drug_items:  # nosemgrep
                         if item.item_code == dd_n.drug_name:
                             self.append(
                                 "sales_items",

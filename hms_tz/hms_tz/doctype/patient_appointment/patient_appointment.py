@@ -726,7 +726,8 @@ def send_message(doc, message):
             context["comments"] = json.loads(doc.get("_comments"))
 
         # jinja to string convertion happens here
-        message = frappe.render_template(message, context)
+        # template from Healthcare Settings
+        message = frappe.render_template(message, context)  # nosemgrep
         number = [patient_mobile]
         try:
             send_sms(number, message)

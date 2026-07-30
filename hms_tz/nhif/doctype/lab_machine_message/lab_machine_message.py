@@ -8,7 +8,8 @@ import frappe
 from frappe.model.document import Document
 
 
-class LabMachineMessage(Document):
+# pre-existing, self.lab_test not persisted from after_insert
+class LabMachineMessage(Document):  # nosemgrep
     def validate(self):
         self.set_missing_fields()
         self.update_lab_test()

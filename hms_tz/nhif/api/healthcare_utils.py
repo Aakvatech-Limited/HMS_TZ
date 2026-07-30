@@ -543,7 +543,9 @@ def get_app_branch(app):
     import subprocess
 
     try:
-        branch = subprocess.check_output(f"cd ../apps/{app} && git rev-parse --abbrev-ref HEAD", shell=True)
+        branch = subprocess.check_output(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=f"../apps/{app}"
+        )
         branch = branch.decode("utf-8")
         branch = branch.strip()
         return branch
@@ -2178,7 +2180,6 @@ def create_invoiced_items_if_not_created(from_date='', to_date=''):
                                 "template": ltt_doc.name,
                                 "practitioner": patient_encounter_doc.practitioner,
                                 "source": patient_encounter_doc.source,
-                                "prescribe": child.prescribe,
                                 "insurance_subscription": (
                                     patient_encounter_doc.insurance_subscription
                                     if patient_encounter_doc.insurance_subscription
@@ -2217,7 +2218,6 @@ def create_invoiced_items_if_not_created(from_date='', to_date=''):
                                 "radiology_examination_template": child.radiology_examination_template,
                                 "practitioner": patient_encounter_doc.practitioner,
                                 "source": patient_encounter_doc.source,
-                                "prescribe": child.prescribe,
                                 "insurance_subscription": (
                                     patient_encounter_doc.insurance_subscription
                                     if patient_encounter_doc.insurance_subscription
@@ -2262,7 +2262,6 @@ def create_invoiced_items_if_not_created(from_date='', to_date=''):
                                 "procedure_template": child.procedure,
                                 "practitioner": patient_encounter_doc.practitioner,
                                 "source": patient_encounter_doc.source,
-                                "prescribe": child.prescribe,
                                 "insurance_subscription": patient_encounter_doc.insurance_subscription,
                                 "medical_department": frappe.get_cached_value(
                                     "Clinical Procedure Template",
@@ -2515,8 +2514,7 @@ def auto_finalize_patient_encounters():
                 "docstatus": 1,
                 "duplicated": 0,
                 "finalized": 0,
-                "encounter_date": [">=", start_date],
-                "encounter_date": ["<=", encounter_date],
+                "encounter_date": ["between", [start_date, encounter_date]],
                 "company": row.company,
             },
             ["name", "reference_encounter", "inpatient_record"],

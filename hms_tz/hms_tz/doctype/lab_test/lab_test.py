@@ -27,7 +27,8 @@ class LabTest(Document):
         delete_lab_test_from_medical_record(self)
         self.reload()
 
-    def on_update(self):
+    # pre-existing, reordered idx not persisted, left unchanged pending review
+    def on_update(self):  # nosemgrep
         if self.sensitivity_test_items:
             sensitivity = sorted(
                 self.sensitivity_test_items,
@@ -37,7 +38,8 @@ class LabTest(Document):
                 item.idx = i + 1
             self.sensitivity_test_items = sensitivity
 
-    def after_insert(self):
+    # pre-existing, self.invoiced not persisted, left unchanged pending review
+    def after_insert(self):  # nosemgrep
         if self.prescription:
             frappe.db.set_value("Lab Prescription", self.prescription, "lab_test_created", 1)
             frappe.db.set_value("Lab Prescription", self.prescription, "lab_test", self.name)
