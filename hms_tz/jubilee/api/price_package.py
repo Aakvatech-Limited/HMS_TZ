@@ -53,14 +53,6 @@ def process_jubilee_records(company):
     )
     frappe.msgprint("Processing Jubilee Coverages via backaground job", alert=True)
 
-    enqueue(
-        method=process_jubilee_coverages,
-        queue="default",
-        timeout=3600,
-        is_async=True,
-        company=company,
-    )
-    frappe.msgprint("Processing Jubilee Coverages via backaground job", alert=True)
 
 def get_price_package(company):
     if not company:
