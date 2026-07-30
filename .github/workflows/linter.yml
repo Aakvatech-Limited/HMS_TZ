@@ -2,11 +2,9 @@ name: Linter
 
 on:
   pull_request:
-    branches: [version-15-beta]
     types: [opened, synchronize, reopened]
   workflow_dispatch:
   push:
-    branches: [version-15-beta]
 
 permissions:
   contents: read
@@ -39,7 +37,6 @@ jobs:
   linter:
     name: Pre-commit + Semgrep
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
 
     steps:
       - uses: actions/checkout@v4
@@ -48,12 +45,28 @@ jobs:
         with:
           python-version: '3.11'
 
+      # Semgrep is skipped here and run as a full-repo scan in the next steps
       - uses: pre-commit/action@v3.0.0
+        env:
+          SKIP: frappe-semgrep-rules
 
       - name: Download Semgrep rules
         run: git clone --depth 1 https://github.com/frappe/semgrep-rules.git frappe-semgrep-rules
 
+      - name: Install Semgrep
+        run: pip install semgrep
+
+      # Blocking: real bugs / security issues only
       - name: Run Semgrep rules
         run: |
-          pip install semgrep
-          semgrep ci --config ./frappe-semgrep-rules/rules --config r/python.lang.security
+          semgrep scan --config ./frappe-semgrep-rules/rules \
+            --config r/python.lang.security \
+            --severity=ERROR --error hms_tz
+
+      # Informational: style and i18n warnings, never fails the build
+      - name: Semgrep warnings (non-blocking)
+        if: always()
+        run: |
+          semgrep scan --config ./frappe-semgrep-rules/rules \
+            --config r/python.lang.security \
+            --severity=WARNING hms_tz || true

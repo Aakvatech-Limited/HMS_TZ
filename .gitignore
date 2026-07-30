@@ -94,3 +94,6 @@ dist/
 build/
 *.apk  # Android packages
 *.ipa  # iOS packages
+
+# Semgrep rules cloned by pre-commit / CI
+frappe-semgrep-rules/
