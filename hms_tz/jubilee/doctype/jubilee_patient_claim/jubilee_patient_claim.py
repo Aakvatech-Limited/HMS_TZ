@@ -197,9 +197,6 @@ class JubileePatientClaim(Document):
             self.patient_appointment,
             ["appointment_date", "appointment_time"],
         )
-        self.set_practitioner_values(encounter_list)
-        self.set_patient_claim_disease(encounter_list)
-        self.set_patient_claim_item(encounter_list)
         self.claim_year = int(self.attendance_date.strftime("%Y"))
         self.claim_month = int(self.attendance_date.strftime("%m"))
         self.patient_type_code = "OUT"
@@ -216,6 +213,10 @@ class JubileePatientClaim(Document):
 
         # Do not set inpatient values because JPC will always be created during or before patient admission
         # self.set_inpatient_values(encounter_list)
+
+        self.set_practitioner_values(encounter_list)
+        self.set_patient_claim_disease(encounter_list)
+        self.set_patient_claim_item(encounter_list)
 
     def set_practitioner_values(self, encounter_list):
         self.practitioners = []
@@ -417,6 +418,9 @@ class JubileePatientClaim(Document):
             return
 
         if not hsr_row.insurance_company or "Jubilee" not in hsr_row.insurance_company:
+            return
+
+        if hsr_row.percent_covered == 0:
             return
 
         new_row = self.append("jubilee_patient_claim_item", {})
