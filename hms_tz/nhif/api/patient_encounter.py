@@ -1705,7 +1705,6 @@ def validate_medication_class(company, encounter, patient, drug_item, caller="Ba
 
 
 def set_practitioner_name(doc, method):
-    return
     practitioner_info = frappe.get_cached_value(
         "Healthcare Practitioner",
         {"user_id": frappe.session.user, "hms_tz_company": doc.company},
