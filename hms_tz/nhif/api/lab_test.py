@@ -302,7 +302,8 @@ def send_sms_for_lab_results(doc):
             if len(draft_labs) == 0:
                 phone_number = [doc.mobile]
                 if lab_result_sms_template and phone_number:
-                    msg = frappe.render_template(lab_result_sms_template, {"doc": doc})
+                    # admin template
+                    msg = frappe.render_template(lab_result_sms_template, {"doc": doc})  # nosemgrep
                     send_sms(phone_number, msg, success_msg=False)
                     sms_sent = True
                     frappe.msgprint(

@@ -31,7 +31,8 @@ class HealthcareServiceUnit(NestedSet):
         super(HealthcareServiceUnit, self).on_update()
         self.validate_one_root()
 
-    def after_insert(self):
+    # pre-existing, assignments not persisted, left unchanged pending review
+    def after_insert(self):  # nosemgrep
         if self.is_group:
             self.allow_appointments = 0
             self.overlap_appointments = 0

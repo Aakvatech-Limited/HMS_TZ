@@ -21,7 +21,7 @@ class TestPatientAppointment(unittest.TestCase):
 
     def test_status(self):
         patient, medical_department, practitioner = create_healthcare_docs()
-        frappe.db.set_value("Healthcare Settings", None, "automate_appointment_invoicing", 0)
+        frappe.db.set_single_value("Healthcare Settings", "automate_appointment_invoicing", 0)
         appointment = create_appointment(patient, practitioner, nowdate())
         self.assertEqual(appointment.status, "Open")
         appointment = create_appointment(patient, practitioner, add_days(nowdate(), 2))
@@ -34,7 +34,7 @@ class TestPatientAppointment(unittest.TestCase):
 
     def test_start_encounter(self):
         patient, medical_department, practitioner = create_healthcare_docs()
-        frappe.db.set_value("Healthcare Settings", None, "automate_appointment_invoicing", 1)
+        frappe.db.set_single_value("Healthcare Settings", "automate_appointment_invoicing", 1)
         appointment = create_appointment(patient, practitioner, add_days(nowdate(), 4), invoice=1)
         self.assertEqual(
             frappe.get_cached_value("Patient Appointment", appointment.name, "invoiced"),
@@ -53,15 +53,15 @@ class TestPatientAppointment(unittest.TestCase):
 
     def test_invoicing(self):
         patient, medical_department, practitioner = create_healthcare_docs()
-        frappe.db.set_value("Healthcare Settings", None, "enable_free_follow_ups", 0)
-        frappe.db.set_value("Healthcare Settings", None, "automate_appointment_invoicing", 0)
+        frappe.db.set_single_value("Healthcare Settings", "enable_free_follow_ups", 0)
+        frappe.db.set_single_value("Healthcare Settings", "automate_appointment_invoicing", 0)
         appointment = create_appointment(patient, practitioner, nowdate())
         self.assertEqual(
             frappe.get_cached_value("Patient Appointment", appointment.name, "invoiced"),
             0,
         )
 
-        frappe.db.set_value("Healthcare Settings", None, "automate_appointment_invoicing", 1)
+        frappe.db.set_single_value("Healthcare Settings", "automate_appointment_invoicing", 1)
         appointment = create_appointment(patient, practitioner, add_days(nowdate(), 2), invoice=1)
         self.assertEqual(
             frappe.get_cached_value("Patient Appointment", appointment.name, "invoiced"),
@@ -84,10 +84,10 @@ class TestPatientAppointment(unittest.TestCase):
 
     def test_appointment_cancel(self):
         patient, medical_department, practitioner = create_healthcare_docs()
-        frappe.db.set_value("Healthcare Settings", None, "enable_free_follow_ups", 1)
-        frappe.db.set_value("Healthcare Settings", None, "automate_appointment_invoicing", 0)
-        frappe.db.set_value("Healthcare Settings", None, "max_visits", 1)
-        frappe.db.set_value("Healthcare Settings", None, "valid_days", 7)
+        frappe.db.set_single_value("Healthcare Settings", "enable_free_follow_ups", 1)
+        frappe.db.set_single_value("Healthcare Settings", "automate_appointment_invoicing", 0)
+        frappe.db.set_single_value("Healthcare Settings", "max_visits", 1)
+        frappe.db.set_single_value("Healthcare Settings", "valid_days", 7)
         appointment = create_appointment(patient, practitioner, nowdate())
         fee_validity = frappe.db.get_value(
             "Fee Validity",
@@ -105,8 +105,8 @@ class TestPatientAppointment(unittest.TestCase):
             visited - 1,
         )
 
-        frappe.db.set_value("Healthcare Settings", None, "enable_free_follow_ups", 0)
-        frappe.db.set_value("Healthcare Settings", None, "automate_appointment_invoicing", 1)
+        frappe.db.set_single_value("Healthcare Settings", "enable_free_follow_ups", 0)
+        frappe.db.set_single_value("Healthcare Settings", "automate_appointment_invoicing", 1)
         appointment = create_appointment(patient, practitioner, nowdate(), invoice=1)
         update_status(appointment.name, "Cancelled")
         # check invoice cancelled
@@ -204,8 +204,8 @@ def create_encounter(appointment):
 
 def create_appointment(patient, practitioner, appointment_date, invoice=0, procedure_template=0):
     item = create_healthcare_service_items()
-    frappe.db.set_value("Healthcare Settings", None, "inpatient_visit_charge_item", item)
-    frappe.db.set_value("Healthcare Settings", None, "op_consulting_charge_item", item)
+    frappe.db.set_single_value("Healthcare Settings", "inpatient_visit_charge_item", item)
+    frappe.db.set_single_value("Healthcare Settings", "op_consulting_charge_item", item)
     company = get_default_company()
     appointment = frappe.new_doc("Patient Appointment")
     appointment.patient = patient

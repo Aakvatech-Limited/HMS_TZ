@@ -1095,7 +1095,8 @@ class JubileePatientClaim(Document):
                 d = item.ref_docname.split(",")
                 ref_docnames.extend(d)
 
-        for row in self.jubilee_patient_claim_item:
+        # appends to original_jubilee_patient_claim_item
+        for row in self.jubilee_patient_claim_item:  # nosemgrep
             if row.ref_docname not in ref_docnames:
                 new_row = row.as_dict()
                 for fieldname in [

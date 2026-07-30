@@ -6,7 +6,8 @@ import frappe
 
 from hms_tz.nhif.api.patient_appointment import get_insurance_amount
 
-appointment_list = frappe.db.sql(
+# one-off 2021 patch, not registered in patches.txt
+appointment_list = frappe.db.sql(  # nosemgrep
     "SELECT name, insurance_subscription, billing_item, company, insurance_company FROM `tabPatient Appointment` WHERE paid_amount = 0 AND insurance_subscription IS NOT NULL AND billing_item IS NOT NULL AND appointment_date BETWEEN '2021-03-23' AND '2021-04-05",
     as_dict=1,
 )

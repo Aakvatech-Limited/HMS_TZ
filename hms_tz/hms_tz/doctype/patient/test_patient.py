@@ -13,7 +13,7 @@ from hms_tz.hms_tz.doctype.patient_appointment.test_patient_appointment import c
 class TestPatient(unittest.TestCase):
     def test_customer_created(self):
         frappe.db.sql("""delete from `tabPatient`""")
-        frappe.db.set_value("Healthcare Settings", None, "link_customer_to_patient", 1)
+        frappe.db.set_single_value("Healthcare Settings", "link_customer_to_patient", 1)
         patient = create_patient()
         self.assertTrue(frappe.get_cached_value("Patient", patient, "customer"))
 
