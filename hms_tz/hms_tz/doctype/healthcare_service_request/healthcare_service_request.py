@@ -286,9 +286,6 @@ class HealthcareServiceRequest(Document):
         if not self.requires_approval:
             return
 
-        if not self.approved_amount:
-            return
-
         from hms_tz.jubilee.api.preauthorization import get_jubilee_payment_rows
 
         total_amount = sum(flt(row.amount) for row in get_jubilee_payment_rows(self.appointment))
