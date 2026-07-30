@@ -5,9 +5,7 @@ from unittest.mock import patch
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from hms_tz.hms_tz.doctype.healthcare_service_request.healthcare_service_request import (
-    set_approval_state,
-)
+from hms_tz.hms_tz.doctype.healthcare_service_request.healthcare_service_request import set_approval_state
 
 
 def jubilee_rows(*amounts):
