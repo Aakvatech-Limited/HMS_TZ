@@ -418,6 +418,9 @@ class NHIFPatientClaim(Document):
         if not hsr_row.insurance_company or "NHIF" not in hsr_row.insurance_company:
             return
 
+        if hsr_row.percent_covered == 0:
+            return
+
         new_row = self.append("nhif_patient_claim_item", {})
         new_row.item_name = hsr_row.service_name
         new_row.item_code = hsr_row.item_code
