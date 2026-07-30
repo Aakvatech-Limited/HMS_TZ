@@ -2575,7 +2575,7 @@ function show_preauth_dialog(frm, data) {
           <div style="border-left: 4px solid #ffc107; background-color: #fff3cd;
                       padding: 15px; border-radius: 10px;
                       box-shadow: 0 2px 6px rgba(0,0,0,0.1); margin: 10px 0;">
-            <p style="font-size: 16px; font-weight: bold;">⚠️ ${data.description}</p>
+            <p style="font-size: 16px; font-weight: bold;">${data.description}</p>
             <p style="font-size: 14px;">
               The total amount of the services exceeds the patient's daily balance.
             </p>
@@ -2616,7 +2616,6 @@ function show_preauth_dialog(frm, data) {
 
           if (result.status === "OK") {
             frappe.utils.play_sound("submit");
-            // <p style="font-size: 16px; font-weight: bold;">✅ Pre-Authorization Request Sent</p>
             frappe.msgprint({
               title: __("Pre-Authorization Request Sent"),
               indicator: "green",
@@ -2624,7 +2623,6 @@ function show_preauth_dialog(frm, data) {
                 <div style="border-left: 4px solid #28a745; background-color: #d4edda;
                             padding: 15px; border-radius: 10px;
                             box-shadow: 0 2px 6px rgba(0,0,0,0.1); margin: 10px 0;">
-
                   <p style="font-size: 14px;">Submission ID: <b>${
                     result.submission_id || "N/A"
                   }</b></p>
