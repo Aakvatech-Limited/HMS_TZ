@@ -25,26 +25,34 @@ frappe.ui.form.on("Healthcare Service Request", {
       return;
     }
 
-    frm.add_custom_button(__("Request Pre-Authorization"), () => {
-      call_approval_check(
-        frm,
-        "send_approval_request",
-        __("Sending Pre-Auth Request...")
-      );
-    });
+    frm.add_custom_button(
+      __("Request Pre-Authorization"),
+      () => {
+        call_approval_check(
+          frm,
+          "send_approval_request",
+          __("Sending Pre-Auth Request...")
+        );
+      },
+      __("Jubilee")
+    );
   },
   get_approval_status: (frm) => {
     if (frm.is_new() || !frm.doc.submission_id) {
       return;
     }
 
-    frm.add_custom_button(__("Get Pre-Auth Status"), () => {
-      call_approval_check(
-        frm,
-        "get_approval_status",
-        __("Checking Pre-Auth Status...")
-      );
-    });
+    frm.add_custom_button(
+      __("Get Pre-Auth Status"),
+      () => {
+        call_approval_check(
+          frm,
+          "get_approval_status",
+          __("Checking Pre-Auth Status...")
+        );
+      },
+      __("Jubilee")
+    );
   },
   onload: (frm) => {
     set_filters(frm);
@@ -231,9 +239,11 @@ var call_approval_check = (frm, method, freeze_message) => {
       if (data.status && data.status !== "ERROR") {
         frappe.utils.play_sound("success");
         frappe.show_alert({
-          message: __(data.description || data.status) + amount_note,
+          message: __(data.status) + amount_note,
           indicator: "green",
         });
+
+        frappe.msgprint(amount_note);
       } else {
         frappe.utils.play_sound("error");
         frappe.msgprint({
