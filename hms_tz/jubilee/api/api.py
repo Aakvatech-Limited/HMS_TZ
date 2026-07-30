@@ -94,13 +94,12 @@ def create_jubilee_subscription(patient_id, card_no, insurance_provider):
         )
         return
 
-    company = get_default_company() or frappe.defaults.get_user_default("Company")
-
     plan_filters = {
         "is_active": 1,
         "insurance_company": ["like", "%Jubilee%"],
     }
-    company = get_default_company()
+
+    company = get_default_company() or frappe.defaults.get_user_default("Company")
     if company:
         plan_filters["company"] = company
 
