@@ -6,8 +6,10 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from hms_tz.jubilee.api.preauthorization import (
+    get_bill_no,
     get_jubilee_payment_rows,
     get_normalized_disease_code,
+    get_preauth_endpoint,
     get_preauth_entities,
     get_service_request_items,
     get_source_encounters,
@@ -255,6 +257,90 @@ class TestJubileePreauthorization(FrappeTestCase):
         self.assertEqual(source.total_amount, 500)
         self.assertEqual(source.folio_items[0].item_code, "REF-9")
         self.assertEqual(source.folio_diseases[0].disease_code, "A12.3")
+
+    def test_bill_no_strips_the_naming_series_prefix(self):
+        self.assertEqual(get_bill_no("HSR-2026-00001"), "202600001")
+
+    def test_endpoint_sends_without_a_cycle_and_updates_with_one(self):
+        """The appointment's first Service Request sends; later ones update."""
+        setting = frappe._dict({
+            "jubilee_url": "https://jubilee.test",
+            "get_jubilee_token": lambda: "token",
+        })
+
+        request_type, url, _headers = get_preauth_endpoint(setting, None)
+        self.assertEqual(request_type, "SendPreauthorization")
+        self.assertTrue(url.endswith("/jubileeapi/SendPreauthorization"))
+
+        request_type, url, _headers = get_preauth_endpoint(setting, "SUB-1")
+        self.assertEqual(request_type, "UpdatePreauthorization")
+        self.assertTrue(url.endswith("/jubileeapi/UpdatePreauthorization"))
+
+    def test_later_service_request_reuses_the_first_bill_no(self):
+        """UpdatePreauthorization must carry the BillNo of the original send."""
+        hsr = frappe._dict({
+            "name": "HSR-2026-00002",
+            "appointment": "APT-1",
+            "patient": "HLC-PAT-0001",
+            "posting_datetime": "2026-07-27 09:00:00",
+            "practitioner": None,
+            "company": "TestCo",
+            "card_no": "CARD-1",
+            "jubilee_procedure": "PROC-1",
+            "benefit_code": "7905",
+            "source_doctype": "Patient Encounter",
+            "source_docname": "PE-1",
+        })
+        cycle_reference = frappe._dict({"name": "HSR-2026-00001", "submission_id": "SUB-1"})
+
+        with (
+            patch(
+                "hms_tz.jubilee.api.preauthorization.get_service_request_items", return_value=[]
+            ),
+            patch("hms_tz.jubilee.api.preauthorization.get_encounter_diseases", return_value=[]),
+            patch("frappe.get_cached_doc", return_value=frappe._dict()),
+            patch("frappe.get_cached_value", return_value=""),
+        ):
+            from hms_tz.jubilee.api.preauthorization import get_source_from_service_request
+
+            source = get_source_from_service_request(hsr, cycle_reference)
+
+        self.assertEqual(source.bill_no, get_bill_no("HSR-2026-00001"))
+        self.assertNotEqual(source.bill_no, get_bill_no("HSR-2026-00002"))
+
+    def test_first_service_request_uses_its_own_bill_no(self):
+        """With no cycle open yet, the sending Service Request supplies the BillNo."""
+        hsr = frappe._dict({
+            "name": "HSR-2026-00001",
+            "appointment": "APT-1",
+            "patient": "HLC-PAT-0001",
+            "posting_datetime": "2026-07-27 09:00:00",
+            "practitioner": None,
+            "company": "TestCo",
+            "card_no": "CARD-1",
+            "jubilee_procedure": "PROC-1",
+            "benefit_code": "7905",
+            "source_doctype": "Patient Encounter",
+            "source_docname": "PE-1",
+        })
+
+        with (
+            patch(
+                "hms_tz.jubilee.api.preauthorization.get_service_request_items", return_value=[]
+            ),
+            patch("hms_tz.jubilee.api.preauthorization.get_encounter_diseases", return_value=[]),
+            patch(
+                "hms_tz.jubilee.api.preauthorization.get_preauth_cycle_reference",
+                return_value=None,
+            ),
+            patch("frappe.get_cached_doc", return_value=frappe._dict()),
+            patch("frappe.get_cached_value", return_value=""),
+        ):
+            from hms_tz.jubilee.api.preauthorization import get_source_from_service_request
+
+            source = get_source_from_service_request(hsr)
+
+        self.assertEqual(source.bill_no, get_bill_no("HSR-2026-00001"))
 
     def test_jar_and_hsr_items_build_identical_folio_items(self):
         """Both paths must send the same FolioItems shape, or payloads drift."""
