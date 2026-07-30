@@ -221,7 +221,7 @@ def after_insert(doc, method):
 
     if doc.insurance_provider == "Jubilee":
         card_no = doc.card_no or doc.national_id
-        create_jubilee_subscription(doc, card_no, "Jubilee")
+        create_jubilee_subscription(doc.name, card_no, "Jubilee")
 
 
 @frappe.whitelist()
