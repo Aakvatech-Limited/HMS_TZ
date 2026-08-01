@@ -289,7 +289,7 @@ def get_services(doc, preapproval_no=None):
                 row.get("prescribe")
                 or row.get("is_not_available_inhouse")
                 or row.get("is_cancelled")
-                or row.get("is_restricted")
+                # or row.get("is_restricted")
                 or row.get("preapproval_status") == "Accepted"
             ):
                 continue
