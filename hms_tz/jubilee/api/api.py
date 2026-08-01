@@ -512,7 +512,12 @@ def verify_jubilee_services(
             ),
         )
 
-        if "Pre-Authorization" in description or "Pre-Auth" in description:
+        if (
+            "Pre-Authorization" in description
+            or "Pre-Auth" in description
+            or "Prior Authorization" in description
+            or "Preauthorization" in description
+        ):
             return {
                 "action": "PreAuthRequired",
                 "description": description,
