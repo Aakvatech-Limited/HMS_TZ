@@ -5,7 +5,11 @@ import requests
 from frappe.core.utils import html2text
 from frappe.utils import nowdate
 
-from hms_tz.hms_tz.doctype.healthcare_service_request.healthcare_service_request import get_childs_map, get_item_refcode
+from hms_tz.hms_tz.doctype.healthcare_service_request.healthcare_service_request import (
+    get_childs_map,
+    get_item_rate,
+    get_item_refcode,
+)
 from hms_tz.nhif.doctype.nhif_response_log.nhif_response_log import add_log
 from hms_tz.nhif.nhif_api.referral import get_disease_code
 
@@ -19,6 +23,9 @@ def get_service_preapproval(
 ):
     # source doc can be either Patient Encounter or Medication Change Request
     source_doc = frappe.get_doc(ref_doctype, ref_docname)
+
+    if not settings_doc:
+        settings_doc = frappe.get_cached_doc("HMS TZ Setting", source_doc.company)
 
     services, service_map, diseases = get_services(source_doc)
     if len(services) == 0:
@@ -65,13 +72,11 @@ def get_service_preapproval(
         "practitionerNo": mct_code,
         "practitionersRemarks": "",
         "telephoneNo": mobile,
+        "facilityCode": settings_doc.facility_code,
         "diseases": diseases,
         "requestedServices": services,
     }
     payload = json.dumps(payload)
-
-    if not settings_doc:
-        settings_doc = frappe.get_cached_doc("HMS TZ Setting", source_doc.company)
 
     url = f"{settings_doc.nhifservice_url}/api/PreApprovals/RequestServices"
 
@@ -300,6 +305,13 @@ def get_services(doc, preapproval_no=None):
                 doc.company,
                 doc.insurance_company
             )
+            item_rate = get_item_rate(
+                row.get(child.get("item")),
+                doc.company,
+                doc.insurance_subscription,
+                doc.insurance_company
+            )
+
             services.append(
                 {
                     "itemCode": ref_code,
@@ -307,6 +319,7 @@ def get_services(doc, preapproval_no=None):
                     "effectiveDate": str(nowdate()),
                     "endDate": str(nowdate()),
                     "quantityRequested": row.get("quantity") or 1,
+                    "unitPrice": item_rate,
                     "remarks": "",
                 }
             )
