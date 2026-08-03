@@ -305,8 +305,9 @@ def get_services(doc, preapproval_no=None):
                 doc.company,
                 doc.insurance_company
             )
+            item = frappe.get_cached_value(child.get("doctype"), row.get(child.get("item")), "item")
             item_rate = get_item_rate(
-                row.get(child.get("item")),
+                item,
                 doc.company,
                 doc.insurance_subscription,
                 doc.insurance_company
