@@ -27,6 +27,9 @@ class LabTest(Document):
         delete_lab_test_from_medical_record(self)
         self.reload()
 
+    def on_update_after_submit(self):
+        update_lab_test_medical_record(self)
+
     # pre-existing, reordered idx not persisted, left unchanged pending review
     def on_update(self):  # nosemgrep
         if self.sensitivity_test_items:
@@ -405,7 +408,7 @@ def get_employee_by_user_id(user_id):
     return None
 
 
-def insert_lab_test_to_medical_record(doc):
+def get_lab_test_medical_record_subject(doc):
     table_row = False
     subject = cstr(doc.lab_test_name)
     if doc.practitioner:
@@ -446,15 +449,32 @@ def insert_lab_test_to_medical_record(doc):
     if doc.custom_result:
         subject += "<br>" + cstr(doc.custom_result)
 
+    return subject
+
+
+def insert_lab_test_to_medical_record(doc):
     medical_record = frappe.new_doc("Patient Medical Record")
     medical_record.patient = doc.patient
-    medical_record.subject = subject
+    medical_record.subject = get_lab_test_medical_record_subject(doc)
     medical_record.status = "Open"
     medical_record.communication_date = doc.submitted_date
     medical_record.reference_doctype = "Lab Test"
     medical_record.reference_name = doc.name
     medical_record.reference_owner = doc.owner
     medical_record.save(ignore_permissions=True)
+
+
+def update_lab_test_medical_record(doc):
+    medical_record_id = frappe.db.exists("Patient Medical Record", {"reference_name": doc.name})
+    if not medical_record_id:
+        return
+
+    frappe.db.set_value(
+        "Patient Medical Record",
+        medical_record_id,
+        "subject",
+        get_lab_test_medical_record_subject(doc),
+    )
 
 
 def delete_lab_test_from_medical_record(self):
