@@ -64,7 +64,7 @@ def get_price_package(company):
     headers = {"Authorization": "Bearer " + token}
     url = str(settings_doc.jubilee_url) + "/jubileeapi/GetPriceList"
 
-    r = requests.get(url, headers=headers, timeout=60)
+    r = requests.get(url, headers=headers, timeout=120)
     if r.status_code != 200:
         add_jubilee_log(
             request_type="GetPricePackage",
