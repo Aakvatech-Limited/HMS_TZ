@@ -151,7 +151,7 @@ class HMSTZSetting(Document):
 
 		for i in range(3):
 			try:
-				r = requests.request("POST", url, headers=headers, data=payload, timeout=5)
+				r = requests.request("POST", url, headers=headers, data=payload, timeout=60)
 				r.raise_for_status()
 
 				data = json.loads(r.text)
