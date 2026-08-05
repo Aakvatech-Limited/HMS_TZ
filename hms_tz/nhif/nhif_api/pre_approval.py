@@ -24,6 +24,13 @@ def get_service_preapproval(
     # source doc can be either Patient Encounter or Medication Change Request
     source_doc = frappe.get_doc(ref_doctype, ref_docname)
 
+    insurance_company = source_doc.get("insurance_company") or ""
+    if "NHIF" not in insurance_company:
+        frappe.throw(
+            f"Cannot request NHIF pre-approval: {ref_doctype} {ref_docname} "
+            f"belongs to insurance company '{insurance_company}', not NHIF"
+        )
+
     if not settings_doc:
         settings_doc = frappe.get_cached_doc("HMS TZ Setting", source_doc.company)
 
@@ -186,6 +193,14 @@ def cancel_preapproval(
     settings_doc=None,
 ):
     source_doc = frappe.get_cached_doc(ref_doctype, ref_docname)
+
+    insurance_company = source_doc.get("insurance_company") or ""
+    if "NHIF" not in insurance_company:
+        frappe.throw(
+            f"Cannot cancel NHIF pre-approval: {ref_doctype} {ref_docname} "
+            f"belongs to insurance company '{insurance_company}', not NHIF"
+        )
+
     services, service_map, diseases = get_services(source_doc, preapproval_no)
     if len(services) == 0:
         frappe.msgprint("No servuce(s) to cancel an Pre-Approvals")

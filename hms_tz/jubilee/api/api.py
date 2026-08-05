@@ -451,6 +451,15 @@ def verify_jubilee_services(
 
     source_doc = frappe.get_doc(source_doctype, source_docname)
 
+    insurance_company = source_doc.get("insurance_company") or ""
+    if "Jubilee" not in insurance_company:
+        frappe.throw(
+            _(
+                "Cannot verify Jubilee services: {0} {1} belongs to insurance "
+                "company '{2}', not Jubilee"
+            ).format(source_doctype, source_docname, insurance_company)
+        )
+
     services, service_map, total_amount = get_services(source_doc)
     if not services:
         frappe.msgprint(_("No service(s) found to verify"), indicator="orange")
