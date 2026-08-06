@@ -920,7 +920,7 @@ class JubileePatientClaim(Document):
         if cint(self.folio_no) != 0:
             return
 
-        self.folio_no = get_or_create_folio_counter(self, "NHIF")
+        self.folio_no = get_or_create_folio_counter(self, "Jubilee")
         self.db_set("folio_no", self.folio_no)
 
     @frappe.whitelist()
