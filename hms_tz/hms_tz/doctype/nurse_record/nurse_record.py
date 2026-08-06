@@ -217,8 +217,8 @@ def create_vital_signs(patient, nurse_record, **kwargs):
     vs.appointment = nr.appointment
     vs.inpatient_record = nr.inpatient_record
     vs.company = nr.company
-    vs.signs_date = nowdate()
-
+    
+    
     # Set vital sign values from kwargs
     vital_fields = [
         "temperature",
@@ -234,6 +234,8 @@ def create_vital_signs(patient, nurse_record, **kwargs):
         "abdomen",
         "reflexes",
         "vital_signs_note",
+        "signs_date",
+        "signs_time",
     ]
     for field in vital_fields:
         if kwargs.get(field):
@@ -483,6 +485,21 @@ def get_completed_medications(patient, inpatient_record):
         order_by="date desc, time desc",
         limit_page_length=50,
     )
+
+    users = {e.administered_by for e in entries if e.administered_by}
+    full_names = {}
+    if users:
+        full_names = dict(
+            frappe.db.get_all(
+                "User",
+                filters={"name": ["in", list(users)]},
+                fields=["name", "full_name"],
+                as_list=True,
+            )
+        )
+
+    for e in entries:
+        e["administered_by_name"] = full_names.get(e.administered_by) or e.administered_by
 
     return entries
 
