@@ -1,7 +1,6 @@
 frappe.ui.form.on("Patient Encounter", {
   setup: (frm) => {
-    nhif_btns(frm);
-    jubilee_btns(frm);
+    insurance_btns(frm);
   },
   on_submit: function (frm) {
     if (!frm.doc.patient_encounter_final_diagnosis) {
@@ -17,8 +16,7 @@ frappe.ui.form.on("Patient Encounter", {
 
   onload: function (frm) {
     control_practitioners_to_submit_others_encounters(frm);
-    nhif_btns(frm);
-    jubilee_btns(frm);
+    insurance_btns(frm);
     add_patient_history_btn(frm);
     add_refer_practtitioner_btn(frm);
     add_btn_final(frm);
@@ -28,8 +26,7 @@ frappe.ui.form.on("Patient Encounter", {
     validate_healthcare_package_order_items(frm);
   },
   refresh: function (frm) {
-    nhif_btns(frm);
-    jubilee_btns(frm);
+    insurance_btns(frm);
     control_practitioners_to_submit_others_encounters(frm);
 
     frm.fields_dict["drug_prescription"].grid.get_field(
@@ -1986,23 +1983,55 @@ var add_refer_practtitioner_btn = (frm) => {
   }
 };
 
+var insurance_page_button_fields = [
+  "login_to_nhif",
+  "logout_from_nhif",
+  "pre_approval_btn",
+  "cancel_pre_approval_btn",
+  "confirm_poc_btn",
+  "verify_services_btn",
+];
+
+var remove_insurance_btns = (frm) => {
+  insurance_page_button_fields.forEach((fieldname) => {
+    const field = frm.page.fields_dict[fieldname];
+    if (field) {
+      field.$wrapper.remove();
+      delete frm.page.fields_dict[fieldname];
+    }
+  });
+};
+
+var is_insurance = (frm, insurer) => {
+  return (
+    frm.doc.insurance_company && frm.doc.insurance_company.includes(insurer)
+  );
+};
+
+var insurance_btns = (frm) => {
+  remove_insurance_btns(frm);
+  nhif_btns(frm);
+  jubilee_btns(frm);
+};
+
 var nhif_btns = (frm) => {
   if (!frappe.user.has_role("Healthcare Practitioner")) {
     return;
   }
 
-  if (
-    !frm.doc.insurance_company ||
-    !frm.doc.insurance_company.includes("NHIF")
-  ) {
+  if (!is_insurance(frm, "NHIF")) {
     return;
   }
 
+  const encounter = frm.doc.name;
   frappe.call({
     method:
       "hms_tz.nhif.api.healthcare_practitioner.get_nhif_practitioner_login_status",
     args: {},
     callback: (r) => {
+      if (frm.doc.name !== encounter || !is_insurance(frm, "NHIF")) {
+        return;
+      }
       let data = r.message;
       if (data.show_login) {
         login_to_nhif(frm);
@@ -2067,10 +2096,7 @@ var jubilee_btns = (frm) => {
     return;
   }
 
-  if (
-    !frm.doc.insurance_company ||
-    !frm.doc.insurance_company.includes("Jubilee")
-  ) {
+  if (!is_insurance(frm, "Jubilee")) {
     return;
   }
 
@@ -2216,10 +2242,17 @@ var pre_approval_btn = (frm) => {
   if (!frm.page.fields_dict.pre_approval_btn) {
     frm.page
       .add_field({
-        label: __("Get PreApproval"),
+        label: __("NHIF PreApproval"),
         fieldname: "pre_approval_btn",
         fieldtype: "Button",
         click: function () {
+          if (!is_insurance(frm, "NHIF")) {
+            frappe.throw(
+              __(
+                "This encounter is not for an NHIF patient. Please reload the page."
+              )
+            );
+          }
           if (frm.is_dirty()) {
             frappe.msgprint(
               "<b>Please save the form before requesting pre-approval</b>"
@@ -2270,6 +2303,13 @@ var cancel_pre_approval_btn = (frm) => {
         fieldname: "cancel_pre_approval_btn",
         fieldtype: "Button",
         click: function () {
+          if (!is_insurance(frm, "NHIF")) {
+            frappe.throw(
+              __(
+                "This encounter is not for an NHIF patient. Please reload the page."
+              )
+            );
+          }
           if (frm.is_dirty()) {
             frappe.msgprint(
               "<b>Please save the form before canceling pre-approval</b>"
@@ -2343,6 +2383,13 @@ var confirm_poc_btn = (frm) => {
         fieldname: "confirm_poc_btn",
         fieldtype: "Button",
         click: async function () {
+          if (!is_insurance(frm, "NHIF")) {
+            frappe.throw(
+              __(
+                "This encounter is not for an NHIF patient. Please reload the page."
+              )
+            );
+          }
           let dialog = new frappe.ui.Dialog({
             title: __("<h4>Point of Care Confirmation</h4>"),
             // width: 150,
@@ -2459,10 +2506,17 @@ var confirm_poc_btn = (frm) => {
 var verify_services_btn = (frm) => {
   if (!frm.page.fields_dict.verify_services_btn) {
     frm.page.add_field({
-      label: "Get PreApproval",
+      label: __("Jubilee PreApproval"),
       fieldname: "verify_services_btn",
       fieldtype: "Button",
       click: async () => {
+        if (!is_insurance(frm, "Jubilee")) {
+          frappe.throw(
+            __(
+              "This encounter is not for a Jubilee patient. Please reload the page."
+            )
+          );
+        }
         if (frm.is_dirty()) {
           frappe.msgprint(
             "<b>Please save the form before verifying services</b>"
