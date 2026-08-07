@@ -2,49 +2,25 @@
 # Copyright (c) 2025, Aakvatech and contributors
 # For license information, please see license.txt
 
-from __future__ import unicode_literals
-
 import frappe
-from frappe import _
-from frappe.query_builder import DocType
+from frappe.sessions import clear_sessions
 
 
-def before_login(login_manager):
-    """
-    Validate if user is already logged in from another session.
-    This function prevents multiple simultaneous logins using the same credentials.
+def on_session_creation(login_manager):
+    """Enforce single-device login (Ministry of Health requirement).
 
-    The system automatically expires sessions after inactivity (typically 5 minutes).
-    This function simply checks if any active session exists for the user.
+    When a user logs in from a new device, every other active session for
+    that user is terminated, so credentials can never be in use on two
+    devices at once. The newest login always wins.
 
-    Args:
-        login_manager: The login manager object containing user information
+    Frappe's own deny_multiple_sessions setting is not enough: it calls
+    clear_sessions without force, so the offset from the user's
+    simultaneous_sessions field keeps the most recent other session alive.
+    force=True ignores that count and clears all sessions except this one.
     """
     user = login_manager.user
-
-    # Skip validation for Administrator to avoid lockouts
     if user == "Administrator":
         return
 
-    # Check for any active sessions for this user
-    # The system automatically handles session expiration based on inactivity
-    Sessions = DocType("Sessions")
-    active_sessions = (
-        frappe.qb.from_(Sessions)
-        .select(Sessions.sid, Sessions.user, Sessions.lastupdate)
-        .where(Sessions.user == user)
-    ).run(as_dict=True)
-
-    # If there are active sessions, prevent login
-    if active_sessions:
-        # Clear the current login attempt
-        frappe.local.login_manager = None
-
-        frappe.throw(
-            msg=_(
-                "You are already logged in from another device or browser."
-                "<br><br><b>Please logout from your previous session before logging in again. </b>"
-            ),
-            title=_("<h4 class='text-danger font-bold'>Multiple Login Detected</h4>"),
-        )
-
+    clear_sessions(user=user, keep_current=True, force=True)
+    frappe.publish_realtime("hms_tz_sessions_cleared", user=user, after_commit=True)
