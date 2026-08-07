@@ -257,7 +257,7 @@ scheduler_events = {
     "daily": ["hms_tz.nhif.api.inpatient_record.daily_update_inpatient_occupancies"],
     "cron": {
         # Routine for every 15 minutes: auto-create Nurse Records for admitted patients
-        "*/15 * * *": [
+        "*/15 * * * *": [
             "hms_tz.hms_tz.doctype.nursing_schedule.nursing_schedule.create_nurse_records_for_admitted_patients"
         ],
         # Routine for every day 00:01 am at night
