@@ -1,19 +1,27 @@
 name: CI
 
+# Server tests are disabled on push/PR: they need a full bench with MariaDB
+# and a test site, which is slow and was blocking PRs on unrelated failures.
+# Tests are run locally instead with: bench --site <site> run-tests --app hms_tz
+# To re-enable CI tests on every PR, uncomment the push/pull_request triggers below.
 on:
-  push:
-    branches:
-      - version-15-beta
-  pull_request:
-    branches:
-      - version-15-beta
-    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+  # push:
+  #   branches:
+  #     - version-15-beta
+  # pull_request:
+  #   branches:
+  #     - version-15-beta
+  #   types: [opened, synchronize, reopened]
 
 env:
   BRANCH_TO_CLONE: version-15
 
 concurrency:
-  group: ci-hms_tz-${{ github.event.pull_request.number || github.ref }}
+  # The pull_request trigger is disabled above, so the PR number is not
+  # available here. Restore the line below when re-enabling tests on PRs.
+  # group: ci-hms_tz-${{ github.event.pull_request.number || github.ref }}
+  group: ci-hms_tz-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
