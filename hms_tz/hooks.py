@@ -100,7 +100,7 @@ after_migrate = [
 
 # Login
 # -----
-# on_login = "hms_tz.api.login.before_login"
+on_session_creation = "hms_tz.api.login.on_session_creation"
 
 
 # Desk Notifications
