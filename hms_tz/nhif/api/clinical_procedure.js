@@ -800,6 +800,21 @@ function show_cp_vital_signs_dialog(frm) {
         fieldtype: "Small Text",
         label: __("Notes"),
       },
+      {
+        fieldname: "signs_date",
+        fieldtype: "Date",
+        label: __("Date Taken"),
+        default: frappe.datetime.get_today(),
+        reqd: 1,
+      },
+      {
+        fieldname: "signs_time",
+        fieldtype: "Time",
+        label: __("Time Taken"),
+        default: frappe.datetime.now_time(),
+        reqd: 1,
+      },
+      { fieldtype: "Section Break" },
     ],
     primary_action_label: __("Save"),
     primary_action(values) {
