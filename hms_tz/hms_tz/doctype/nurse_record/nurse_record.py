@@ -217,8 +217,8 @@ def create_vital_signs(patient, nurse_record, **kwargs):
     vs.appointment = nr.appointment
     vs.inpatient_record = nr.inpatient_record
     vs.company = nr.company
-    
-    
+
+
     # Set vital sign values from kwargs
     vital_fields = [
         "temperature",
