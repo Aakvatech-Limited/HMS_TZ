@@ -107,13 +107,6 @@ def get_nhif_patient_info(
 
 
 def update_patient_history(doc):
-    # Remarked till multi company setting is required and feasible from Patient doctype 2021-03-20 19:57:14
-    # company = get_default_company()
-    # update_history = frappe.get_cached_value(
-    #     "Company NHIF Settings", company, "update_patient_history")
-    # if not update_history:
-    #     return
-
     medical_history = ""
     for row in doc.codification_table:
         if row.definition:
