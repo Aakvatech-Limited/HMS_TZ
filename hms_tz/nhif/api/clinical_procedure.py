@@ -9,7 +9,7 @@ import json
 import frappe
 from frappe import _
 from frappe.query_builder import DocType
-from frappe.utils import flt, get_fullname, nowdate, nowtime
+from frappe.utils import flt, get_fullname, nowdate
 
 from hms_tz.hms_tz.doctype.hospital_revenue_entry.hospital_revenue_entry import (
     create_revenue_entry,
@@ -220,7 +220,7 @@ def create_vital_signs_from_cp(clinical_procedure: str, **kwargs) -> str:
         "weight", "height_in_cm",
         "tongue", "abdomen", "reflexes",
         "vital_signs_note",
-        "signs_date", 
+        "signs_date",
         "signs_time",
     ]
     for field in vital_fields:
