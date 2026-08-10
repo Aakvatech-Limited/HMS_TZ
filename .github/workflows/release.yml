@@ -1,54 +1,43 @@
-name: Release
+name: Generate Semantic Release
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
 
 permissions:
   contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   release:
-    name: Create Release
+    name: Release
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
+      - name: Checkout Entire Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          python-version: '3.11'
+          node-version: 20
 
-      - name: Generate Changelog
+      - name: Setup dependencies
         run: |
-          python - <<'PY'
-          import subprocess
-
-          def sh(*args):
-              return subprocess.check_output(list(args), text=True).strip()
-
-          try:
-              prev_tag = sh('git', 'describe', '--tags', '--abbrev=0', 'HEAD^')
-              rev_range = f"{prev_tag}..HEAD"
-          except Exception:
-              rev_range = 'HEAD'
-
-          commits = sh('git', 'log', '--pretty=format:%s', rev_range).splitlines()
-          changelog = '## Changes\n\n' + ''.join(f'- {c}\n' for c in commits if c)
-
-          with open('CHANGELOG_RELEASE.md', 'w', encoding='utf-8') as f:
-              f.write(changelog)
-          PY
+          npm install @semantic-release/git @semantic-release/exec --no-save
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          body_path: CHANGELOG_RELEASE.md
-          generate_release_notes: true
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          GIT_AUTHOR_NAME: "Aakvatech Release Bot"
+          GIT_AUTHOR_EMAIL: "info@aakvatech.com"
+          GIT_COMMITTER_NAME: "Aakvatech Release Bot"
+          GIT_COMMITTER_EMAIL: "info@aakvatech.com"
+        run: npx semantic-release
