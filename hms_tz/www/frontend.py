@@ -1,23 +1,20 @@
-from __future__ import unicode_literals
-
 import frappe
 from frappe.utils.telemetry import capture
 
-cache = 1
+no_cache = 1
+
 
 def get_context():
-    frappe.db.commit()
-    context = frappe._dict()
-    context = get_boot()
+    """Boot data for the frappe-ui SPA. The template iterates `boot`."""
     if frappe.session.user != "Guest":
         capture("active_site", "frontend")
 
-    return context
+    return frappe._dict({"boot": get_boot()})
+
 
 def get_boot():
     return frappe._dict(
         {
-            "frappe_version": frappe.__version__,
             "default_route": "/frontend",
             "site_name": frappe.local.site,
             "read_only_mode": frappe.flags.read_only,
