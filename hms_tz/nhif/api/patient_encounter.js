@@ -2092,6 +2092,11 @@ var nhif_btns = (frm) => {
 };
 
 var jubilee_btns = (frm) => {
+  // Jubilee API is only for OPD
+  if (frm.doc.inpatient_record) {
+    return;
+  }
+
   if (!frappe.user.has_role("Healthcare Practitioner")) {
     return;
   }
