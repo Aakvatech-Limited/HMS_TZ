@@ -1951,6 +1951,10 @@ def validate_nhif_pre_approval(doc):
 
 
 def validate_jubilee_pre_approval(doc):
+    # Jubilee API is only for OPD
+    if doc.inpatient_record:
+        return
+
     if not frappe.get_cached_value(
         "HMS TZ Setting",
         doc.company,
