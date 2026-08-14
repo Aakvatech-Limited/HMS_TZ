@@ -1034,7 +1034,7 @@ class JubileePatientClaim(Document):
             entities.DateDischarged = (
                 str(self.date_discharge) + " " + str(self.discharge_time)
             )
-        entities.PractitionerNo = ", ".join([d.mct_code for d in self.practitioners if d.mct_code]),
+        entities.PractitionerNo = ", ".join([d.mct_code for d in self.practitioners if d.mct_code])
         # entities.PractitionerName = self.practitioner_name
         entities.ProviderID = self.provider_id
         entities.ClinicalNotes = self.clinical_notes
