@@ -8,7 +8,12 @@
     ],
     "python.testing.pytestEnabled": false,
     "python.testing.unittestEnabled": true,
-    
+
+    // Files under www/ are Jinja templates, not plain HTML. Their <script>
+    // blocks contain {% %} tags that are only valid JavaScript after Frappe
+    // renders them server-side.
+    "html.validate.scripts": false,
+
     // Git commit message settings
     "git.inputValidationSubjectLength": 72,
     "git.inputValidationLength": 500,
