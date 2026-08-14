@@ -332,4 +332,6 @@ before_tests = "hms_tz.install.before_tests"
 #
 # auto_cancel_exempted_doctypes = ["Auto Repeat"]
 
-website_route_rules = [{'from_route': '/frontend/<path:app_path>', 'to_route': 'frontend'}, {'from_route': '/frontend/<path:app_path>', 'to_route': 'frontend'},]
+website_route_rules = [
+    {"from_route": "/frontend/<path:app_path>", "to_route": "frontend"},
+]
