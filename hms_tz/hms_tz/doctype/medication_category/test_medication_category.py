@@ -6,4 +6,4 @@ import unittest
 
 
 class TestMedicationCategory(unittest.TestCase):
-    pass
+	pass

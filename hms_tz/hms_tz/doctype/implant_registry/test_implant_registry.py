@@ -5,4 +5,4 @@ import unittest
 
 
 class TestImplantRegistry(unittest.TestCase):
-    pass
+	pass

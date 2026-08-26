@@ -7,61 +7,62 @@ from frappe import _, msgprint
 
 
 def execute(filters=None):
-    columns = get_columns(filters)
-    data = []
+	columns = get_columns(filters)
+	data = []
 
-    lab_details = get_lab_results(filters)
-    if not lab_details:
-        msgprint(
-            frappe.bold("No Record Found for Filters You Specified, Please Choose Different Filters and Try Again..!! ")
-        )
-    else:
-        lab_colnames = [key for key in lab_details[0].keys()]
-        df = pd.DataFrame.from_records(lab_details, columns=lab_colnames)
+	lab_details = get_lab_results(filters)
+	if not lab_details:
+		msgprint(
+			frappe.bold(
+				"No Record Found for Filters You Specified, Please Choose Different Filters and Try Again..!! "
+			)
+		)
+	else:
+		lab_colnames = [key for key in lab_details[0].keys()]
+		df = pd.DataFrame.from_records(lab_details, columns=lab_colnames)
 
-        pvt = pd.pivot_table(
-            df,
-            values="result_value",
-            index="lab_test_name",
-            columns="result_date",
-            fill_value=" ",
-            aggfunc="first",
-        )
+		pvt = pd.pivot_table(
+			df,
+			values="result_value",
+			index="lab_test_name",
+			columns="result_date",
+			fill_value=" ",
+			aggfunc="first",
+		)
 
-        columns += pvt.columns.values.tolist()
-        data += pvt.reset_index().values.tolist()
-    return columns, data
+		columns += pvt.columns.values.tolist()
+		data += pvt.reset_index().values.tolist()
+	return columns, data
 
 
 def get_columns(filters):
-    columns = [
-        {
-            "fieldname": "lab_test_name",
-            "fieldtype": "Data",
-            "label": _("Lab Test Name"),
-        }
-    ]
-    return columns
+	columns = [
+		{
+			"fieldname": "lab_test_name",
+			"fieldtype": "Data",
+			"label": _("Lab Test Name"),
+		}
+	]
+	return columns
 
 
 def get_lab_results(filters):
+	conditions = ""
 
-    conditions = ""
+	if filters.get("patient"):
+		conditions += "and lb.patient = %(patient)s"
 
-    if filters.get("patient"):
-        conditions += "and lb.patient = %(patient)s"
+	if filters.get("from_date"):
+		conditions += "and lb.result_date >= %(from_date)s"
 
-    if filters.get("from_date"):
-        conditions += "and lb.result_date >= %(from_date)s"
+	if filters.get("to_date"):
+		conditions += "and lb.result_date <= %(to_date)s"
 
-    if filters.get("to_date"):
-        conditions += "and lb.result_date <= %(to_date)s"
+	if filters.get("department"):
+		conditions += "and lb.department = %(department)s"
 
-    if filters.get("department"):
-        conditions += "and lb.department = %(department)s"
-
-    return frappe.db.sql(
-        f"""
+	return frappe.db.sql(
+		f"""
         select lb.lab_test_name as lab_test_name,  date_format(lb.result_date, '%%Y-%%m-%%d') as result_date, n.result_value as result_value
         from `tabLab Test` lb inner join `tabNormal Test Result` n on lb.name = n.parent
         where lb.docstatus = 1
@@ -86,6 +87,6 @@ def get_lab_results(filters):
         and lb.lab_test_name not in (select lbt.lab_test_name from `tabLab Test Template` lbt where lbt.lab_test_template_type="Grouped")
         and lb.status = "Completed" {conditions}
         """,
-        filters,
-        as_dict=1,
-    )
+		filters,
+		as_dict=1,
+	)

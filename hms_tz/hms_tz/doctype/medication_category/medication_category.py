@@ -6,4 +6,4 @@ from frappe.utils.nestedset import NestedSet
 
 
 class MedicationCategory(NestedSet):
-    pass
+	pass

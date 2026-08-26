@@ -6,4 +6,4 @@ from frappe.model.document import Document
 
 
 class HealthcareRoomType(Document):
-    pass
+	pass
