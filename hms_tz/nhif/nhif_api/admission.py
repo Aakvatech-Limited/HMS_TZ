@@ -2,6 +2,7 @@ import json
 
 import frappe
 import requests
+from frappe import _
 from frappe.core.utils import html2text
 from frappe.query_builder import DocType
 from frappe.utils import date_diff, get_datetime, get_fullname, get_url_to_form, now_datetime, nowdate

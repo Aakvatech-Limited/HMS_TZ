@@ -277,8 +277,6 @@ def get_packages_for_price_list(doctype_name, company, insurance_customer_name, 
 			pp.unitprice.as_("unitprice"),
 			pp.schemeid,
 		)
-
-		item_query
 	elif doctype_name == "Jubilee Price Package":
 		item_query = item_query.select(
 			pp.itemprice.as_("unitprice"),
@@ -319,7 +317,7 @@ def handle_insurance_prices(itp, package, price_list, currency):
 						itp.name == price.name
 					).run()
 
-					out = frappe.get_doc(
+					frappe.get_doc(
 						{
 							"doctype": "Comment",
 							"comment_type": "Comment",
@@ -397,7 +395,7 @@ def create_insurance_price_list(company, price_list, currency, insurance_provide
 				price_list,
 			)
 
-			out = frappe.get_doc(
+			frappe.get_doc(
 				{
 					"doctype": "Comment",
 					"comment_type": "Comment",

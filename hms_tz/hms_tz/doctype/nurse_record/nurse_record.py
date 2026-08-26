@@ -950,7 +950,7 @@ def _generate_schedule_entries(
 	entries = []
 	current_dt = start_dt
 
-	for _ in range(total_doses):
+	for _dose in range(total_doses):
 		entry_date = current_dt.strftime("%Y-%m-%d")
 		entry_time = current_dt.strftime("%H:%M:00")
 
