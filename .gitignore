@@ -97,3 +97,7 @@ build/
 
 # Semgrep rules cloned by pre-commit / CI
 frappe-semgrep-rules/
+
+# Local dev symlinks — never commit these, create them locally if needed
+frontend/sites
+hms_tz/public/node_modules
