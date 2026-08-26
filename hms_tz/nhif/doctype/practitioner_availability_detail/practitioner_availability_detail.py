@@ -74,8 +74,8 @@ def get_events(doctype, start, end, field_map, filters=None, fields=None):
 	if field_map.color:
 		fields.append(field_map.color)
 
-	start_date = "ifnull(%s, '0001-01-01 00:00:00')" % field_map.start
-	end_date = "ifnull(%s, '2199-12-31 00:00:00')" % field_map.end
+	start_date = f"ifnull({field_map.start}, '0001-01-01 00:00:00')"
+	end_date = f"ifnull({field_map.end}, '2199-12-31 00:00:00')"
 
 	filters += [
 		[doctype, start_date, "<=", end],

@@ -31,9 +31,8 @@ def execute():
         INNER JOIN  `tabPatient Encounter` pe ON lrpt.parent = pe.name
         SET sii.healthcare_service_unit = lrpt.department_hsu,
             sii.healthcare_practitioner = pe.practitioner
-        WHERE sii.name IN (%s)
-    """
-		% (", ".join(["%s"] * len(sii_items))),
+        WHERE sii.name IN ({})
+    """.format(", ".join(["%s"] * len(sii_items))),
 		tuple([d for d in sii_items]),
 	)
 
@@ -45,9 +44,8 @@ def execute():
         INNER JOIN  `tabPatient Encounter` pe ON lrpt.parent = pe.name
         SET sii.healthcare_service_unit = lrpt.department_hsu,
             sii.healthcare_practitioner = pe.practitioner
-        WHERE sii.name IN (%s)
-    """
-		% (", ".join(["%s"] * len(sii_items))),
+        WHERE sii.name IN ({})
+    """.format(", ".join(["%s"] * len(sii_items))),
 		tuple([d for d in sii_items]),
 	)
 
@@ -59,9 +57,8 @@ def execute():
         INNER JOIN  `tabPatient Encounter` pe ON lrpt.parent = pe.name
         SET sii.healthcare_service_unit = lrpt.department_hsu,
             sii.healthcare_practitioner = pe.practitioner
-        WHERE sii.name IN (%s)
-    """
-		% (", ".join(["%s"] * len(sii_items))),
+        WHERE sii.name IN ({})
+    """.format(", ".join(["%s"] * len(sii_items))),
 		tuple([d for d in sii_items]),
 	)
 
@@ -73,9 +70,8 @@ def execute():
         INNER JOIN  `tabPatient Encounter` pe ON lrpt.parent = pe.name
         SET sii.healthcare_service_unit = lrpt.department_hsu,
             sii.healthcare_practitioner = pe.practitioner
-        WHERE sii.name IN (%s)
-    """
-		% (", ".join(["%s"] * len(sii_items))),
+        WHERE sii.name IN ({})
+    """.format(", ".join(["%s"] * len(sii_items))),
 		tuple([d for d in sii_items]),
 	)
 

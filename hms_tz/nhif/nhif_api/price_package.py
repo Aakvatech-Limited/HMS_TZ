@@ -519,7 +519,7 @@ def get_nhif_copayment_items(company):
 		frappe.throw(json.loads(r.text))
 	else:
 		data = json.loads(r.text)
-		log_name = add_log(
+		add_log(
 			request_type="GetCoPaymentSchedule",
 			request_url=url,
 			request_header=headers,

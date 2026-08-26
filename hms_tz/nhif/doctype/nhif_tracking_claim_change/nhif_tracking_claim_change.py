@@ -62,7 +62,7 @@ def create_nhif_track_record(
 	med_change_request=None,
 ):
 	amount_changed = abs(prev_amount - item.amount_claimed)
-	new_item = frappe.get_doc(
+	frappe.get_doc(
 		{
 			"doctype": "NHIF Tracking Claim Change",
 			"item_code": item.item_code,

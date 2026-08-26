@@ -193,12 +193,14 @@ def update_service_approval(
 	service_type,
 	service_name,
 	qty=1,
-	item_row={},
+	item_row=None,
 	reference_name=None,
 	reference_doctype=None,
 	item_authorization_id=None,
 	service_authorization_id=None,
 ):
+	if item_row is None:
+		item_row = {}
 	if not ref_doctype or not ref_docname:
 		frappe.throw("Document Type and Document Name are required")
 
@@ -610,12 +612,14 @@ def get_update_approval_payload(
 	service_name,
 	appointment,
 	qty=1,
-	item_row={},
+	item_row=None,
 	reference_name=None,
 	reference_doctype=None,
 	item_authorization_id=None,
 	service_authorization_id=None,
 ):
+	if item_row is None:
+		item_row = {}
 	patient_doc = frappe.get_cached_doc("Patient", doc.patient)
 	appointment_info = get_appointment_details(appointment)
 

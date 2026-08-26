@@ -62,7 +62,7 @@ def create_revenue_entry(doc):
 		hre.reload()
 
 
-def create_revenue_entry_from_insurance_mcr(doc, ref_docnames=[]):
+def create_revenue_entry_from_insurance_mcr(doc, ref_docnames=None):
 	"""
 	Create Hospital Revenue Entry documents from Medication Change Request
 
@@ -71,6 +71,8 @@ def create_revenue_entry_from_insurance_mcr(doc, ref_docnames=[]):
 	    ref_docnames: List of reference document names to create entries for
 	"""
 
+	if ref_docnames is None:
+		ref_docnames = []
 	entries = build_insurance_drug_entry(doc, ref_docnames)
 
 	if len(entries) == 0:

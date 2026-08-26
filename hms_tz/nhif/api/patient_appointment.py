@@ -75,7 +75,7 @@ def get_cash_amount(
 
 
 @frappe.whitelist()
-def invoice_appointment(name, mops=[]):
+def invoice_appointment(name, mops=None):
 	"""create sales invoice for appointment
 
 	args:
@@ -83,6 +83,8 @@ def invoice_appointment(name, mops=[]):
 	    mops (list): List of mode of payments.
 	"""
 
+	if mops is None:
+		mops = []
 	appointment_doc = frappe.get_cached_doc("Patient Appointment", name)
 	if appointment_doc.billing_item:
 		if appointment_doc.mode_of_payment:

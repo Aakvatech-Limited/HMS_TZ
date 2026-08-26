@@ -99,7 +99,7 @@ def get_healthcare_services_to_invoice(
 		if not appointment and encounter_doc.appointment:
 			appointment = encounter_doc.appointment
 
-		for key, value in childs_map.items():
+		for _key, value in childs_map.items():
 			table = encounter_doc.get(value.get("table"))
 			if not table:
 				continue
@@ -998,7 +998,9 @@ def inpatient_billing(encounter_doc, method):
 
 # create LRPMT docs for Cash OPD and Insurance (OPD & IPD) patient
 @frappe.whitelist()
-def create_healthcare_docs(reference_encounter, encounter_list=[], method="event"):
+def create_healthcare_docs(reference_encounter, encounter_list=None, method="event"):
+	if encounter_list is None:
+		encounter_list = []
 	if len(encounter_list) == 0:
 		encounter_list = frappe.db.get_all(
 			"Patient Encounter", filters={"reference_encounter": reference_encounter}, pluck="name"
@@ -1318,7 +1320,9 @@ def create_individual_procedure_prescription(source_doc, encounter_child, hsr_ch
 			).run()
 
 
-def create_therapy_plan(enc_doc=None, invoice_therapy_dict=[]):
+def create_therapy_plan(enc_doc=None, invoice_therapy_dict=None):
+	if invoice_therapy_dict is None:
+		invoice_therapy_dict = []
 	therapies = []
 	encounter_ids = []
 	patient_encounter_docs = []
@@ -1427,7 +1431,9 @@ def create_therapy_plan(enc_doc=None, invoice_therapy_dict=[]):
 	create_plan(patient_encounter_docs, therapies)
 
 
-def create_plan(patient_encounter_docs, therapies, therapy_map={}):
+def create_plan(patient_encounter_docs, therapies, therapy_map=None):
+	if therapy_map is None:
+		therapy_map = {}
 	for encounter_doc in patient_encounter_docs:
 		item_counts = 0
 		patient_sex = frappe.get_cached_value("Patient", encounter_doc.patient, "sex")

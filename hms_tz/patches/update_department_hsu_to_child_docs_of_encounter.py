@@ -23,9 +23,8 @@ def execute():
         INNER JOIN `tabLab Test Template` item_template ON lrpt.lab_test_code = item_template.name AND item_template.disabled = 0
         INNER JOIN `tabHealthcare Company Option` hco ON item_template.name = hco.parent AND hco.company = pe.company
         SET lrpt.department_hsu = hco.service_unit
-        WHERE pe.name IN (%s)
-    """
-		% (", ".join(["%s"] * len(encounters))),
+        WHERE pe.name IN ({})
+    """.format(", ".join(["%s"] * len(encounters))),
 		tuple([d for d in encounters]),
 	)
 
@@ -37,9 +36,8 @@ def execute():
                 AND item_template.disabled = 0
         INNER JOIN `tabHealthcare Company Option` hco ON item_template.name = hco.parent AND hco.company = pe.company
         SET lrpt.department_hsu = hco.service_unit
-        WHERE pe.name IN (%s)
-    """
-		% (", ".join(["%s"] * len(encounters))),
+        WHERE pe.name IN ({})
+    """.format(", ".join(["%s"] * len(encounters))),
 		tuple([d for d in encounters]),
 	)
 
@@ -50,9 +48,8 @@ def execute():
         INNER JOIN `tabClinical Procedure Template` item_template ON lrpt.procedure = item_template.name AND item_template.disabled = 0
         INNER JOIN `tabHealthcare Company Option` hco ON item_template.name = hco.parent AND hco.company = pe.company
         SET lrpt.department_hsu = hco.service_unit
-        WHERE pe.name IN (%s)
-    """
-		% (", ".join(["%s"] * len(encounters))),
+        WHERE pe.name IN ({})
+    """.format(", ".join(["%s"] * len(encounters))),
 		tuple([d for d in encounters]),
 	)
 
@@ -63,9 +60,8 @@ def execute():
         INNER JOIN `tabTherapy Type` item_template ON lrpt.therapy_type = item_template.name AND item_template.disabled = 0
         INNER JOIN `tabHealthcare Company Option` hco ON item_template.name = hco.parent AND hco.company = pe.company
         SET lrpt.department_hsu = hco.service_unit
-        WHERE pe.name IN (%s)
-    """
-		% (", ".join(["%s"] * len(encounters))),
+        WHERE pe.name IN ({})
+    """.format(", ".join(["%s"] * len(encounters))),
 		tuple([d for d in encounters]),
 	)
 

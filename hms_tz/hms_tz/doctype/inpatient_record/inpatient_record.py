@@ -452,7 +452,7 @@ def get_leave_from(doctype, txt, searchfield, start, page_len, filters):
 			}
 		),
 		{
-			"txt": "%%%s%%" % txt,
+			"txt": f"%{txt}%",
 			"_txt": txt.replace("%", ""),
 			"start": start,
 			"page_len": page_len,

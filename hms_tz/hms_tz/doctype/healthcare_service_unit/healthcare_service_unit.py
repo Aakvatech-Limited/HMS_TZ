@@ -26,7 +26,7 @@ class HealthcareServiceUnit(NestedSet):
 			self.name = self.healthcare_service_unit_name
 
 	def on_update(self):
-		super(HealthcareServiceUnit, self).on_update()
+		super().on_update()
 		self.validate_one_root()
 
 	# pre-existing, assignments not persisted, left unchanged pending review

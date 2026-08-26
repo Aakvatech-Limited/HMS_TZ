@@ -151,7 +151,7 @@ class PatientAppointment(Document):
 				self.company = service_unit_company
 
 	def set_appointment_datetime(self):
-		self.appointment_datetime = "%s %s" % (
+		self.appointment_datetime = "{} {}".format(
 			self.appointment_date,
 			self.appointment_time or "00:00:00",
 		)
@@ -541,7 +541,7 @@ def get_present_event_slots(present_events, date, practitioner):
 			total_time_diff = time_diff_in_seconds(present_event.to_time, present_event.from_time) / 60
 			from_time = present_event.from_time
 			slot_name = present_event.availability
-			for x in range(0, int(total_time_diff), present_event.duration):
+			for _x in range(0, int(total_time_diff), present_event.duration):
 				to_time = from_time + datetime.timedelta(seconds=present_event.duration * 60)
 				event_available_slots.append({"from_time": from_time, "to_time": to_time})
 				from_time = to_time

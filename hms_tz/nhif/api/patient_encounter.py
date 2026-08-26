@@ -1131,9 +1131,12 @@ def validate_patient_balance_vs_patient_costs(
 	inpatient_cost=0,
 	cash_limit=0,
 	caller="",
-	encounters=[],
+	encounters=None,
 	exclude_consumable=None,
 ):
+	if encounters is None:
+		encounters = []
+
 	def get_encounter_costs(encounters):
 		encounter_cost = 0
 		child_map = [
@@ -1677,7 +1680,7 @@ def get_encounter_cost_estimate(encounter_doc):
 
 	total_cost = 0
 	# calculate total cost
-	for key, value in cost_dict.items():
+	for _key, value in cost_dict.items():
 		for row in value:
 			total_cost += row.get("amount") or 0
 

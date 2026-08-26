@@ -530,7 +530,7 @@ def verify_jubilee_services(
 
 	status = data.get("Status", "")
 
-	for (child_doctype, child_name, item_name), ref_code in service_map.items():
+	for (child_doctype, child_name, _item_name), ref_code in service_map.items():
 		if str(ref_code) not in verified_map:
 			continue
 

@@ -43,7 +43,7 @@ class MedicationChangeRequest(Document):
 
 		if self.sales_order:
 			url = get_url_to_form("Medication Change Request", self.name)
-			comment = frappe.get_doc(
+			frappe.get_doc(
 				{
 					"doctype": "Comment",
 					"comment_type": "Comment",
@@ -134,7 +134,7 @@ class MedicationChangeRequest(Document):
 	def on_trash(self):
 		if self.sales_order:
 			url = get_url_to_form("Medication Change Request", self.name)
-			comment = frappe.get_doc(
+			frappe.get_doc(
 				{
 					"doctype": "Comment",
 					"comment_type": "Comment",
