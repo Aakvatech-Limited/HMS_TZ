@@ -1,54 +1,30 @@
-name: Linter
+name: Linters
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
   workflow_dispatch:
-  push:
 
 permissions:
   contents: read
 
 concurrency:
-  group: linter-hms_tz-${{ github.event.pull_request.number || github.ref }}
+  group: linters-hms_tz-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  commit-lint:
-    name: Semantic Commits
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 200
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 18
-          check-latest: true
-
-      - name: Check commit titles
-        run: |
-          npm install @commitlint/cli @commitlint/config-conventional
-          npx commitlint --config commitlint.config.js --verbose --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }}
-
-  linter:
-    name: Pre-commit + Semgrep
+  semgrep:
+    name: Frappe Linter
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-
-      # Semgrep is skipped here and run as a full-repo scan in the next steps
-      - uses: pre-commit/action@v3.0.0
-        env:
-          SKIP: frappe-semgrep-rules
+          python-version: "3.11"
+          cache: pip
 
       - name: Download Semgrep rules
         run: git clone --depth 1 https://github.com/frappe/semgrep-rules.git frappe-semgrep-rules
@@ -56,7 +32,7 @@ jobs:
       - name: Install Semgrep
         run: pip install semgrep
 
-      # Blocking: real bugs / security issues only
+      # Blocking: real bugs and security issues only
       - name: Run Semgrep rules
         run: |
           semgrep scan --config ./frappe-semgrep-rules/rules \
@@ -70,3 +46,28 @@ jobs:
           semgrep scan --config ./frappe-semgrep-rules/rules \
             --config r/python.lang.security \
             --severity=WARNING hms_tz || true
+
+  deps-vulnerable-check:
+    name: Vulnerable Dependency Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/*requirements.txt', '**/pyproject.toml', '**/setup.py') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+            ${{ runner.os }}-
+
+      - name: Install and run pip-audit
+        run: |
+          pip install pip-audit
+          pip-audit --desc on .

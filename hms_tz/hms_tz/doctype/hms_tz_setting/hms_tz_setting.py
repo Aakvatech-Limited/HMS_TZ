@@ -92,7 +92,7 @@ class HMSTZSetting(Document):
 						request_body=payload,
 						response_data=data,
 						status_code=r.status_code,
-						company=self.company
+						company=self.company,
 					)
 
 				if data["token_type"].lower() == "bearer":
@@ -113,7 +113,7 @@ class HMSTZSetting(Document):
 						request_header=headers,
 						request_body=payload,
 						status_code=r.status_code,
-						company=self.company
+						company=self.company,
 					)
 					frappe.throw(str(data))
 
@@ -136,7 +136,7 @@ class HMSTZSetting(Document):
 		payload = {
 			"username": self.jubilee_user,
 			"password": self.get_password("jubilee_password"),
-			"providerid": self.jubilee_provider_id
+			"providerid": self.jubilee_provider_id,
 		}
 
 		headers = {}
@@ -145,7 +145,7 @@ class HMSTZSetting(Document):
 		# 	"Content-Type": "application/json"
 		# }
 
-		#{"Content-Type": "form-data"}
+		# {"Content-Type": "form-data"}
 
 		url = f"{self.jubilee_url}/jubileeapi/Token"
 
@@ -164,14 +164,10 @@ class HMSTZSetting(Document):
 						request_body=payload,
 						response_data=data,
 						status_code=r.status_code,
-						company=self.company
-
+						company=self.company,
 					)
 
-				if (
-					data["Description"]
-					and data["Description"].get("access_token")
-				):
+				if data["Description"] and data["Description"].get("access_token"):
 					token = data["Description"].get("access_token")
 					issued_at = data["Description"].get("issued_at", 0)
 					expires_in = data["Description"].get("expires_in", 0)

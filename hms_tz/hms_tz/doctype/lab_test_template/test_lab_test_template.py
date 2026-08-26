@@ -1,7 +1,5 @@
-# -*- coding: utf-8 -*-
 # Copyright (c) 2015, ESS and Contributors
 # See license.txt
-from __future__ import unicode_literals
 
 import unittest
 
@@ -9,4 +7,4 @@ import unittest
 
 
 class TestLabTestTemplate(unittest.TestCase):
-    pass
+	pass

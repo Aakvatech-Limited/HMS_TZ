@@ -9,8 +9,8 @@ import frappe
 
 
 def execute():
-    frappe.db.add_unique(
-        "Insurance Folio Counter",
-        ["company", "claim_year", "claim_month", "insurance_provider"],
-        constraint_name="unique_folio_counter_period",
-    )
+	frappe.db.add_unique(
+		"Insurance Folio Counter",
+		["company", "claim_year", "claim_month", "insurance_provider"],
+		constraint_name="unique_folio_counter_period",
+	)

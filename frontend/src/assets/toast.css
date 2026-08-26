@@ -3,7 +3,8 @@
 /* Basic toast styling to match Frappe UI */
 .Vue__Toastification__toast {
   @apply rounded-lg shadow-lg border min-h-[48px] !important;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
+    "Helvetica Neue", Arial, sans-serif !important;
   padding: 16px 20px !important; /* Increased padding for better readability */
   margin-bottom: 8px !important;
   font-size: 14px !important;

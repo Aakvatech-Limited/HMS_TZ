@@ -1,8 +1,6 @@
-# -*- coding: utf-8 -*-
 # Copyright (c) 2015, ESS LLP and contributors
 # For license information, please see license.txt
 
-from __future__ import unicode_literals
 
 import frappe
 from erpnext.accounts.party import validate_party_accounts
@@ -13,68 +11,72 @@ from frappe.model.naming import append_number_if_name_exists
 
 
 class HealthcarePractitioner(Document):
-    def onload(self):
-        load_address_and_contact(self)
+	def onload(self):
+		load_address_and_contact(self)
 
-    def autoname(self):
-        # concat first and last name
-        self.name = self.practitioner_name
+	def autoname(self):
+		# concat first and last name
+		self.name = self.practitioner_name
 
-        if frappe.db.exists("Healthcare Practitioner", self.name):
-            self.name = append_number_if_name_exists("Contact", self.name)
+		if frappe.db.exists("Healthcare Practitioner", self.name):
+			self.name = append_number_if_name_exists("Contact", self.name)
 
-    def validate(self):
-        self.set_full_name()
-        validate_party_accounts(self)
-        if self.inpatient_visit_charge_item:
-            validate_service_item(
-                self.inpatient_visit_charge_item,
-                "Configure a service Item for Inpatient Consulting Charge Item",
-            )
-        if self.op_consulting_charge_item:
-            validate_service_item(
-                self.op_consulting_charge_item,
-                "Configure a service Item for Out Patient Consulting Charge Item",
-            )
+	def validate(self):
+		self.set_full_name()
+		validate_party_accounts(self)
+		if self.inpatient_visit_charge_item:
+			validate_service_item(
+				self.inpatient_visit_charge_item,
+				"Configure a service Item for Inpatient Consulting Charge Item",
+			)
+		if self.op_consulting_charge_item:
+			validate_service_item(
+				self.op_consulting_charge_item,
+				"Configure a service Item for Out Patient Consulting Charge Item",
+			)
 
-        if self.user_id:
-            self.validate_user_id()
-        else:
-            existing_user_id = frappe.get_cached_value("Healthcare Practitioner", self.name, "user_id")
-            if existing_user_id:
-                frappe.permissions.remove_user_permission("Healthcare Practitioner", self.name, existing_user_id)
+		if self.user_id:
+			self.validate_user_id()
+		else:
+			existing_user_id = frappe.get_cached_value("Healthcare Practitioner", self.name, "user_id")
+			if existing_user_id:
+				frappe.permissions.remove_user_permission(
+					"Healthcare Practitioner", self.name, existing_user_id
+				)
 
-    # def on_update(self):
-    # 	if self.user_id:
-    # 		frappe.permissions.add_user_permission('Healthcare Practitioner', self.name, self.user_id)
+	# def on_update(self):
+	# 	if self.user_id:
+	# 		frappe.permissions.add_user_permission('Healthcare Practitioner', self.name, self.user_id)
 
-    def set_full_name(self):
-        if self.last_name:
-            self.practitioner_name = " ".join(filter(None, [self.first_name, self.last_name]))
-        else:
-            self.practitioner_name = self.first_name
+	def set_full_name(self):
+		if self.last_name:
+			self.practitioner_name = " ".join(filter(None, [self.first_name, self.last_name]))
+		else:
+			self.practitioner_name = self.first_name
 
-    def validate_user_id(self):
-        if not frappe.db.exists("User", self.user_id):
-            frappe.throw(_(f"User {self.user_id} does not exist"))
-        elif not frappe.db.exists("User", self.user_id, "enabled"):
-            frappe.throw(_(f"User {self.user_id} is disabled"))
+	def validate_user_id(self):
+		if not frappe.db.exists("User", self.user_id):
+			frappe.throw(_(f"User {self.user_id} does not exist"))
+		elif not frappe.db.exists("User", self.user_id, "enabled"):
+			frappe.throw(_(f"User {self.user_id} is disabled"))
 
-        # check duplicate
-        practitioner = frappe.db.exists(
-            "Healthcare Practitioner",
-            {"user_id": self.user_id, "name": ("!=", self.name)},
-        )
-        if practitioner:
-            frappe.throw(_(f"User {self.user_id} is already assigned to Healthcare Practitioner {practitioner}"))
+		# check duplicate
+		practitioner = frappe.db.exists(
+			"Healthcare Practitioner",
+			{"user_id": self.user_id, "name": ("!=", self.name)},
+		)
+		if practitioner:
+			frappe.throw(
+				_(f"User {self.user_id} is already assigned to Healthcare Practitioner {practitioner}")
+			)
 
-    def on_trash(self):
-        delete_contact_and_address("Healthcare Practitioner", self.name)
+	def on_trash(self):
+		delete_contact_and_address("Healthcare Practitioner", self.name)
 
 
 def validate_service_item(item, msg):
-    if frappe.get_cached_value("Item", item, "is_stock_item"):
-        frappe.throw(_(msg))
+	if frappe.get_cached_value("Item", item, "is_stock_item"):
+		frappe.throw(_(msg))
 
 
 # @frappe.whitelist()

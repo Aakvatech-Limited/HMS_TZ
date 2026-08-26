@@ -5,4 +5,4 @@ import unittest
 
 
 class TestRecoveryScoreEntry(unittest.TestCase):
-    pass
+	pass

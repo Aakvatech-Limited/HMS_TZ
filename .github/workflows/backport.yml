@@ -31,9 +31,9 @@ jobs:
           pull_title: "${pull_title}"
           pull_description: |
             Backport of #${pull_number} to `${target_branch}`.
-            
+
             ---
-            
+
             ${pull_description}
           merge_commits: "skip"
           copy_requested_reviewers: true
@@ -47,11 +47,10 @@ jobs:
           script: |
             const { owner, repo } = context.repo;
             const pull_number = context.payload.pull_request.number;
-            
+
             await github.rest.issues.createComment({
               owner,
               repo,
               issue_number: pull_number,
               body: `⚠️ **Backport failed!**\n\nThe automatic backport could not be completed. This might be due to merge conflicts.\n\nPlease manually cherry-pick the commits to the target branch:\n\n\`\`\`bash\ngit checkout <target-branch>\ngit cherry-pick -x ${context.payload.pull_request.merge_commit_sha}\n\`\`\`\n\nThen create a new PR targeting the branch.`
             });
-

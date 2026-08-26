@@ -6,4 +6,4 @@ from frappe.model.document import Document
 
 
 class NHIFFolioCounter(Document):
-    pass
+	pass

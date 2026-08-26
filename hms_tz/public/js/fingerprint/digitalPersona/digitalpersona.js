@@ -11,7 +11,7 @@ export class DigitalPersona {
     this.samples = null;
     this.fingerprintAcquired = false;
     this.initialized = false;
-    
+
     // Event handlers will be set by the main fingerprint manager
     this.onDeviceConnected = null;
     this.onDeviceDisconnected = null;
@@ -58,9 +58,9 @@ export class DigitalPersona {
     try {
       this.samples = event.samples;
       this.fingerprintAcquired = true;
-      
+
       if (this.onSamplesAcquired) {
-        this.onSamplesAcquired(event.samples, 'digitalpersona');
+        this.onSamplesAcquired(event.samples, "digitalpersona");
       }
     } catch (error) {
       console.error("DigitalPersona SampleAcquired Error:", error);
@@ -93,13 +93,15 @@ export class DigitalPersona {
   handleQualityReported = (event) => {
     console.log("DigitalPersona QualityReported started", event);
     this.qualityReported = event.quality;
-    
+
     if (this.onQualityReported) {
       this.onQualityReported(event.quality);
     }
 
     if (event.quality !== QualityCode.Good) {
-      console.log(`DigitalPersona fingerprint quality is poor: ${event.quality}`);
+      console.log(
+        `DigitalPersona fingerprint quality is poor: ${event.quality}`
+      );
       this.resetDeviceState();
     }
   };
@@ -108,16 +110,16 @@ export class DigitalPersona {
     try {
       // Initialize reader if not already done
       this.initializeReader();
-      
+
       if (!this.dpReader) {
         throw new Error("DigitalPersona reader not available");
       }
-      
+
       const dpDevices = await this.dpReader.enumerateDevices();
       return dpDevices.map((device, index) => ({
         name: `DIGITAL PERSONA U4500`,
-        type: 'digitalpersona',
-        originalDevice: device
+        type: "digitalpersona",
+        originalDevice: device,
       }));
     } catch (error) {
       console.warn("DigitalPersona devices not available:", error);
@@ -129,7 +131,7 @@ export class DigitalPersona {
     if (!this.dpReader) {
       throw new Error("DigitalPersona reader not initialized");
     }
-    
+
     const deviceId = device.deviceId || device;
     // await this.dpReader.startAcquisition(SampleFormat.PngImage, deviceId);
     await this.dpReader.startAcquisition(SampleFormat.Compressed, deviceId); // to support WSQ format
@@ -149,7 +151,7 @@ export class DigitalPersona {
     // For DigitalPersona
     // let base64Data = sample.replace(/-/g, "+").replace(/_/g, "/");
     // return `data:image/bmp;base64,${sample}`;
-    return '/assets/hms_tz/images/fingerprint.png';
+    return "/assets/hms_tz/images/fingerprint.png";
   }
 
   destroy() {
@@ -160,17 +162,26 @@ export class DigitalPersona {
   }
 
   initializeReader() {
-    if (!this.initialized && typeof FingerprintReader !== 'undefined') {
+    if (!this.initialized && typeof FingerprintReader !== "undefined") {
       try {
         this.dpReader = new FingerprintReader();
         this.initialized = true;
-        
+
         // Initialize event handlers if callbacks are already set
         if (this.onCommunicationFailed) {
-          this.dpReader.on("CommunicationFailed", this.handleCommunicationFailed);
+          this.dpReader.on(
+            "CommunicationFailed",
+            this.handleCommunicationFailed
+          );
           this.dpReader.on("DeviceConnected", this.handleDeviceConnected);
-          this.dpReader.on("DeviceDisconnected", this.handleDeviceDisconnected);
-          this.dpReader.on("AcquisitionStarted", this.handleAcquisitionStarted);
+          this.dpReader.on(
+            "DeviceDisconnected",
+            this.handleDeviceDisconnected
+          );
+          this.dpReader.on(
+            "AcquisitionStarted",
+            this.handleAcquisitionStarted
+          );
           this.dpReader.on("QualityReported", this.handleQualityReported);
           this.dpReader.on("SamplesAcquired", this.handleSamplesAcquired);
           this.dpReader.on("ErrorOccurred", this.handleReaderError);
