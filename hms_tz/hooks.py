@@ -8,6 +8,8 @@ app_email = "info@aakvatech.com"
 app_license = "MIT"
 
 
+required_apps = ["erpnext", "healthcare"]
+
 # Includes in <head>
 # ------------------
 
