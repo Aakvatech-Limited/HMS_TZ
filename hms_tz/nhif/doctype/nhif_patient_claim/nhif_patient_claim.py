@@ -21,7 +21,7 @@ from frappe.utils import (
 	time_diff_in_seconds,
 )
 from frappe.utils.pdf import get_pdf
-from PyPDF2 import PdfFileWriter
+from pypdf import PdfWriter
 
 from hms_tz.hms_tz.doctype.insurance_folio_counter.insurance_folio_counter import get_or_create_folio_counter
 from hms_tz.nhif.api.healthcare_utils import get_approval_number_from_LRPMT, to_base64
@@ -860,10 +860,6 @@ class NHIFPatientClaim(Document):
 		if not self.main_diagnosis_code:
 			frappe.throw(_("Main Diagnosis Code is required"))
 
-	def validate_reqd_fields(self):
-		if not self.main_diagnosis_code:
-			frappe.throw(_("Main Diagnosis Code is required"))
-
 
 def get_missing_patient_signature(self):
 	if self.patient:
@@ -1029,7 +1025,7 @@ def generate_pdf(doc):
 
 
 def download_multi_pdf(doctype, name, print_format=None, no_letterhead=0):
-	output = PdfFileWriter()
+	output = PdfWriter()
 	if isinstance(doctype, dict):
 		for doctype_name in doctype:
 			for doc_name in doctype[doctype_name]:

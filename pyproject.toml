@@ -8,7 +8,7 @@ requires-python = ">=3.10"
 readme = "README.md"
 dynamic = ["version"]
 dependencies = [
-    "PyPDF2",
+    "pypdf>=3.9.0",
     "requests",
     "python-dateutil",
     "numpy",
@@ -46,6 +46,9 @@ ignore = [
   "E501",
   "E402",
   "E741",
+    "F401",  # unused imports
+    "F403",  # star imports
+    "F405",  # names from star imports
 ]
 
 [tool.ruff.format]
