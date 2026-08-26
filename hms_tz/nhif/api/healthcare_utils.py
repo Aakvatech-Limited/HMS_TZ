@@ -2362,14 +2362,14 @@ def update_invoice_reference_in_lrpmt_childs(child, item, fieldname=""):
 def auto_submit_nhif_patient_claim(setting_dict=None):
     """Routine to submit patient claims and will be triggered:
     1. Every 00:01 am at night by cron job
-    2. By a button called 'Auto Submit Patient Claim' which is on Company NHIF settings
+    2. By a button called 'Auto Submit Patient Claim' which is on HMS TZ Setting
     """
     company_setting_detail = []
 
     if not setting_dict:
         company_setting_detail = frappe.get_all(
-            "Company NHIF Settings",
-            filters={"enable": 1, "enable_auto_submit_of_claims": 1},
+            "HMS TZ Setting",
+            filters={"enable_nhif_api": 1, "enable_auto_submit_of_claims": 1},
             fields=["company", "submit_claim_year", "submit_claim_month"],
         )
     else:
