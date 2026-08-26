@@ -1,6 +1,9 @@
 # Semgrep Ignore File
 # Files and directories to exclude from security scanning
 
+# Semgrep defaults (re-listed: this file replaces them)
+.git/
+
 # Test files
 **/test_*.py
 **/tests/
