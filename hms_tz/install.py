@@ -3,8 +3,6 @@ import sys
 
 import frappe
 from erpnext import get_default_company
-from erpnext.setup.utils import before_tests as erpnext_before_tests
-from healthcare.healthcare.utils import before_tests as healthcare_before_tests
 from healthcare.setup import setup_healthcare
 
 from hms_tz.patches.custom_fields.create_custom_fields import execute as create_custom_fields
@@ -59,38 +57,28 @@ def create_accounting_dimensions():
 def before_tests():
 	"""Setup required master data before running tests.
 
-	When ``bench run-tests --app hms_tz`` is executed, Frappe's test runner
-	only invokes ``before_tests`` hooks registered by *hms_tz* (because it
-	passes ``app_name="hms_tz"`` to ``frappe.get_hooks``).  ERPNext's and
-	Healthcare's ``before_tests`` hooks — which bootstrap the full setup
-	wizard, fixture records, healthcare master data, etc. — are **not**
-	called automatically.
-
-	This function therefore delegates to the upstream apps first,
-	ensuring the test database has all required master data (Company,
-	Chart of Accounts, Warehouse Types, Genders, Medical Departments,
-	Item Groups, etc.) before hms_tz's own test records are created.
+	The test runner only invokes ``before_tests`` hooks registered by *hms_tz*,
+	and neither ERPNext nor Healthcare ships such a hook any more.  This
+	function therefore bootstraps the upstream master data itself (Company,
+	Chart of Accounts, Warehouse Types, Genders, Medical Departments, Item
+	Groups, etc.) before creating hms_tz's own test records.
 	"""
 
-	# 1. ERPNext: runs setup_complete() → install_fixtures (Warehouse Types,
-	#    Genders, Item Groups, Territories, etc.), creates Company, Fiscal Year,
-	#    enables all roles for Administrator, sets selling/stock defaults.
-	erpnext_before_tests()
+	# 1. ERPNext: setup wizard (Warehouse Types, Genders, Item Groups,
+	#    Territories, etc.), Company, Fiscal Year, all roles for Administrator,
+	#    selling/stock defaults.
+	setup_erpnext_for_tests()
 
-	# 2. Healthcare: creates Frappe Care LLC (if needed), Medical Departments,
-	#    Antibiotics, Lab Test UOMs, Dosages, Prescription Durations,
-	#    Healthcare Item Groups, Sensitivities, Healthcare Service Units, etc.
-	#    NOTE: healthcare_before_tests() only calls setup_healthcare() when no
-	#    Company exists.  Since erpnext_before_tests() already created one,
-	#    we must call setup_healthcare() explicitly afterwards.
-	healthcare_before_tests()
+	# 2. Healthcare: Medical Departments, Antibiotics, Lab Test UOMs, Dosages,
+	#    Prescription Durations, Healthcare Item Groups, Sensitivities,
+	#    root Healthcare Service Units, etc.
 	setup_healthcare()
 
 	# 3. Ensure a non-group Customer Group is available and set in Selling Settings.
 	#    ERPNext's set_defaults_for_tests() sets Selling Settings.customer_group
 	#    to the root "All Customer Groups" (is_group=1).  Newer ERPNext versions
 	#    reject group-type Customer Groups during Customer.validate().  We must
-	#    override it with a leaf node AFTER ERPNext's before_tests has run.
+	#    override it with a leaf node AFTER the ERPNext defaults are applied.
 	_ensure_non_group_customer_group()
 
 	# 4. hms_tz accounting dimensions (Healthcare Practitioner, Healthcare Service Unit)
@@ -102,6 +90,44 @@ def before_tests():
 	# 6. hms_tz-specific setup: custom fields, property setters, etc.
 	setup_hms_tz_test_data()
 
+	frappe.db.commit()
+
+
+def setup_erpnext_for_tests():
+	"""Complete the setup wizard and apply ERPNext test defaults.
+
+	ERPNext v16 dropped its own ``before_tests`` hook, and Frappe's runs only
+	when no other app is installed, so hms_tz bootstraps the test site itself.
+	"""
+	from erpnext.setup.utils import enable_all_roles_and_domains, set_defaults_for_tests
+	from frappe.desk.page.setup_wizard.setup_wizard import setup_complete
+	from frappe.utils import now_datetime
+
+	frappe.clear_cache()
+
+	if not frappe.db.a_row_exists("Company"):
+		current_year = now_datetime().year
+		setup_complete(
+			{
+				"currency": "USD",
+				"full_name": "Test User",
+				"company_name": "Wind Power LLC",
+				"timezone": "America/New_York",
+				"company_abbr": "WP",
+				"industry": "Manufacturing",
+				"country": "United States",
+				"fy_start_date": f"{current_year}-01-01",
+				"fy_end_date": f"{current_year}-12-31",
+				"language": "english",
+				"company_tagline": "Testing",
+				"email": "test@erpnext.com",
+				"password": "test",
+				"chart_of_accounts": "Standard",
+			}
+		)
+
+	enable_all_roles_and_domains()
+	set_defaults_for_tests()
 	frappe.db.commit()
 
 
