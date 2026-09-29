@@ -7,6 +7,8 @@ from datetime import date
 import frappe
 from erpnext import get_default_company
 from frappe import _
+from frappe.query_builder import DocType
+from frappe.query_builder.functions import Concat, Replace
 from frappe.utils import flt, getdate, nowdate
 from frappe.utils.background_jobs import enqueue
 
@@ -145,22 +147,29 @@ def check_national_id(national_id, is_new=None, patient=None, caller=None):
 
 @frappe.whitelist()
 def check_card_number(card_no, is_new=None, patient=None, caller=None):
+	card_no = (card_no or "").replace(" ", "")
 	if not card_no:
 		return False
 
-	filters = {"insurance_card_detail": ["like", "%" + card_no + "%"]}
+	patient_doctype = DocType("Patient")
+	card_list = Concat(",", Replace(patient_doctype.insurance_card_detail, " ", ""), ",")
+	query = (
+		frappe.qb.from_(patient_doctype)
+		.select(patient_doctype.name)
+		.where(card_list.like(f"%,{card_no},%"))
+		.limit(1)
+	)
 	if not is_new and patient:
-		filters["name"] = ["!=", patient]
+		query = query.where(patient_doctype.name != patient)
 
-	patients = frappe.db.get_all("Patient", filters=filters)
-	if len(patients):
+	patients = query.run(as_dict=True)
+	if patients:
 		if caller:
 			frappe.throw(
-				f"Cardno: <b>{card_no}</b> used with patient: <b>{patient}</b>, Please change Cardno to Proceed"
+				f"Cardno: <b>{card_no}</b> used with patient: <b>{patients[0].name}</b>, Please change Cardno to Proceed"
 			)
 		return patients[0].name
-	else:
-		return False
+	return False
 
 
 def create_nhif_subscription(doc):
