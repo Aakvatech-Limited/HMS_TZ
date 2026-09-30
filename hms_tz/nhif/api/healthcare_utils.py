@@ -21,6 +21,7 @@ from frappe.utils import (
 	nowtime,
 )
 
+from hms_tz.hms_tz.doctype.hms_tz_setting.hms_tz_setting import is_cash_inpatient_deposit_allowed
 from hms_tz.hms_tz.utils import manage_fee_validity
 
 
@@ -938,6 +939,16 @@ def set_healthcare_services(doc, checked_values):
 	return doc.name
 
 
+def is_cash_inpatient_on_deposit(encounter_doc):
+	"""Cash inpatient whose services are created at once and paid from deposits."""
+	return bool(
+		encounter_doc.inpatient_record
+		and not encounter_doc.insurance_subscription
+		and not encounter_doc.healthcare_package_order
+		and is_cash_inpatient_deposit_allowed(encounter_doc.company)
+	)
+
+
 # create LRPMT docs for Cash inpatient
 def inpatient_billing(encounter_doc, method):
 	if encounter_doc.insurance_subscription:  # IPD/OPD insurance
@@ -1041,8 +1052,8 @@ def create_lrp_docs(encounter_doc):
 
 	if (
 		not encounter_doc.insurance_subscription
-		and not encounter_doc.inpatient_record
 		and not encounter_doc.healthcare_package_order
+		and not is_cash_inpatient_on_deposit(encounter_doc)
 	):
 		return
 
@@ -1394,7 +1405,9 @@ def create_therapy_plan(enc_doc=None, invoice_therapy_dict=None):
 			)
 			return
 
-		if not enc_doc.insurance_subscription and not enc_doc.inpatient_record:
+		if not enc_doc.insurance_subscription and not (
+			enc_doc.inpatient_record and is_cash_inpatient_deposit_allowed(enc_doc.company)
+		):
 			return
 
 		patient_encounter_docs.append(enc_doc)
@@ -1522,8 +1535,8 @@ def create_delivery_note(encounter_doc, method):
 
 	if (
 		not encounter_doc.insurance_subscription
-		and not encounter_doc.inpatient_record
 		and not encounter_doc.healthcare_package_order
+		and not is_cash_inpatient_on_deposit(encounter_doc)
 	):
 		return
 
