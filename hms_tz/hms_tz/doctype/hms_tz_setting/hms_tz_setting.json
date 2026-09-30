@@ -39,6 +39,7 @@
   "allow_discharge_patient_with_pending_unbilled_invoices",
   "auto_create_imo_from_delivery_note",
   "column_break_kkzg",
+  "allow_cash_inpatient_deposit",
   "hms_tz_has_cash_limit_alert",
   "hms_tz_limit_under_minimum_percent_action",
   "column_break_finc",
@@ -270,18 +271,26 @@
   },
   {
    "default": "1",
+   "description": "If unticked, Cash inpatient services are created only after payment through Sales Invoice, like Cash OPD.",
+   "fieldname": "allow_cash_inpatient_deposit",
+   "fieldtype": "Check",
+   "label": "Allow Cash Inpatient Deposit"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.allow_cash_inpatient_deposit == 1",
    "fieldname": "hms_tz_has_cash_limit_alert",
    "fieldtype": "Check",
    "label": "Has Cash Limit Alert"
   },
   {
    "default": "10",
-   "depends_on": "eval: doc.hms_tz_has_cash_limit_alert == 1",
+   "depends_on": "eval:doc.allow_cash_inpatient_deposit == 1 && doc.hms_tz_has_cash_limit_alert == 1",
    "description": "Minimum cash limit percent to warn/stop doctor.",
    "fieldname": "hms_tz_minimum_cash_limit_percent",
    "fieldtype": "Int",
    "label": "Minimum Cash Limit Percent",
-   "mandatory_depends_on": "eval:doc.hms_tz_has_cash_limit_alert == 1"
+   "mandatory_depends_on": "eval:doc.allow_cash_inpatient_deposit == 1 && doc.hms_tz_has_cash_limit_alert == 1"
   },
   {
    "fieldname": "column_break_qsun",
@@ -289,23 +298,23 @@
   },
   {
    "default": "Warn",
-   "depends_on": "eval:doc.hms_tz_has_cash_limit_alert == 1",
+   "depends_on": "eval:doc.allow_cash_inpatient_deposit == 1 && doc.hms_tz_has_cash_limit_alert == 1",
    "description": "Action to take on doctor level when cash limit is under minimum percent.",
    "fieldname": "hms_tz_limit_under_minimum_percent_action",
    "fieldtype": "Select",
    "label": "Limit Under Minimum Percent Action",
-   "mandatory_depends_on": "eval:doc.hms_tz_has_cash_limit_alert == 1",
+   "mandatory_depends_on": "eval:doc.allow_cash_inpatient_deposit == 1 && doc.hms_tz_has_cash_limit_alert == 1",
    "options": "\nWarn\nStop\nIgnore",
    "translatable": 1
   },
   {
    "default": "Stop",
-   "depends_on": "eval:doc.hms_tz_has_cash_limit_alert == 1",
+   "depends_on": "eval:doc.allow_cash_inpatient_deposit == 1 && doc.hms_tz_has_cash_limit_alert == 1",
    "description": "Action to take on doctor level when cash limit is exceeded.",
    "fieldname": "hms_tz_limit_exceed_action",
    "fieldtype": "Select",
    "label": "Limit Exceed Action",
-   "mandatory_depends_on": "eval:doc.hms_tz_has_cash_limit_alert == 1",
+   "mandatory_depends_on": "eval:doc.allow_cash_inpatient_deposit == 1 && doc.hms_tz_has_cash_limit_alert == 1",
    "options": "\nWarn\nStop\nIgnore",
    "translatable": 1
   },
@@ -702,7 +711,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-05-15 03:05:19.349908",
+ "modified": "2026-09-29 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Hms Tz",
  "name": "HMS TZ Setting",
