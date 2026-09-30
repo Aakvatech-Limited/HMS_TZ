@@ -133,6 +133,9 @@ on_session_creation = "hms_tz.api.login.on_session_creation"
 # Hook on document methods and events
 
 doc_events = {
+	"Code Value": {
+		"autoname": "hms_tz.nhif.api.code_value.autoname",
+	},
 	"Patient Appointment": {
 		"before_insert": "hms_tz.nhif.api.patient_appointment.before_insert",
 		"validate": "hms_tz.nhif.api.patient_appointment.make_next_doc",
