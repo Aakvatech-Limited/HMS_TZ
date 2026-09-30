@@ -25,6 +25,7 @@ from hms_tz.hms_tz.doctype.healthcare_service_request.healthcare_service_request
 	get_item_rate,
 	get_mop_amount,
 	inpatient_billing,
+	is_cash_inpatient_on_deposit,
 	msgPrint,
 	msgThrow,
 	validate_nhif_patient_claim_status,
@@ -561,8 +562,7 @@ def duplicate_encounter(encounter):
 
 
 def on_submit(doc, method):
-	if doc.inpatient_record and not doc.insurance_subscription and not doc.healthcare_package_order:
-		# Cash inpatient billing
+	if is_cash_inpatient_on_deposit(doc):
 		if doc.mode_of_payment:
 			validate_patient_balance_vs_patient_costs(
 				doc.patient,
@@ -573,7 +573,7 @@ def on_submit(doc, method):
 			)
 		inpatient_billing(doc, method)
 	else:
-		# insurance patient
+		# insurance patient, or cash patient who pays through Sales Invoice
 		on_submit_validation(doc, method)
 		create_service_request(doc_obj=doc)
 
@@ -1204,7 +1204,7 @@ def validate_patient_balance_vs_patient_costs(
 
 	cash_limit_details = frappe.get_cached_value(
 		"HMS TZ Setting",
-		{"company": company, "hms_tz_has_cash_limit_alert": 1},
+		{"company": company, "allow_cash_inpatient_deposit": 1, "hms_tz_has_cash_limit_alert": 1},
 		[
 			"hms_tz_minimum_cash_limit_percent",
 			"hms_tz_limit_exceed_action",

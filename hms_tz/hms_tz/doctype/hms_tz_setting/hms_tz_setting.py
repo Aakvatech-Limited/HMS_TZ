@@ -9,7 +9,7 @@ import frappe
 import requests
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import add_to_date, get_datetime, now_datetime
+from frappe.utils import add_to_date, cint, get_datetime, now_datetime
 
 from hms_tz.jubilee.doctype.jubilee_response_log.jubilee_response_log import add_jubilee_log
 from hms_tz.nhif.doctype.nhif_response_log.nhif_response_log import add_log
@@ -198,3 +198,9 @@ class HMSTZSetting(Document):
 					continue
 				else:
 					raise e
+
+
+def is_cash_inpatient_deposit_allowed(company):
+	"""Companies without an HMS TZ Setting keep the deposit flow."""
+	allowed = frappe.get_cached_value("HMS TZ Setting", company, "allow_cash_inpatient_deposit")
+	return allowed is None or cint(allowed) == 1
