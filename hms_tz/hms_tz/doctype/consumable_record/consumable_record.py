@@ -6,6 +6,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import flt, nowdate, nowtime
 
+from hms_tz.hms_tz.doctype.hms_tz_setting.hms_tz_setting import is_cash_inpatient_deposit_allowed
 from hms_tz.nhif.api.patient_encounter import validate_patient_balance_vs_patient_costs
 
 
@@ -80,17 +81,18 @@ class ConsumableRecord(Document):
 	def try_create_delivery_note(self):
 		"""Create Delivery Note if all payment conditions are met.
 
-		- Full cash patient (self.payment_type == "Cash"):
-		  Deposit already validated by validate_cash_patient_deposit,
-		  so create DN immediately.
-		- Insurance patient (self.payment_type == "Insurance"):
-		  If any item-level cash co-pay items are uninvoiced,
+		- Cash inpatient on deposit: deposit already validated by
+		  validate_cash_patient_deposit, so create DN immediately.
+		- Insurance patient, or cash inpatient without deposit:
+		  if any billable cash items are uninvoiced,
 		  hold DN until Sales Invoice is created and paid.
 		"""
-		if self.payment_type == "Insurance":
-			# Check for uninvoiced cash co-pay items at the item level
+		is_inpatient_without_deposit = self.inpatient_record and not is_cash_inpatient_deposit_allowed(
+			self.company
+		)
+		if self.payment_type == "Insurance" or is_inpatient_without_deposit:
 			has_uninvoiced_cash = any(
-				item.payment_type == "Cash" and not item.invoiced for item in self.items
+				item.payment_type == "Cash" and item.is_billable and not item.invoiced for item in self.items
 			)
 
 			if has_uninvoiced_cash:

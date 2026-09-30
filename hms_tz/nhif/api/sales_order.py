@@ -4,6 +4,7 @@ from frappe.query_builder import DocType
 from frappe.query_builder.functions import CombineDatetime
 from frappe.utils import nowdate
 
+from hms_tz.hms_tz.doctype.hms_tz_setting.hms_tz_setting import is_cash_inpatient_deposit_allowed
 from hms_tz.nhif.api.healthcare_utils import msgThrow
 
 
@@ -25,7 +26,7 @@ def before_submit(doc, method):
 
 
 def create_sales_order(doc, method):
-	if doc.mode_of_payment and doc.inpatient_record:
+	if doc.mode_of_payment and doc.inpatient_record and is_cash_inpatient_deposit_allowed(doc.company):
 		return
 
 	company_details = frappe.get_cached_value(
