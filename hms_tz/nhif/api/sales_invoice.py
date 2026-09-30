@@ -6,6 +6,7 @@ import frappe
 from frappe import _
 from frappe.query_builder import DocType
 
+from hms_tz.hms_tz.doctype.hms_tz_setting.hms_tz_setting import is_cash_inpatient_deposit_allowed
 from hms_tz.nhif.api.healthcare_utils import (
 	create_individual_lab_test,
 	create_individual_procedure_prescription,
@@ -49,7 +50,7 @@ def validate_create_delivery_note(doc):
 		insurance_subscription = frappe.get_cached_value(
 			"Inpatient Record", inpatient_record, "insurance_subscription"
 		)
-		if not insurance_subscription:
+		if not insurance_subscription and is_cash_inpatient_deposit_allowed(doc.company):
 			if hasattr(doc, "enabled_auto_create_delivery_notes"):
 				doc.enabled_auto_create_delivery_notes = 0
 
