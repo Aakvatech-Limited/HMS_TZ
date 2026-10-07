@@ -31,5 +31,59 @@
     "default": "0",
     "read_only": 1,
     "description": "Hospital Revenue Entry has been created for this occupancy"
+  },
+  {
+    "dt": "Inpatient Occupancy",
+    "fieldname": "preapproval_section",
+    "fieldtype": "Section Break",
+    "label": "Pre-Approval",
+    "insert_after": "sales_invoice_number",
+    "collapsible": 1
+  },
+  {
+    "dt": "Inpatient Occupancy",
+    "fieldname": "preapproval_status",
+    "fieldtype": "Data",
+    "label": "Preapproval Status",
+    "insert_after": "preapproval_section",
+    "read_only": 1
+  },
+  {
+    "dt": "Inpatient Occupancy",
+    "fieldname": "preapproval_no",
+    "fieldtype": "Data",
+    "label": "Preapproval No",
+    "insert_after": "preapproval_status",
+    "read_only": 1
+  },
+  {
+    "dt": "Inpatient Occupancy",
+    "fieldname": "rejection_reason_code",
+    "fieldtype": "Data",
+    "label": "Rejection Reason Code",
+    "insert_after": "preapproval_no",
+    "read_only": 1
+  },
+  {
+    "dt": "Inpatient Occupancy",
+    "fieldname": "preapproval_column_break",
+    "fieldtype": "Column Break",
+    "insert_after": "rejection_reason_code"
+  },
+  {
+    "dt": "Inpatient Occupancy",
+    "fieldname": "rejection_details",
+    "fieldtype": "Small Text",
+    "label": "Preapproval Rejection Details",
+    "insert_after": "preapproval_column_break",
+    "read_only": 1
+  },
+  {
+    "dt": "Inpatient Occupancy",
+    "fieldname": "preapproval_cancel_remarks",
+    "fieldtype": "Small Text",
+    "label": "Preapproval Cancel Remarks",
+    "insert_after": "rejection_details",
+    "read_only": 1
   }
 ]
