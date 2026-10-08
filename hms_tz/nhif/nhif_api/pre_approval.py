@@ -3,7 +3,7 @@ import json
 import frappe
 import requests
 from frappe.core.utils import html2text
-from frappe.utils import getdate, nowdate
+from frappe.utils import nowdate
 from frappe.utils.caching import request_cache
 
 from hms_tz.hms_tz.doctype.healthcare_service_request.healthcare_service_request import (
@@ -13,8 +13,6 @@ from hms_tz.hms_tz.doctype.healthcare_service_request.healthcare_service_request
 )
 from hms_tz.nhif.doctype.nhif_response_log.nhif_response_log import add_log
 from hms_tz.nhif.nhif_api.referral import get_disease_code
-
-MAX_BEDS_PER_REQUEST = 10
 
 
 @frappe.whitelist()
@@ -257,7 +255,7 @@ def cancel_preapproval(
 			ref_docname=ref_docname,
 		)
 
-		for row, _template_doctype, _template_name in get_service_rows(source_doc):
+		for row, _template_doctype, _template_name in get_service_rows(source_doc, preapproval_no):
 			if row.preapproval_no == preapproval_no:
 				row.preapproval_status = "Cancelled"
 				row.preapproval_no = ""
@@ -282,10 +280,10 @@ def cancel_preapproval(
 		return True
 
 
-def get_service_rows(doc):
-	"""Yield (row, template doctype, template name) for encounter services and inpatient beds.
+def get_service_rows(doc, preapproval_no=None):
+	"""Yield (row, template doctype, template name) for encounter services and today's inpatient beds.
 
-	Only the oldest MAX_BEDS_PER_REQUEST beds awaiting pre-approval are yielded; later requests take the rest.
+	NHIF rejects effective dates before today, so older beds are only loaded to cancel `preapproval_no`.
 	"""
 	for child in get_childs_map():
 		for row in doc.get(child.get("table")) or []:
@@ -294,17 +292,27 @@ def get_service_rows(doc):
 	if doc.doctype != "Patient Encounter" or not doc.get("inpatient_record"):
 		return
 
-	pending_beds = 0
-	for row in frappe.get_doc("Inpatient Record", doc.inpatient_record).inpatient_occupancies:
-		if is_preapproval_required(row):
-			pending_beds += 1
-			if pending_beds > MAX_BEDS_PER_REQUEST:
-				continue
-
+	for row in get_bed_rows(doc.inpatient_record, preapproval_no):
 		service_unit_type = frappe.get_cached_value(
 			"Healthcare Service Unit", row.service_unit, "service_unit_type"
 		)
 		yield row, "Healthcare Service Unit Type", service_unit_type
+
+
+def get_bed_rows(inpatient_record, preapproval_no=None):
+	today = nowdate()
+	or_filters = {"check_in": ["between", [today, today]]}
+	if preapproval_no:
+		or_filters["preapproval_no"] = preapproval_no
+
+	rows = frappe.get_all(
+		"Inpatient Occupancy",
+		filters={"parent": inpatient_record, "parenttype": "Inpatient Record"},
+		or_filters=or_filters,
+		fields=["*"],
+		order_by="idx",
+	)
+	return [frappe.get_doc({"doctype": "Inpatient Occupancy", **row}) for row in rows]
 
 
 def is_preapproval_required(row):
@@ -317,14 +325,6 @@ def is_preapproval_required(row):
 		or row.get("is_cancelled")
 		or row.get("preapproval_status") == "Accepted"
 	)
-
-
-def get_service_dates(row):
-	"""Beds run from check-in to check-out; an open bed ends today."""
-	if row.doctype == "Inpatient Occupancy":
-		return str(getdate(row.check_in)), str(getdate(row.check_out or nowdate()))
-
-	return nowdate(), nowdate()
 
 
 def get_disease_row(row):
@@ -358,7 +358,7 @@ def get_services(doc, preapproval_no=None):
 	services = []
 	requested_rows = []
 
-	for row, template_doctype, template_name in get_service_rows(doc):
+	for row, template_doctype, template_name in get_service_rows(doc, preapproval_no):
 		if not template_name:
 			continue
 
@@ -371,14 +371,13 @@ def get_services(doc, preapproval_no=None):
 
 		ref_code, item = get_service_item(template_doctype, template_name, doc.company, doc.insurance_company)
 		item_rate = get_service_rate(row, item, doc)
-		effective_date, end_date = get_service_dates(row)
 
 		services.append(
 			{
 				"itemCode": ref_code,
 				"usage": "",
-				"effectiveDate": effective_date,
-				"endDate": end_date,
+				"effectiveDate": nowdate(),
+				"endDate": nowdate(),
 				"quantityRequested": row.get("quantity") or 1,
 				"unitPrice": item_rate,
 				"remarks": "",
