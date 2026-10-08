@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import frappe
 from frappe.model.base_document import BaseDocument
 from frappe.tests.utils import FrappeTestCase
-from frappe.utils import nowdate
+from frappe.utils import add_days, nowdate
 
 from hms_tz.nhif.nhif_api import pre_approval
 
@@ -93,13 +93,18 @@ class TestNHIFPreApprovalBeds(FrappeTestCase):
 			inpatient_record=INPATIENT_RECORD,
 			examination_detail="<p>Admitted</p>",
 		)
+		today = nowdate()
+		yesterday = add_days(today, -1)
 		insert_occupancy(
-			"_Test PA Closed Bed", idx=1, check_in="2026-10-01 10:00:00", check_out="2026-10-02 00:00:00"
+			"_Test PA Approved Bed", idx=1, check_in=f"{add_days(today, -2)} 10:00:00", preapproval_no="OLD-1"
 		)
 		insert_occupancy(
-			"_Test PA Approved Bed", idx=2, check_in="2026-09-30 10:00:00", preapproval_no="OLD-1"
+			"_Test PA Yesterday Bed", idx=2, check_in=f"{yesterday} 00:00:00", check_out=f"{today} 00:00:00"
 		)
-		insert_occupancy("_Test PA Open Bed", idx=3, check_in="2026-10-02 00:00:00", amount=OPEN_BED_AMOUNT)
+		insert_occupancy(
+			"_Test PA Transfer Bed", idx=3, check_in=f"{today} 00:00:00", check_out=f"{today} 10:00:00"
+		)
+		insert_occupancy("_Test PA Today Bed", idx=4, check_in=f"{today} 10:00:00", amount=OPEN_BED_AMOUNT)
 
 	def setUp(self):
 		frappe.db.savepoint("pre_approval_test")
@@ -127,39 +132,24 @@ class TestNHIFPreApprovalBeds(FrappeTestCase):
 	def test_missing_bed_amount_is_priced_and_stored(self):
 		pre_approval.get_services(self.make_encounter())
 		self.assertEqual(
-			frappe.db.get_value("Inpatient Occupancy", "_Test PA Closed Bed", "amount"), BED_RATE
+			frappe.db.get_value("Inpatient Occupancy", "_Test PA Transfer Bed", "amount"), BED_RATE
 		)
 
-	def test_beds_without_preapproval_no_are_requested(self):
+	def test_only_todays_beds_without_preapproval_no_are_requested(self):
 		services, requested_rows, diseases = pre_approval.get_services(self.make_encounter())
 
 		self.assertEqual(
 			services,
 			[
-				bed_service("2026-10-01", "2026-10-02", BED_RATE),
-				bed_service("2026-10-02", nowdate(), OPEN_BED_AMOUNT),
+				bed_service(nowdate(), nowdate(), BED_RATE),
+				bed_service(nowdate(), nowdate(), OPEN_BED_AMOUNT),
 			],
 		)
 		self.assertEqual(
 			[(row.name, template_name) for row, template_name, _ref_code in requested_rows],
-			[("_Test PA Closed Bed", SERVICE_UNIT_TYPE), ("_Test PA Open Bed", SERVICE_UNIT_TYPE)],
+			[("_Test PA Transfer Bed", SERVICE_UNIT_TYPE), ("_Test PA Today Bed", SERVICE_UNIT_TYPE)],
 		)
 		self.assertEqual(diseases, [])
-
-	@patch.object(pre_approval, "MAX_BEDS_PER_REQUEST", 1)
-	def test_beds_are_requested_in_batches_oldest_first(self):
-		encounter = self.make_encounter()
-		_services, requested_rows, _diseases = pre_approval.get_services(encounter)
-		self.assertEqual([row.name for row, *_ in requested_rows], ["_Test PA Closed Bed"])
-
-		frappe.db.set_value("Inpatient Occupancy", "_Test PA Closed Bed", "preapproval_no", "PA-1")
-		_services, requested_rows, _diseases = pre_approval.get_services(encounter)
-		self.assertEqual([row.name for row, *_ in requested_rows], ["_Test PA Open Bed"])
-
-	@patch.object(pre_approval, "MAX_BEDS_PER_REQUEST", 1)
-	def test_cancel_finds_beds_beyond_batch_limit(self):
-		services, _requested_rows, _diseases = pre_approval.get_services(self.make_encounter(), "OLD-1")
-		self.assertIn(SERVICE_UNIT_TYPE, services)
 
 	def test_disease_code_has_no_standard_prefix_or_space(self):
 		row = frappe._dict(medical_code="ICD-10 Z22.0", parentfield="lab_test_prescription")
@@ -192,10 +182,11 @@ class TestNHIFPreApprovalBeds(FrappeTestCase):
 		self.assertTrue(result)
 		payload = json.loads(request.call_args.kwargs["data"])
 		self.assertEqual(len(payload["requestedServices"]), 2)
-		for name in ["_Test PA Closed Bed", "_Test PA Open Bed"]:
+		for name in ["_Test PA Transfer Bed", "_Test PA Today Bed"]:
 			bed = get_occupancy(name)
 			self.assertEqual((bed.preapproval_no, bed.preapproval_status), ("PA-1", "ACCEPTED"))
 		self.assertEqual(get_occupancy("_Test PA Approved Bed").preapproval_no, "OLD-1")
+		self.assertFalse(get_occupancy("_Test PA Yesterday Bed").preapproval_no)
 
 	@patch.object(pre_approval.requests, "request")
 	def test_rejected_response_clears_bed_preapproval_no(self, request):
@@ -211,7 +202,7 @@ class TestNHIFPreApprovalBeds(FrappeTestCase):
 			"Patient Encounter", ENCOUNTER, authorization_no="AUTH1", settings_doc=make_settings()
 		)
 
-		bed = get_occupancy("_Test PA Closed Bed")
+		bed = get_occupancy("_Test PA Transfer Bed")
 		self.assertEqual(bed.preapproval_status, "REJECTED")
 		self.assertFalse(bed.preapproval_no)
 		self.assertEqual(bed.rejection_details, "Not covered")
@@ -253,5 +244,5 @@ class TestNHIFPreApprovalBeds(FrappeTestCase):
 
 		self.assertEqual(
 			sorted(name for name in updated if name.startswith("_Test PA") and "Bed" in name),
-			["_Test PA Closed Bed", "_Test PA Open Bed"],
+			["_Test PA Today Bed", "_Test PA Transfer Bed"],
 		)
