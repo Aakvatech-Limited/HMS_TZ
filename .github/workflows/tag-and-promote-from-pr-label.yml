@@ -41,7 +41,17 @@ jobs:
             const match = targetBranch.match(/^version-(\d+)(?:-hotfix)?$/);
 
             if (!match) {
-              core.info("The PR target is not a version maintenance branch. Skipping release.");
+              const promotionRequested = labels.some(name => name.startsWith("promote/"));
+              if (promotionRequested) {
+                core.setFailed(
+                  "Release promotion blocked: target branch '" + targetBranch +
+                  "' does not identify a Frappe major version. " +
+                  "Use version-N or version-N-hotfix (for example, version-15-hotfix). " +
+                  "No version or tag was changed."
+                );
+                return;
+              }
+              core.info("The PR target is not a version maintenance branch and no promotion was requested. Skipping release.");
               core.setOutput("should_release", "false");
               return;
             }
