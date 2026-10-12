@@ -534,6 +534,18 @@ def admit_patient(
 			text=f"NHIF Admission Successful<br><br>Status Code: {r.status_code}<br>AdmissionNo: <b>{data.get('AdmissionNo')}<b>",
 		)
 
+		admission_no = data.get("AdmissionNo")
+		if not admission_no:
+			frappe.throw(
+				_("Cannot admit NHIF patient without an Admission Number from NHIF."),
+				title=_("Admission Number Missing"),
+			)
+
+		# Patient is now admitted on NHIF side: persist admission_no immediately so that
+		# a failure below (POC / local admit) does not lose it and cause "already admitted" on retry
+		doc.db_set("admission_no", admission_no)
+		frappe.db.commit()
+
 		point_of_care_name = ""
 		if ward_type == "Normal Ward":
 			point_of_care_name = "Normal Ward Admission"
@@ -542,29 +554,30 @@ def admit_patient(
 		elif ward_type == "ICU":
 			point_of_care_name = "ICU Admission"
 
-		reference_data = get_poc_reference_no(
-			point_of_care_name,
-			doc.primary_practitioner,
-			fingerprint,
-			fpcode,
-			biometric_method,
-			settings_doc.name,
-			appointment_id=doc.patient_appointment,
-			authorization_no=authorization_no,
-			settings_doc=settings_doc,
-			practitioner_no=mct_code,
-			ref_doctype=ref_doctype,
-			ref_docname=ref_docname,
-		)
-
-		admission_no = data.get("AdmissionNo")
-		poc_reference_no = reference_data.get("ReferenceNo") if reference_data else ""
-
-		if not admission_no:
-			frappe.throw(
-				_("Cannot admit NHIF patient without an Admission Number from NHIF."),
-				title=_("Admission Number Missing"),
+		try:
+			reference_data = get_poc_reference_no(
+				point_of_care_name,
+				doc.primary_practitioner,
+				fingerprint,
+				fpcode,
+				biometric_method,
+				settings_doc.name,
+				appointment_id=doc.patient_appointment,
+				authorization_no=authorization_no,
+				settings_doc=settings_doc,
+				practitioner_no=mct_code,
+				ref_doctype=ref_doctype,
+				ref_docname=ref_docname,
 			)
+		except Exception:
+			# patient is already admitted on NHIF, so admit locally anyway and keep the admission_no
+			reference_data = None
+			doc.add_comment(
+				comment_type="Comment",
+				text="POC Reference No for admission could not be generated, patient admitted without it",
+			)
+
+		poc_reference_no = reference_data.get("ReferenceNo") if reference_data else ""
 
 		local_admit_patient(
 			doc,

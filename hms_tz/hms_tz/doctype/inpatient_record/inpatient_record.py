@@ -358,9 +358,13 @@ def admit_patient(
 ):
 	inpatient_record.admitted_datetime = check_in
 	inpatient_record.status = "Admitted"
-	inpatient_record.admission_no = admission_no
+	# do not wipe an NHIF admission_no / poc_reference_no already stored on the record,
+	# otherwise the patient can never be discharged from NHIF
+	if admission_no:
+		inpatient_record.admission_no = admission_no
+	if poc_reference_no:
+		inpatient_record.poc_reference_no = poc_reference_no
 	inpatient_record.admission_type = admission_type
-	inpatient_record.poc_reference_no = poc_reference_no
 	inpatient_record.expected_discharge = expected_discharge
 
 	inpatient_record.set("inpatient_occupancies", [])
