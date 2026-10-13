@@ -936,6 +936,8 @@ def before_submit(doc, method):
 	validate_point_of_care(doc, "validate_poc_at_encounter")
 
 	if not doc.healthcare_package_order:
+		# before_save hooks don't run on submit, so the medical code check must be repeated here to block
+		validate_medical_code(doc, method)
 		set_amounts(doc)
 
 	# shm rock: 151
