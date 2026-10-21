@@ -398,7 +398,7 @@ def get_room_types(company=None, caller=None):
 			)
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def admit_patient(
 	admission_type: str,
 	service_unit: str,
@@ -582,7 +582,7 @@ def admit_patient(
 		}
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def discharge_patient(discharge_type, ref_doctype, ref_docname):
 	doc = frappe.get_cached_doc("Inpatient Record", ref_docname)
 	mct_code = frappe.get_cached_value("Healthcare Practitioner", doc.discharge_practitioner, "tz_mct_code")
@@ -691,7 +691,7 @@ def discharge_patient(discharge_type, ref_doctype, ref_docname):
 		return data
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def transfer_patient(
 	service_unit_type,
 	service_unit,
