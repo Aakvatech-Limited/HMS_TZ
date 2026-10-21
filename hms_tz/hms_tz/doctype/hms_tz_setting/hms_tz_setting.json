@@ -27,8 +27,6 @@
   "auto_prescribe_items_on_patient_encounter",
   "validate_medication_class",
   "auto_create_sales_order_from_encounter",
-  "sales_order_opd_pharmacy",
-  "sales_order_ipd_pharmacy",
   "lab_test_conf_section",
   "allow_send_sms_for_multiple_labs",
   "column_break_zsbe",
@@ -403,22 +401,6 @@
    "label": "Auto Create Sales Order from Encounter"
   },
   {
-   "depends_on": "eval: doc.auto_create_sales_order_from_encounter == 1",
-   "fieldname": "sales_order_opd_pharmacy",
-   "fieldtype": "Link",
-   "label": "Sales Order OPD Pharmacy",
-   "mandatory_depends_on": "eval: doc.auto_create_sales_order_from_encounter == 1",
-   "options": "Warehouse"
-  },
-  {
-   "depends_on": "eval: doc.auto_create_sales_order_from_encounter == 1",
-   "fieldname": "sales_order_ipd_pharmacy",
-   "fieldtype": "Link",
-   "label": "Sales Order IPD Pharmacy",
-   "mandatory_depends_on": "eval: doc.auto_create_sales_order_from_encounter == 1",
-   "options": "Warehouse"
-  },
-  {
    "default": "1",
    "description": "If ticked, Uncovered items will be marked as prescribed and required to be paid in cash on patient encounter",
    "fieldname": "auto_prescribe_items_on_patient_encounter",
@@ -711,7 +693,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-29 12:00:00.000000",
+ "modified": "2026-10-21 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Hms Tz",
  "name": "HMS TZ Setting",

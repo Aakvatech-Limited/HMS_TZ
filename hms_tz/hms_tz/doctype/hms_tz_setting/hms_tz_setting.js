@@ -51,22 +51,6 @@ frappe.ui.form.on("HMS TZ Setting", {
         },
       };
     });
-    frm.set_query("sales_order_opd_pharmacy", () => {
-      return {
-        filters: {
-          disabled: 0,
-          company: frm.doc.company,
-        },
-      };
-    });
-    frm.set_query("sales_order_ipd_pharmacy", () => {
-      return {
-        filters: {
-          disabled: 0,
-          company: frm.doc.company,
-        },
-      };
-    });
     frm.set_query("nhif_customer_name", () => {
       return {
         filters: {
