@@ -11,23 +11,18 @@ from frappe.model.document import Document
 from frappe.model.naming import set_name_by_naming_series
 from frappe.query_builder import DocType, Interval
 from frappe.query_builder.functions import (
-	Cast_,
 	Count,
 	CurDate,
 	CustomFunction,
-	IfNull,
-	Max,
 	UnixTimestamp,
 )
-from frappe.utils import cint, cstr, flt, getdate
+from frappe.utils import flt, getdate
 from frappe.utils.nestedset import get_root_of
 from healthcare.healthcare.doctype.healthcare_settings.healthcare_settings import (
 	get_income_account,
 	get_receivable_account,
 	send_registration_sms,
 )
-
-SubstringIndex = CustomFunction("SUBSTRING_INDEX", ["string", "delimiter", "count"])
 
 
 class Patient(Document):
@@ -136,18 +131,18 @@ class Patient(Document):
 	def get_patient_name(self):
 		self.set_full_name()
 		name = self.patient_name
-		if frappe.get_cached_value("Patient", name):
-			patient = DocType("Patient")
-			name_suffix = Cast_(SubstringIndex(patient.name, " ", -1), "UNSIGNED")
-			count = (
-				frappe.qb.from_(patient)
-				.select(IfNull(Max(name_suffix), 0))
-				.where(patient.name.like(f"%{name} - %"))
-			).run()[0][0]
-			count = cint(count) + 1
-			return f"{name} - {cstr(count)}"
+		if not frappe.get_cached_value("Patient", name):
+			return name
 
-		return name
+		prefix = f"{name} - "
+		like_prefix = prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+		patient = DocType("Patient")
+		names = (
+			frappe.qb.from_(patient).select(patient.name).where(patient.name.like(f"{like_prefix}%"))
+		).run(pluck=True)
+		suffixes = [patient_name[len(prefix) :] for patient_name in names]
+		counters = [int(suffix) for suffix in suffixes if suffix.isdecimal()]
+		return f"{prefix}{max(counters, default=0) + 1}"
 
 	def get_age(self):
 		age_str = ""
