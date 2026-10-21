@@ -4,7 +4,7 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import nowdate
+from frappe.utils import add_days, get_datetime, nowdate, to_timedelta
 
 
 class NursingSchedule(Document):
@@ -150,11 +150,12 @@ class NursingSchedule(Document):
 
 
 def create_nurse_records_for_admitted_patients():
-	"""Background job (every 1 hour): auto-create Nurse Records for admitted patients.
+	"""Background job (every 15 minutes): auto-create Nurse Records for admitted patients.
 
 	Logic:
-	1. Get all Nursing Schedule records for today that haven't yet generated
-	   a Nurse Record (nurse_record_created == 0).
+	1. Get all submitted Nursing Schedule records for today. Schedules that
+	   already created records are included, so patients admitted or
+	   transferred later in the day are still picked up.
 	2. Get all Inpatient Records with status 'Admitted'.
 	3. For each admitted patient, get the last service unit from the
 	   inpatient_occupancies child table.
@@ -162,18 +163,19 @@ def create_nurse_records_for_admitted_patients():
 	   - schedule.room == last occupancy service_unit, OR
 	   - schedule.ward == service_unit_type of the last
 	     occupancy's service unit
-	5. Create a Nurse Record for each match if one doesn't already exist.
+	   Shifts that ended before the patient checked in to that unit are skipped.
+	5. Create a Nurse Record for each match if one doesn't already exist
+	   for the same patient + nurse + date + shift.
 	6. Mark the Nursing Schedule's nurse_record_created checkbox.
 	"""
 	today = nowdate()
 
-	# Get today's nursing schedules that haven't generated records
+	# Get today's nursing schedules
 	schedules = frappe.db.get_all(
 		"Nursing Schedule",
 		filters={
 			"assignment_date": today,
 			"docstatus": 1,
-			"nurse_record_created": 0,
 		},
 		fields=[
 			"name",
@@ -204,19 +206,22 @@ def create_nurse_records_for_admitted_patients():
 
 	for ip in admitted_records:
 		# Get the last service unit from inpatient occupancies
-		last_occupancy = frappe.db.get_value(
+		occupancy = frappe.db.get_value(
 			"Inpatient Occupancy",
 			filters={
 				"parent": ip.name,
 				"parenttype": "Inpatient Record",
 				"left": 0,
 			},
-			fieldname="service_unit",
+			fieldname=["service_unit", "check_in"],
 			order_by="check_in desc",
+			as_dict=True,
 		)
 
-		if not last_occupancy:
+		if not occupancy:
 			continue
+
+		last_occupancy = occupancy.service_unit
 
 		# Get the service unit type of the last occupancy's service unit
 		last_su_type = frappe.db.get_value(
@@ -240,6 +245,10 @@ def create_nurse_records_for_admitted_patients():
 			if not matched:
 				continue
 
+			# Skip shifts that ended before the patient arrived in this unit
+			if _shift_ended_before(today, schedule, occupancy.check_in):
+				continue
+
 			# Check if a record already exists for this nurse + patient + shift
 			existing = frappe.db.exists(
 				"Nurse Record",
@@ -247,7 +256,7 @@ def create_nurse_records_for_admitted_patients():
 					"patient": ip.patient,
 					"nurse": schedule.nurse,
 					"posting_date": today,
-					"shift_type": schedule.shift_type,
+					"nurse_shift": schedule.shift_type,
 					"docstatus": ["!=", 2],
 				},
 			)
@@ -262,6 +271,8 @@ def create_nurse_records_for_admitted_patients():
 				)
 				continue
 
+			savepoint = "nurse_record_auto_create"
+			frappe.db.savepoint(savepoint)
 			try:
 				nr = frappe.new_doc("Nurse Record")
 				nr.appointment = ip.patient_appointment
@@ -316,4 +327,20 @@ def create_nurse_records_for_admitted_patients():
 					reference_doctype="Nursing Schedule",
 					reference_name=schedule.name,
 				)
-				frappe.db.rollback()
+				# Only undo this record, not the ones already created in this run
+				frappe.db.rollback(save_point=savepoint)
+
+
+def _shift_ended_before(posting_date, schedule, check_in) -> bool:
+	"""True if the schedule's shift ended before the given check-in time."""
+	if not schedule.shift_start_time or not schedule.shift_end_time or not check_in:
+		return False
+
+	start = to_timedelta(schedule.shift_start_time)
+	end = to_timedelta(schedule.shift_end_time)
+	shift_end = get_datetime(posting_date) + end
+	if end <= start:
+		# Overnight shift ends the next day
+		shift_end = get_datetime(add_days(posting_date, 1)) + end
+
+	return shift_end < get_datetime(check_in)
