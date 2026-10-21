@@ -335,7 +335,7 @@ def process_nhif_prices(company, facility_code, item_code=None):
 		frappe.db.commit()
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def process_nhif_coverages(company, facility_code, coverage_plan=None):
 	print("Getting Insurance Coverage Items")
 	hsic_data = []

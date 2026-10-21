@@ -629,7 +629,7 @@ def add_preauth_comment(encounter_doc, service_request_name, result):
 	)
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def request_preauthorization(source_doctype, source_docname, benefit_code):
 	"""Submit the encounter, create a draft Service Request, and send the pre-auth.
 
