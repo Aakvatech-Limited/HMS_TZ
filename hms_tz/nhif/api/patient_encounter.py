@@ -1910,6 +1910,7 @@ def get_filterd_drug(doctype, txt, searchfield, start, page_len, filters):
 		.inner_join(apl)
 		.on(md.name == apl.parent)
 		.select(md.name, md.national_drug_code, md.generic_name, md.strength_text)
+		.distinct()
 		.where(md.disabled == 0)
 		.orderby(md.name)
 		.limit(cint(page_len))
