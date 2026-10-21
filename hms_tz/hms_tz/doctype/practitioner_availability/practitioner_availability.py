@@ -5,6 +5,8 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
+from frappe.query_builder import Criterion, DatePart, DocType
+from frappe.query_builder.functions import Extract, IfNull
 from frappe.utils import formatdate, getdate, time_diff_in_seconds
 
 
@@ -56,18 +58,19 @@ def validate_duration(doc):
 
 
 def validate_existing_appointment(doc):
-	appointment_query = f"""
-		select
-			name
-		from
-			`tabPatient Appointment`
-		where
-			practitioner = '{doc.get("practitioner")}' and docstatus < 2 and status != 'Cancelled' and appointment_date = '{doc.from_date}' and (appointment_time >= '{doc.from_time}' and appointment_time < '{doc.to_time}')
-		"""
-	appointments = frappe.db.sql(
-		appointment_query,
-		as_dict=1,
-	)
+	appointment = DocType("Patient Appointment")
+	appointments = (
+		frappe.qb.from_(appointment)
+		.select(appointment.name)
+		.where(
+			(appointment.practitioner == doc.get("practitioner"))
+			& (appointment.docstatus < 2)
+			& (appointment.status != "Cancelled")
+			& (appointment.appointment_date == doc.from_date)
+			& (appointment.appointment_time >= doc.from_time)
+			& (appointment.appointment_time < doc.to_time)
+		)
+	).run(as_dict=True)
 	if appointments:
 		frappe.throw(
 			_("Cannot create event!  There are booked appointments at the time, cancel them and proceed.")
@@ -98,80 +101,74 @@ def validate_service_unit_capacity(doc):
 			frappe.throw(_(f"Not Allowed - Maximum Capacity {service_unit_capacity}"))
 
 
-def validate_event_overlap(doc):
-	query = f"""
-		select
-			name, from_date, from_time, to_time, service_unit
-		from
-			`tabPractitioner Availability`
-		where
-			name != '{doc.name}' and present = '{doc.present}'
-			and practitioner = '{doc.get("practitioner")}' and docstatus < 2 and
+def get_repeating_event_overlap(doc, availability):
+	repeat_till = IfNull(availability.repeat_till, "3000-01-01")
+	doc_repeat_till = doc.repeat_till or "3000-01-01"
+	weekdays = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
+	return (
+		(availability.repeat_this_event == 1)
+		& (
+			availability.from_date.between(doc.from_date, doc_repeat_till)
+			| repeat_till.between(doc.from_date, doc_repeat_till)
+			| ((availability.from_date < doc.from_date) & (repeat_till > doc_repeat_till))
+		)
+		& (
 			(
-				(
-					repeat_this_event = 1
-					and
-					(
-						(from_date between '{doc.from_date}' and '{doc.repeat_till}')
-						or
-						(ifnull(repeat_till, "3000-01-01") between '{doc.from_date}' and '{doc.repeat_till}')
-						or
-						(from_date < '{doc.from_date}' and ifnull(repeat_till, "3000-01-01") > '{doc.repeat_till}')
-					)
-					and
-					(
-						(
-							repeat_on = 'Every Day'
-							and
-							(
-								monday={doc.monday} or tuesday={doc.tuesday} or wednesday={doc.wednesday} or thursday={doc.thursday}
-								or
-								friday={doc.friday} or saturday={doc.saturday} or sunday={doc.sunday}
-							)
-						)
-						or
-						(
-							repeat_on = 'Every Month'
-							and
-							(
-								month('{doc.from_date}')=month(from_date)
-							)
-						)
-					)
-				)
-				or
-				(
-					repeat_this_event != 1
-					and
-					(
-						('{doc.from_date}' between from_date and to_date)
-						or
-						('{doc.to_date}' between from_date and to_date)
-						or
-						('{doc.from_date}' < from_date and '{doc.to_date}' > to_date)
-					)
-				)
+				(availability.repeat_on == "Every Day")
+				& Criterion.any(availability[day] == doc.get(day) for day in weekdays)
 			)
-			and
-			(
-				(from_time >= '{doc.from_time}' and from_time < '{doc.to_time}')
-				or
-				(to_time > '{doc.from_time}' and to_time <= '{doc.to_time}')
-				or
-				(from_time between '{doc.from_time}' and '{doc.to_time}') and (to_time between '{doc.from_time}' and '{doc.to_time}')
-				or
-				(from_time < '{doc.from_time}' and to_time > '{doc.to_time}')
+			| (
+				(availability.repeat_on == "Every Month")
+				& (Extract(DatePart.month, availability.from_date) == getdate(doc.from_date).month)
 			)
-		"""
+		)
+	)
 
+
+def get_single_event_overlap(doc, availability):
+	return (availability.repeat_this_event != 1) & (
+		((availability.from_date <= doc.from_date) & (availability.to_date >= doc.from_date))
+		| ((availability.from_date <= doc.to_date) & (availability.to_date >= doc.to_date))
+		| ((availability.from_date > doc.from_date) & (availability.to_date < doc.to_date))
+	)
+
+
+def get_time_overlap(doc, availability):
+	return (
+		((availability.from_time >= doc.from_time) & (availability.from_time < doc.to_time))
+		| ((availability.to_time > doc.from_time) & (availability.to_time <= doc.to_time))
+		| (
+			availability.from_time.between(doc.from_time, doc.to_time)
+			& availability.to_time.between(doc.from_time, doc.to_time)
+		)
+		| ((availability.from_time < doc.from_time) & (availability.to_time > doc.to_time))
+	)
+
+
+def validate_event_overlap(doc):
 	if not doc.name:
 		# hack! if name is null, it could cause problems with !=
 		doc.name = "New " + doc.doctype
 
-	overlap_doc = frappe.db.sql(
-		query,
-		as_dict=1,
-	)
+	availability = DocType("Practitioner Availability")
+	overlap_doc = (
+		frappe.qb.from_(availability)
+		.select(
+			availability.name,
+			availability.from_date,
+			availability.from_time,
+			availability.to_time,
+			availability.service_unit,
+		)
+		.where(
+			(availability.name != doc.name)
+			& (availability.present == doc.present)
+			& (availability.practitioner == doc.get("practitioner"))
+			& (availability.docstatus < 2)
+			& (get_repeating_event_overlap(doc, availability) | get_single_event_overlap(doc, availability))
+			& get_time_overlap(doc, availability)
+		)
+	).run(as_dict=True)
 
 	if overlap_doc:
 		if doc.service_unit:
