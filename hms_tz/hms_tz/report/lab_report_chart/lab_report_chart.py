@@ -4,6 +4,8 @@
 import frappe
 import pandas as pd
 from frappe import _, msgprint
+from frappe.query_builder import DocType
+from frappe.query_builder.functions import DateFormat
 
 
 def execute(filters=None):
@@ -47,46 +49,58 @@ def get_columns(filters):
 
 
 def get_lab_results(filters):
-	conditions = ""
+	lab_test = DocType("Lab Test")
+	result_tables = (
+		(DocType("Normal Test Result"), "result_value"),
+		(DocType("Descriptive Test Result"), "result_value"),
+		(DocType("Organism Test Result"), "colony_population"),
+		(DocType("Sensitivity Test Result"), "antibiotic_sensitivity"),
+	)
+	criteria = get_lab_test_criteria(lab_test, filters)
+
+	queries = [
+		frappe.qb.from_(lab_test)
+		.inner_join(result_table)
+		.on(lab_test.name == result_table.parent)
+		.select(
+			lab_test.lab_test_name.as_("lab_test_name"),
+			DateFormat(lab_test.result_date, "%Y-%m-%d").as_("result_date"),
+			result_table[result_field].as_("result_value"),
+		)
+		.where(criteria)
+		for result_table, result_field in result_tables
+	]
+
+	query = queries[0]
+	for part in queries[1:]:
+		query = query.union(part)
+
+	return query.run(as_dict=True)
+
+
+def get_lab_test_criteria(lab_test, filters):
+	template = DocType("Lab Test Template")
+	grouped_tests = (
+		frappe.qb.from_(template)
+		.select(template.lab_test_name)
+		.where(template.lab_test_template_type == "Grouped")
+	)
+	criteria = (
+		(lab_test.docstatus == 1)
+		& lab_test.lab_test_name.notin(grouped_tests)
+		& (lab_test.status == "Completed")
+	)
 
 	if filters.get("patient"):
-		conditions += "and lb.patient = %(patient)s"
+		criteria &= lab_test.patient == filters.get("patient")
 
 	if filters.get("from_date"):
-		conditions += "and lb.result_date >= %(from_date)s"
+		criteria &= lab_test.result_date >= filters.get("from_date")
 
 	if filters.get("to_date"):
-		conditions += "and lb.result_date <= %(to_date)s"
+		criteria &= lab_test.result_date <= filters.get("to_date")
 
 	if filters.get("department"):
-		conditions += "and lb.department = %(department)s"
+		criteria &= lab_test.department == filters.get("department")
 
-	return frappe.db.sql(
-		f"""
-        select lb.lab_test_name as lab_test_name,  date_format(lb.result_date, '%%Y-%%m-%%d') as result_date, n.result_value as result_value
-        from `tabLab Test` lb inner join `tabNormal Test Result` n on lb.name = n.parent
-        where lb.docstatus = 1
-        and lb.lab_test_name not in (select lbt.lab_test_name from `tabLab Test Template` lbt where lbt.lab_test_template_type="Grouped")
-        and lb.status = "Completed" {conditions}
-        union
-        select lb.lab_test_name as lab_test_name,  date_format(lb.result_date, '%%Y-%%m-%%d') as result_date, d.result_value as result_value
-        from `tabLab Test` lb inner join `tabDescriptive Test Result` d on lb.name = d.parent
-        where lb.docstatus = 1
-        and lb.lab_test_name not in (select lbt.lab_test_name from `tabLab Test Template` lbt where lbt.lab_test_template_type="Grouped")
-        and lb.status = "Completed" {conditions}
-        union
-        select lb.lab_test_name as lab_test_name,  date_format(lb.result_date, '%%Y-%%m-%%d') as result_date, org.colony_population as result_value
-        from `tabLab Test` lb inner join `tabOrganism Test Result` org on lb.name = org.parent
-        where lb.docstatus = 1
-        and lb.lab_test_name not in (select lbt.lab_test_name from `tabLab Test Template` lbt where lbt.lab_test_template_type="Grouped")
-        and lb.status = "Completed" {conditions}
-        union
-        select lb.lab_test_name as lab_test_name,  date_format(lb.result_date, '%%Y-%%m-%%d') as result_date, ss.antibiotic_sensitivity as result_value
-        from `tabLab Test` lb inner join `tabSensitivity Test Result` ss on lb.name = ss.parent
-        where lb.docstatus = 1
-        and lb.lab_test_name not in (select lbt.lab_test_name from `tabLab Test Template` lbt where lbt.lab_test_template_type="Grouped")
-        and lb.status = "Completed" {conditions}
-        """,
-		filters,
-		as_dict=1,
-	)
+	return criteria
