@@ -8,6 +8,7 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 from frappe.model.rename_doc import rename_doc
+from frappe.query_builder import DocType
 from frappe.utils import cint
 
 
@@ -70,20 +71,16 @@ class TherapyType(Document):
 	def get_exercises_for_body_parts(self):
 		body_parts = [entry.body_part for entry in self.therapy_for]
 
-		exercises = frappe.db.sql(
-			"""
-                SELECT DISTINCT
-                    b.parent, e.name, e.difficulty_level
-                FROM
-                     `tabExercise Type` e, `tabBody Part Link` b
-                WHERE
-                    b.body_part IN %(body_parts)s AND b.parent=e.name
-            """,
-			{"body_parts": body_parts},
-			as_dict=1,
-		)
-
-		return exercises
+		exercise_type = DocType("Exercise Type")
+		body_part_link = DocType("Body Part Link")
+		return (
+			frappe.qb.from_(exercise_type)
+			.inner_join(body_part_link)
+			.on(body_part_link.parent == exercise_type.name)
+			.select(body_part_link.parent, exercise_type.name, exercise_type.difficulty_level)
+			.distinct()
+			.where(body_part_link.body_part.isin(body_parts))
+		).run(as_dict=True)
 
 
 def create_item_from_therapy(doc):
