@@ -1,4 +1,5 @@
 import frappe
+from frappe.query_builder import DocType
 
 
 def execute():
@@ -23,56 +24,26 @@ def execute():
 	if not sii_items:
 		return
 
-	frappe.db.sql(
-		"""
-        UPDATE `tabSales Invoice Item` sii
-        INNER JOIN `tabLab Prescription` lrpt ON sii.reference_dn = lrpt.name
-            AND sii.reference_dt = "Lab Prescription"
-        INNER JOIN  `tabPatient Encounter` pe ON lrpt.parent = pe.name
-        SET sii.healthcare_service_unit = lrpt.department_hsu,
-            sii.healthcare_practitioner = pe.practitioner
-        WHERE sii.name IN ({})
-    """.format(", ".join(["%s"] * len(sii_items))),
-		tuple([d for d in sii_items]),
-	)
+	sii = DocType("Sales Invoice Item")
+	pe = DocType("Patient Encounter")
+	updates = {}
+	for refdoc in refdocs:
+		lrpt = DocType(refdoc)
+		rows = (
+			frappe.qb.from_(sii)
+			.inner_join(lrpt)
+			.on((sii.reference_dn == lrpt.name) & (sii.reference_dt == refdoc))
+			.inner_join(pe)
+			.on(lrpt.parent == pe.name)
+			.select(sii.name, lrpt.department_hsu, pe.practitioner)
+			.where(sii.name.isin(sii_items))
+		).run(as_dict=True)
 
-	frappe.db.sql(
-		"""
-        UPDATE `tabSales Invoice Item` sii
-        INNER JOIN `tabRadiology Procedure Prescription` lrpt ON sii.reference_dn = lrpt.name
-            AND sii.reference_dt = "Radiology Procedure Prescription"
-        INNER JOIN  `tabPatient Encounter` pe ON lrpt.parent = pe.name
-        SET sii.healthcare_service_unit = lrpt.department_hsu,
-            sii.healthcare_practitioner = pe.practitioner
-        WHERE sii.name IN ({})
-    """.format(", ".join(["%s"] * len(sii_items))),
-		tuple([d for d in sii_items]),
-	)
+		for row in rows:
+			updates[row.name] = {
+				"healthcare_service_unit": row.department_hsu,
+				"healthcare_practitioner": row.practitioner,
+			}
 
-	frappe.db.sql(
-		"""
-        UPDATE `tabSales Invoice Item` sii
-        INNER JOIN `tabProcedure Prescription` lrpt ON sii.reference_dn = lrpt.name
-            AND sii.reference_dt = "Procedure Prescription"
-        INNER JOIN  `tabPatient Encounter` pe ON lrpt.parent = pe.name
-        SET sii.healthcare_service_unit = lrpt.department_hsu,
-            sii.healthcare_practitioner = pe.practitioner
-        WHERE sii.name IN ({})
-    """.format(", ".join(["%s"] * len(sii_items))),
-		tuple([d for d in sii_items]),
-	)
-
-	frappe.db.sql(
-		"""
-        UPDATE `tabSales Invoice Item` sii
-        INNER JOIN `tabTherapy Plan Detail` lrpt ON sii.reference_dn = lrpt.name
-            AND sii.reference_dt = "Therapy Plan Detail"
-        INNER JOIN  `tabPatient Encounter` pe ON lrpt.parent = pe.name
-        SET sii.healthcare_service_unit = lrpt.department_hsu,
-            sii.healthcare_practitioner = pe.practitioner
-        WHERE sii.name IN ({})
-    """.format(", ".join(["%s"] * len(sii_items))),
-		tuple([d for d in sii_items]),
-	)
-
+	frappe.db.bulk_update("Sales Invoice Item", updates, update_modified=False)
 	frappe.db.commit()
