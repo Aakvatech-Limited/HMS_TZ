@@ -36,6 +36,11 @@ class TestTherapySessionOverlap(FrappeTestCase):
 	def test_other_patient_is_allowed(self):
 		make_session("10:10:00", 30, patient="_Test Other Patient").validate_duplicate()
 
+	def test_session_without_start_time_is_allowed(self):
+		make_session("00:00:00", 30).db_insert()
+
+		make_session(None, 30).validate_duplicate()
+
 	def test_overlap_past_midnight_raises(self):
 		make_session("23:45:00", 10).db_insert()
 
