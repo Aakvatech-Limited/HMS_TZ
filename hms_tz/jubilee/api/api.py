@@ -278,7 +278,7 @@ def create_jubilee_benefits(
 		frappe.db.bulk_insert("Jubilee Benefit", fields=fields, values=values, ignore_duplicates=True)
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def enqueue_get_jubilee_procedures(company: str):
 	frappe.enqueue(
 		method="hms_tz.jubilee.api.api.get_procedure_list",
