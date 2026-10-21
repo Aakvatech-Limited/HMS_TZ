@@ -23,6 +23,9 @@ class TherapySession(Document):
 		self.set_total_counts()
 
 	def validate_duplicate(self):
+		if not self.start_time:
+			return
+
 		start_time = get_timedelta(self.start_time)
 		end_time = start_time + datetime.timedelta(minutes=flt(self.duration))
 
