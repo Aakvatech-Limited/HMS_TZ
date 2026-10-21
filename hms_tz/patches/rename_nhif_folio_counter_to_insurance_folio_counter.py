@@ -2,6 +2,8 @@
 # For license information, please see license.txt
 
 import frappe
+from frappe.database.schema import add_column
+from frappe.query_builder import DocType
 
 
 def execute():
@@ -38,19 +40,13 @@ def execute():
 		frappe.db.commit()
 
 	if not frappe.db.has_column("Insurance Folio Counter", "insurance_provider"):
-		frappe.db.sql(
-			"""
-            ALTER TABLE `tabInsurance Folio Counter`
-            ADD COLUMN `insurance_provider` VARCHAR(140) DEFAULT NULL
-            """
-		)
+		add_column("Insurance Folio Counter", "insurance_provider", "Data")
 		frappe.db.commit()
 
-	frappe.db.sql(
-		"""
-        UPDATE `tabInsurance Folio Counter`
-        SET insurance_provider = 'NHIF'
-        WHERE (insurance_provider IS NULL OR insurance_provider = '')
-        """
-	)
+	folio_counter = DocType("Insurance Folio Counter")
+	(
+		frappe.qb.update(folio_counter)
+		.set(folio_counter.insurance_provider, "NHIF")
+		.where(folio_counter.insurance_provider.isnull() | (folio_counter.insurance_provider == ""))
+	).run()
 	frappe.db.commit()
