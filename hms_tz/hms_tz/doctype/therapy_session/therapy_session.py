@@ -10,7 +10,7 @@ from frappe.model.document import Document
 from frappe.model.mapper import get_mapped_doc
 from frappe.query_builder import DocType
 from frappe.query_builder.functions import TimestampAdd
-from frappe.utils import cstr, flt, get_link_to_form, get_time, getdate
+from frappe.utils import cstr, flt, get_link_to_form, get_timedelta, getdate
 from healthcare.healthcare.doctype.healthcare_settings.healthcare_settings import (
 	get_income_account,
 	get_receivable_account,
@@ -23,9 +23,11 @@ class TherapySession(Document):
 		self.set_total_counts()
 
 	def validate_duplicate(self):
-		end_time = datetime.datetime.combine(
-			getdate(self.start_date), get_time(self.start_time)
-		) + datetime.timedelta(minutes=flt(self.duration))
+		if not self.start_time:
+			return
+
+		start_time = get_timedelta(self.start_time)
+		end_time = start_time + datetime.timedelta(minutes=flt(self.duration))
 
 		session = DocType("Therapy Session")
 		session_end = TimestampAdd("minute", session.duration, session.start_time)
@@ -38,18 +40,19 @@ class TherapySession(Document):
 				& (session.docstatus != 2)
 				& ((session.practitioner == self.practitioner) | (session.patient == self.patient))
 				& (
-					((session.start_time < self.start_time) & (session_end > end_time.time()))
-					| ((session.start_time > self.start_time) & (session.start_time < end_time.time()))
-					| (session.start_time == self.start_time)
+					((session.start_time < end_time) & (session_end > start_time))
+					| (session.start_time == start_time)
 				)
 			)
 		).run()
 
 		if overlaps:
-			overlapping_details = _(
-				f"Therapy Session overlaps with {get_link_to_form('Therapy Session', overlaps[0][0])}"
+			frappe.throw(
+				_("Therapy Session overlaps with {0}").format(
+					get_link_to_form("Therapy Session", overlaps[0][0])
+				),
+				title=_("Therapy Sessions Overlapping"),
 			)
-			frappe.throw(overlapping_details(title=_("Therapy Sessions Overlapping")))
 
 	def on_submit(self):
 		self.update_sessions_count_in_therapy_plan()
