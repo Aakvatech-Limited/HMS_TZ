@@ -273,15 +273,15 @@ def get_daily_limit_exceeded_items(filters):
 		.where(
 			(pe.patient == filters.patient)
 			& (pe.appointment == filters.patient_appointment)
-			& (pe.inpatient_record.isnull() | pe.inpatient_record == "")
+			& (pe.inpatient_record.isnull() | (pe.inpatient_record == ""))
 		)
 	)
 
 	if filters.get("from_date"):
-		encounters_query.where(pe.encounter_date >= filters.from_date)
+		encounters_query = encounters_query.where(pe.encounter_date >= filters.from_date)
 
 	if filters.get("to_date"):
-		encounters_query.where(pe.encounter_date <= filters.to_date)
+		encounters_query = encounters_query.where(pe.encounter_date <= filters.to_date)
 	encounters = [d.name for d in encounters_query.run(as_dict=True)]
 
 	if not encounters or len(encounters) == 0:
