@@ -8,6 +8,8 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 from frappe.model.mapper import get_mapped_doc
+from frappe.query_builder import DocType
+from frappe.query_builder.functions import TimestampAdd
 from frappe.utils import cstr, flt, get_link_to_form, get_time, getdate
 from healthcare.healthcare.doctype.healthcare_settings.healthcare_settings import (
 	get_income_account,
@@ -25,31 +27,23 @@ class TherapySession(Document):
 			getdate(self.start_date), get_time(self.start_time)
 		) + datetime.timedelta(minutes=flt(self.duration))
 
-		overlaps = frappe.db.sql(
-			"""
-            select
-                name
-            from
-                `tabTherapy Session`
-            where
-                start_date=%s and name!=%s and docstatus!=2
-                and (practitioner=%s or patient=%s) and
-                ((start_time<%s and start_time + INTERVAL duration MINUTE>%s) or
-                (start_time>%s and start_time<%s) or
-                (start_time=%s))
-            """,
-			(
-				self.start_date,
-				self.name,
-				self.practitioner,
-				self.patient,
-				self.start_time,
-				end_time.time(),
-				self.start_time,
-				end_time.time(),
-				self.start_time,
-			),
-		)
+		session = DocType("Therapy Session")
+		session_end = TimestampAdd("minute", session.duration, session.start_time)
+		overlaps = (
+			frappe.qb.from_(session)
+			.select(session.name)
+			.where(
+				(session.start_date == self.start_date)
+				& (session.name != self.name)
+				& (session.docstatus != 2)
+				& ((session.practitioner == self.practitioner) | (session.patient == self.patient))
+				& (
+					((session.start_time < self.start_time) & (session_end > end_time.time()))
+					| ((session.start_time > self.start_time) & (session.start_time < end_time.time()))
+					| (session.start_time == self.start_time)
+				)
+			)
+		).run()
 
 		if overlaps:
 			overlapping_details = _(
