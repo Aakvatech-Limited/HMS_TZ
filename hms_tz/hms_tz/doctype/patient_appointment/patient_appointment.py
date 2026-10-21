@@ -11,7 +11,9 @@ from frappe import _
 from frappe.core.doctype.sms_settings.sms_settings import send_sms
 from frappe.model.document import Document
 from frappe.model.mapper import get_mapped_doc
-from frappe.utils import flt, get_time, getdate, time_diff_in_seconds
+from frappe.query_builder import DocType
+from frappe.query_builder.functions import IfNull, TimestampAdd
+from frappe.utils import flt, get_time, getdate, make_filter_tuple, time_diff_in_seconds
 from healthcare.healthcare.doctype.healthcare_settings.healthcare_settings import (
 	get_income_account,
 	get_receivable_account,
@@ -67,34 +69,39 @@ class PatientAppointment(Document):
 			getdate(self.appointment_date), get_time(self.appointment_time)
 		) + datetime.timedelta(minutes=flt(self.duration))
 
-		query = """
-		select
-			name, practitioner, patient, appointment_time, duration
-		from
-			`tabPatient Appointment`
-		where
-			appointment_date=%(appointment_date)s and name!=%(name)s and status NOT IN ("Closed", "Cancelled")
-			and (practitioner=%(practitioner)s or patient=%(patient)s) and
-			((appointment_time<%(appointment_time)s and appointment_time + INTERVAL duration MINUTE>%(appointment_time)s) or
-			(appointment_time>%(appointment_time)s and appointment_time<%(end_time)s) or
-			(appointment_time=%(appointment_time)s))
-		"""
+		appointment = DocType("Patient Appointment")
+		appointment_end = TimestampAdd("minute", appointment.duration, appointment.appointment_time)
+		query = (
+			frappe.qb.from_(appointment)
+			.select(
+				appointment.name,
+				appointment.practitioner,
+				appointment.patient,
+				appointment.appointment_time,
+				appointment.duration,
+			)
+			.where(
+				(appointment.appointment_date == self.appointment_date)
+				& (appointment.name != self.name)
+				& (appointment.status.notin(["Closed", "Cancelled"]))
+				& ((appointment.practitioner == self.practitioner) | (appointment.patient == self.patient))
+				& (
+					(
+						(appointment.appointment_time < self.appointment_time)
+						& (appointment_end > self.appointment_time)
+					)
+					| (
+						(appointment.appointment_time > self.appointment_time)
+						& (appointment.appointment_time < end_time.time())
+					)
+					| (appointment.appointment_time == self.appointment_time)
+				)
+			)
+		)
 
 		# service unit overlap
 		if self.service_unit:
-			query += """ and service_unit=%(service_unit)s"""
-			overlaps = frappe.db.sql(
-				query.format(),
-				{
-					"appointment_date": self.appointment_date,
-					"name": self.name,
-					"practitioner": self.practitioner,
-					"patient": self.patient,
-					"appointment_time": self.appointment_time,
-					"end_time": end_time.time(),
-					"service_unit": self.service_unit,
-				},
-			)
+			overlaps = query.where(appointment.service_unit == self.service_unit).run()
 			allow_overlap = frappe.get_cached_value(
 				"Healthcare Service Unit",
 				self.service_unit,
@@ -122,17 +129,7 @@ class PatientAppointment(Document):
 				else:
 					overlaps = False
 		else:
-			overlaps = frappe.db.sql(
-				query.format(),
-				{
-					"appointment_date": self.appointment_date,
-					"name": self.name,
-					"practitioner": self.practitioner,
-					"patient": self.patient,
-					"appointment_time": self.appointment_time,
-					"end_time": end_time.time(),
-				},
-			)
+			overlaps = query.run()
 
 		if overlaps:
 			frappe.throw(
@@ -377,13 +374,17 @@ def check_employee_wise_availability(date, practitioner_doc):
 			frappe.throw(msg=_(f"{date} is a holiday"), title=_("Not Available"))
 
 		# check leave status
-		leave_record = frappe.db.sql(
-			"""select half_day from `tabLeave Application`
-			where employee = %s and %s between from_date and to_date
-			and docstatus = 1""",
-			(employee, date),
-			as_dict=True,
-		)
+		leave = DocType("Leave Application")
+		leave_record = (
+			frappe.qb.from_(leave)
+			.select(leave.half_day)
+			.where(
+				(leave.employee == employee)
+				& (leave.from_date <= date)
+				& (leave.to_date >= date)
+				& (leave.docstatus == 1)
+			)
+		).run(as_dict=True)
 		if leave_record:
 			if leave_record[0].half_day:
 				frappe.throw(
@@ -397,49 +398,66 @@ def check_employee_wise_availability(date, practitioner_doc):
 				)
 
 
+def get_practitioner_events_query(practitioner, date):
+	"""Practitioner Availability events of the practitioner that cover the date."""
+	availability = DocType("Practitioner Availability")
+	return (
+		frappe.qb.from_(availability)
+		.select(
+			availability.name,
+			availability.availability,
+			availability.from_time,
+			availability.to_time,
+			availability.from_date,
+			availability.to_date,
+			availability.duration,
+			availability.service_unit,
+			availability.repeat_this_event,
+			availability.repeat_on,
+			availability.repeat_till,
+			availability.monday,
+			availability.tuesday,
+			availability.wednesday,
+			availability.thursday,
+			availability.friday,
+			availability.saturday,
+			availability.sunday,
+		)
+		.where(
+			(availability.practitioner == practitioner)
+			& (
+				(
+					(availability.repeat_this_event == 1)
+					& (availability.from_date <= date)
+					& (IfNull(availability.repeat_till, "3000-01-01") >= date)
+				)
+				| (
+					(availability.repeat_this_event != 1)
+					& (availability.from_date <= date)
+					& (availability.to_date >= date)
+				)
+			)
+		)
+	)
+
+
 def get_present_event(practitioner, date):
 	date = getdate(date)
-	present_events = frappe.db.sql(
-		f"""
-		select
-			name, availability, from_time, to_time, from_date, to_date, duration, service_unit, repeat_this_event, repeat_on, repeat_till,
-			monday, tuesday, wednesday, thursday, friday, saturday, sunday
-		from
-			`tabPractitioner Availability`
-		where
-			practitioner = '{practitioner}' and present = 1 and
-			(
-				(repeat_this_event = 1 and (from_date<='{date}' and ifnull(repeat_till, "3000-01-01")>='{date}'))
-				or
-				(repeat_this_event != 1 and (from_date<='{date}' and to_date>='{date}'))
-			)
-		order by
-			from_date, from_time
-	""",
-		as_dict=True,
-	)
+	availability = DocType("Practitioner Availability")
+	present_events = (
+		get_practitioner_events_query(practitioner, date)
+		.where(availability.present == 1)
+		.orderby(availability.from_date)
+		.orderby(availability.from_time)
+	).run(as_dict=True)
 	return present_events if present_events else ""
 
 
 def get_absent_event(practitioner, date):
-	# Absent events
 	date = getdate(date)
-	absent_events = frappe.db.sql(
-		f"""
-		select
-			name, availability, from_time, to_time, from_date, to_date, duration, service_unit, service_unit, repeat_this_event, repeat_on, repeat_till,
-			monday, tuesday, wednesday, thursday, friday, saturday, sunday
-		from
-			`tabPractitioner Availability`
-		where
-			practitioner = '{practitioner}' and present != 1 and
-			(
-				(repeat_this_event = 1 and (from_date<='{date}' and ifnull(repeat_till, "3000-01-01")>='{date}'))
-				or
-				(repeat_this_event != 1 and (from_date<='{date}' and to_date>='{date}'))
-			)
-	""",
-		as_dict=True,
+	availability = DocType("Practitioner Availability")
+	absent_events = (
+		get_practitioner_events_query(practitioner, date).where(availability.present != 1).run(as_dict=True)
 	)
 
 	if absent_events:
@@ -755,29 +773,53 @@ def get_events(start, end, filters=None):
 	:param end: End date-time.
 	:param filters: Filters (JSON).
 	"""
-	from frappe.desk.calendar import get_event_conditions
+	filters = frappe.parse_json(filters) or []
+	if isinstance(filters, dict):
+		filters = [make_filter_tuple("Patient Appointment", key, value) for key, value in filters.items()]
 
-	conditions = get_event_conditions("Patient Appointment", filters)
+	filters += [
+		["Patient Appointment", "appointment_date", "between", [start, end]],
+		["Patient Appointment", "status", "!=", "Cancelled"],
+		["Patient Appointment", "docstatus", "<", 2],
+	]
+	data = frappe.get_list(
+		"Patient Appointment",
+		fields=[
+			"name",
+			"patient_name",
+			"practitioner_name",
+			"patient_sex",
+			"patient_age",
+			"appointment_type",
+			"practitioner",
+			"status",
+			"triage",
+			"duration",
+			"appointment_date",
+			"appointment_time",
+		],
+		filters=filters,
+	)
 
-	data = frappe.db.sql(
-		f"""
-		select
-		`tabPatient Appointment`.name, `tabPatient Appointment`.patient_name, `tabPatient Appointment`.practitioner_name,`tabPatient Appointment`.patient_sex, `tabPatient Appointment`.patient_age,`tabPatient Appointment`.appointment_type,
-		`tabPatient Appointment`.practitioner, `tabPatient Appointment`.status,`tabPatient Appointment`.triage,
-		`tabPatient Appointment`.duration,
-		timestamp(`tabPatient Appointment`.appointment_date, `tabPatient Appointment`.appointment_time) as 'start',
-		`tabAppointment Type`.color
-		from
-		`tabPatient Appointment`
-		left join `tabAppointment Type` on `tabPatient Appointment`.appointment_type=`tabAppointment Type`.name
-		where
-		(`tabPatient Appointment`.appointment_date between '{start}' and '{end}')
-		and `tabPatient Appointment`.status != 'Cancelled' and `tabPatient Appointment`.docstatus < 2 {conditions}""",
-		as_dict=True,
-		update={"allDay": 0},
+	# get_all, not a get_list join: calendar users may lack read access to Appointment Type
+	appointment_types = list({item.appointment_type for item in data if item.appointment_type})
+	type_colors = dict(
+		frappe.get_all(
+			"Appointment Type",
+			filters={"name": ["in", appointment_types]},
+			fields=["name", "color"],
+			as_list=True,
+		)
+		if appointment_types
+		else []
 	)
 
 	for item in data:
+		item.color = type_colors.get(item.appointment_type)
+		item.allDay = 0
+		item.start = datetime.datetime.combine(item.pop("appointment_date"), datetime.time()) + item.pop(
+			"appointment_time"
+		)
 		item.end = item.start + datetime.timedelta(minutes=item.duration)
 		item.title = item.practitioner_name + " - "
 		if item.appointment_type:
@@ -799,38 +841,51 @@ def get_events(start, end, filters=None):
 
 @frappe.whitelist()
 def get_procedure_prescribed(patient):
-	return frappe.db.sql(
-		"""
-			SELECT
-				pp.name, pp.procedure, pp.parent, ct.practitioner,
-				ct.encounter_date, pp.practitioner, pp.date, pp.department, ct.source, ct.referring_practitioner
-			FROM
-				`tabPatient Encounter` ct, `tabProcedure Prescription` pp
-			WHERE
-				ct.patient=%(patient)s and pp.parent=ct.name and pp.appointment_booked=0
-			ORDER BY
-				ct.creation desc
-		""",
-		{"patient": patient},
-	)
+	encounter = DocType("Patient Encounter")
+	prescription = DocType("Procedure Prescription")
+	return (
+		frappe.qb.from_(encounter)
+		.inner_join(prescription)
+		.on(prescription.parent == encounter.name)
+		.select(
+			prescription.name,
+			prescription.procedure,
+			prescription.parent,
+			encounter.practitioner,
+			encounter.encounter_date,
+			prescription.practitioner,
+			prescription.date,
+			prescription.department,
+			encounter.source,
+			encounter.referring_practitioner,
+		)
+		.where((encounter.patient == patient) & (prescription.appointment_booked == 0))
+		.orderby(encounter.creation, order=frappe.qb.desc)
+	).run()
 
 
 @frappe.whitelist()
 def get_prescribed_therapies(patient):
-	return frappe.db.sql(
-		"""
-			SELECT
-				t.therapy_type, t.name, t.parent, e.practitioner,
-				e.encounter_date, e.therapy_plan, e.medical_department, e.source, e.referring_practitioner
-			FROM
-				`tabPatient Encounter` e, `tabTherapy Plan Detail` t
-			WHERE
-				e.patient=%(patient)s and t.parent=e.name
-			ORDER BY
-				e.creation desc
-		""",
-		{"patient": patient},
-	)
+	encounter = DocType("Patient Encounter")
+	therapy = DocType("Therapy Plan Detail")
+	return (
+		frappe.qb.from_(encounter)
+		.inner_join(therapy)
+		.on(therapy.parent == encounter.name)
+		.select(
+			therapy.therapy_type,
+			therapy.name,
+			therapy.parent,
+			encounter.practitioner,
+			encounter.encounter_date,
+			encounter.therapy_plan,
+			encounter.medical_department,
+			encounter.source,
+			encounter.referring_practitioner,
+		)
+		.where(encounter.patient == patient)
+		.orderby(encounter.creation, order=frappe.qb.desc)
+	).run()
 
 
 def update_appointment_status():
