@@ -527,16 +527,14 @@ def get_item_info(item_code=None, medication_name=None):
 
 
 def get_stock_availability(item_code, warehouse):
-	latest_sle = frappe.db.sql(
-		"""SELECT qty_after_transaction AS actual_qty
-        FROM `tabStock Ledger Entry`
-        WHERE item_code = %s AND warehouse = %s
-          AND is_cancelled = 0
-        ORDER BY creation DESC
-        LIMIT 1""",
-		(item_code, warehouse),
-		as_dict=1,
-	)
+	sle = DocType("Stock Ledger Entry")
+	latest_sle = (
+		frappe.qb.from_(sle)
+		.select(sle.qty_after_transaction.as_("actual_qty"))
+		.where((sle.item_code == item_code) & (sle.warehouse == warehouse) & (sle.is_cancelled == 0))
+		.orderby(sle.creation, order=frappe.qb.desc)
+		.limit(1)
+	).run(as_dict=True)
 
 	sle_qty = latest_sle[0].actual_qty or 0 if latest_sle else 0
 	return sle_qty

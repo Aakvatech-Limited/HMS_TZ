@@ -6,8 +6,8 @@ import json
 
 import frappe
 from frappe import _
-from frappe.desk.reportview import get_match_cond
 from frappe.model.document import Document
+from frappe.query_builder import DocType
 from frappe.utils import get_datetime, getdate, now_datetime, today
 
 
@@ -69,14 +69,15 @@ class InpatientRecord(Document):
 				frappe.throw(_(f"Row #{entry.idx}: Check Out datetime cannot be less than Check In datetime"))
 
 	def validate_already_scheduled_or_admitted(self):
-		query = """
-			select name, status
-			from `tabInpatient Record`
-			where (status = 'Admitted' or status = 'Admission Scheduled')
-			and patient = %(patient)s
-			"""
-
-		ip_record = frappe.db.sql(query, {"patient": self.patient}, as_dict=1)
+		inpatient_record = DocType("Inpatient Record")
+		ip_record = (
+			frappe.qb.from_(inpatient_record)
+			.select(inpatient_record.name, inpatient_record.status)
+			.where(
+				(inpatient_record.status.isin(["Admitted", "Admission Scheduled"]))
+				& (inpatient_record.patient == self.patient)
+			)
+		).run(as_dict=True)
 
 		if len(ip_record) > 0:
 			msg = _(
@@ -436,28 +437,19 @@ def add_bed_charge(inpatient_record, service_unit, check_in, check_out, left):
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
 def get_leave_from(doctype, txt, searchfield, start, page_len, filters):
-	docname = filters["docname"]
-
-	query = """select io.service_unit
-		from `tabInpatient Occupancy` io, `tabInpatient Record` ir
-		where io.parent = '{docname}' and io.parentfield = 'inpatient_occupancies'
-		and io.left!=1 and io.parent = ir.name"""
-
-	return frappe.db.sql(
-		query.format(
-			**{
-				"docname": docname,
-				"searchfield": searchfield,
-				"mcond": get_match_cond(doctype),
-			}
-		),
-		{
-			"txt": f"%{txt}%",
-			"_txt": txt.replace("%", ""),
-			"start": start,
-			"page_len": page_len,
-		},
-	)
+	occupancy = DocType("Inpatient Occupancy")
+	inpatient_record = DocType("Inpatient Record")
+	return (
+		frappe.qb.from_(occupancy)
+		.inner_join(inpatient_record)
+		.on(occupancy.parent == inpatient_record.name)
+		.select(occupancy.service_unit)
+		.where(
+			(occupancy.parent == filters["docname"])
+			& (occupancy.parentfield == "inpatient_occupancies")
+			& (occupancy.left != 1)
+		)
+	).run()
 
 
 def validate_discharge(inpatient_record):
