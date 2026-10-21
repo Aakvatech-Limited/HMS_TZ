@@ -1,8 +1,6 @@
 frappe.ui.form.on("Sales Order", {
   refresh: function (frm) {
-    if (frm.doc.patient_encounter) {
-      frm.set_df_property("items", "read_only", 1);
-    }
+    lock_encounter_items(frm);
 
     // 2024-03-12
     // disabling this, because sales order will be created automatic from patient encounter
@@ -18,9 +16,7 @@ frappe.ui.form.on("Sales Order", {
     // };
   },
   onload: function (frm) {
-    if (frm.doc.patient_encounter) {
-      frm.set_df_property("items", "read_only", 1);
-    }
+    lock_encounter_items(frm);
   },
   med_change_request: (frm) => {
     if (!frm.doc.med_change_request_comment) {
@@ -42,6 +38,39 @@ frappe.ui.form.on("Sales Order", {
     });
   },
 });
+
+frappe.ui.form.on("Sales Order Item", {
+  form_render: (frm, cdt, cdn) => {
+    if (frm.doc.patient_encounter) {
+      frm.fields_dict.items.grid.wrapper.find(".grid-delete-row").hide();
+      frm.fields_dict.items.grid.wrapper.find(".grid-insert-row-below").hide();
+      frm.fields_dict.items.grid.wrapper.find(".grid-insert-row").hide();
+      frm.fields_dict.items.grid.wrapper.find(".grid-duplicate-row").hide();
+      frm.fields_dict.items.grid.wrapper.find(".grid-move-row").hide();
+    }
+  },
+});
+
+// Encounter items can only move to another warehouse
+var lock_encounter_items = function (frm) {
+  if (!frm.doc.patient_encounter) {
+    return;
+  }
+
+  const grid = frm.get_field("items").grid;
+  frappe.get_meta("Sales Order Item").fields.forEach((field) => {
+    if (field.fieldname !== "warehouse") {
+      grid.update_docfield_property(field.fieldname, "read_only", 1);
+    }
+  });
+
+  // hide button to add rows of sales order item
+  grid.cannot_add_rows = true;
+
+  // hide button to delete rows of sales order item
+  $("*[data-fieldname='items']").find(".grid-remove-rows").hide();
+  $("*[data-fieldname='items']").find(".grid-remove-all-rows").hide();
+};
 
 var get_healthcare_services_to_invoice = function (frm) {
   var me = this;
