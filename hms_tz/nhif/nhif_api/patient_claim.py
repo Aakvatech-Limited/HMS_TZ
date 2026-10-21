@@ -7,7 +7,7 @@ from frappe.utils import add_to_date, flt, get_datetime, get_fullname
 from hms_tz.nhif.doctype.nhif_response_log.nhif_response_log import add_log
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def sign_folio(
 	ref_doctype, ref_docname, signature_method="signature", signature=None, fingerprint=None, fpcode=None
 ):
@@ -536,7 +536,7 @@ def send_confirmation_code(ref_doctype, ref_docname):
 		return True
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def get_receipt(ref_doctype, ref_docname):
 	"""
 	Get receipt from NHIF

@@ -9,7 +9,7 @@ from hms_tz.nhif.doctype.nhif_response_log.nhif_response_log import add_log
 from hms_tz.nhif.doctype.nhif_scheme.nhif_scheme import add_scheme
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def get_visit_types(company=None, caller=None):
 	if not company:
 		settings = frappe.db.get_all(

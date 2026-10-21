@@ -74,7 +74,7 @@ def get_ot_roster_data(company: str, start_date: str, end_date: str) -> dict:
 	}
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def save_ot_schedule(schedule_data: str | dict) -> dict:
 	"""Create a new OT Schedule from the roster dialog.
 
@@ -114,7 +114,7 @@ def save_ot_schedule(schedule_data: str | dict) -> dict:
 	return {"name": doc.name, "message": _("OT Schedule {0} created.").format(doc.name)}
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def cancel_ot_schedule(name: str) -> dict:
 	"""Cancel an OT Schedule. Only future-dated schedules can be cancelled."""
 	doc = frappe.get_doc("OT Schedule", name)
@@ -136,7 +136,7 @@ def cancel_ot_schedule(name: str) -> dict:
 	return {"message": _("OT Schedule {0} cancelled.").format(name)}
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def remove_ot_schedule(name: str) -> dict:
 	"""Remove (cancel + delete) an OT Schedule. Only future-dated schedules."""
 	doc = frappe.get_doc("OT Schedule", name)
@@ -153,7 +153,7 @@ def remove_ot_schedule(name: str) -> dict:
 	return {"message": _("OT Schedule {0} removed.").format(name)}
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def postpone_ot_schedule(name: str) -> dict:
 	"""Postpone an OT Schedule. Only future-dated scheduled entries can be postponed."""
 	doc = frappe.get_doc("OT Schedule", name)

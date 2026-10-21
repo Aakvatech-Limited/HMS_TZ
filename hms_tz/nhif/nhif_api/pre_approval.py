@@ -15,7 +15,7 @@ from hms_tz.nhif.doctype.nhif_response_log.nhif_response_log import add_log
 from hms_tz.nhif.nhif_api.referral import get_disease_code
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def get_service_preapproval(
 	ref_doctype,
 	ref_docname,
@@ -181,7 +181,7 @@ def get_service_preapproval(
 		return True
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def cancel_preapproval(
 	ref_doctype,
 	ref_docname,

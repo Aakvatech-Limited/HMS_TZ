@@ -48,16 +48,6 @@ frappe.ui.form.on("Jubilee Patient Claim", {
           });
       });
     }
-
-    // frm.add_custom_button(__("Send Claim"), () => {
-    //	frm.call('send_jubilee_claim', {
-    //		self: frm.doc,
-    //		freeze: true,
-    //		freeze_message: __('<i class="fa fa-spinner fa-spin fa-4x"></i>'),
-    //	}).then(r => {
-    //		// frm.refresh();
-    //	});
-    // });
   },
 
   onload: function (frm) {
