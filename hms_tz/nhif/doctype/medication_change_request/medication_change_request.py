@@ -14,9 +14,11 @@ from frappe.utils import get_fullname, get_url_to_form, nowdate
 from hms_tz.hms_tz.doctype.healthcare_service_request.healthcare_service_request import (
 	get_discount_percent,
 	get_drug_quantity,
+	get_item_info,
 	get_item_rate,
 	get_item_refcode,
 	get_mop_amount,
+	get_stock_availability,
 	get_template_company_option,
 	get_warehouse_from_service_unit,
 	msgThrow,
@@ -78,8 +80,8 @@ class MedicationChangeRequest(Document):
 						)
 					)
 
-				self.validate_drug_quantity(drug)
 				self.validate_item_available_in_house(drug)
+				self.validate_drug_quantity(drug)
 
 				if not self.sales_order:
 					self.validate_item_insurance_coverage(drug, "validate")
@@ -273,15 +275,41 @@ class MedicationChangeRequest(Document):
 
 		row.delivered_quantity = row.quantity - (row.quantity_returned or 0)
 
-		validate_stock_item(
-			row.drug_code,
-			row.quantity,
-			self.company,
-			row.doctype,
-			row.healthcare_service_unit,
-			caller="unknown",
-			method="validate",
-		)
+		if row.is_not_available_inhouse or row.is_cancelled:
+			return
+
+		if not row.healthcare_service_unit:
+			frappe.throw(
+				f"Please set Healthcare Service Unit for item: {frappe.bold(row.drug_code)}, Row#: {frappe.bold(row.idx)}"
+			)
+
+		if self.insurance_subscription:
+			validate_stock_item(
+				row.drug_code,
+				row.quantity,
+				self.company,
+				row.prescribe,
+				healthcare_service_unit=row.healthcare_service_unit,
+				caller=row.doctype,
+				method="validate",
+			)
+			return
+
+		self.validate_cash_drug_stock(row)
+
+	def validate_cash_drug_stock(self, row):
+		"""Cash drugs must be in stock in the service unit warehouse, whatever the alert settings say."""
+		item_info = get_item_info(medication_name=row.drug_code)
+		if not item_info.get("is_stock"):
+			return
+
+		warehouse = get_warehouse_from_service_unit(row.healthcare_service_unit)
+		stock_qty = get_stock_availability(item_info.get("item_code"), warehouse) or 0
+		if row.delivered_quantity > stock_qty:
+			frappe.throw(
+				f"Available quantity for item: {frappe.bold(item_info.get('item_code'))} is {frappe.bold(stock_qty)} "
+				f"in {frappe.bold(warehouse)}, Row#: {frappe.bold(row.idx)} needs {frappe.bold(row.delivered_quantity)}"
+			)
 
 	def validate_item_available_in_house(self, row):
 		template_doc = get_template_company_option(row.drug_code, self.company)
@@ -526,7 +554,7 @@ class MedicationChangeRequest(Document):
 				"dosage_info": dosage_info,
 				"qty": row.quantity - row.quantity_returned,
 				"delivery_date": nowdate(),
-				"warehouse": so_doc.set_warehouse,
+				"warehouse": get_warehouse_from_service_unit(row.healthcare_service_unit),
 				"reference_dt": row.get("doctype"),
 				"reference_dn": row.get("name"),
 				"healthcare_practitioner": encounter_doc.get("practitioner"),
@@ -535,6 +563,8 @@ class MedicationChangeRequest(Document):
 
 			so_doc.append("items", new_row)
 
+		warehouses = {item.warehouse for item in so_doc.items}
+		so_doc.set_warehouse = warehouses.pop() if len(warehouses) == 1 else None
 		so_doc.med_change_request_status = "Approved"
 		so_doc.save(ignore_permissions=True)
 		so_doc.add_comment(
