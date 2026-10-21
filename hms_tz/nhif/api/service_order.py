@@ -25,7 +25,7 @@ def set_missing_values(doc, method):
 		doc.prescribed = prescribe
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def clear_insurance_details(service_order):
 	service_order_doc = frappe.get_cached_doc("Healthcare Service Order", service_order)
 	if service_order_doc.docstatus != 0:
