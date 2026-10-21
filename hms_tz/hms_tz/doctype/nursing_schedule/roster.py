@@ -127,7 +127,7 @@ def get_roster_data(
 	}
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def save_roster_assignments(
 	company: str,
 	start_date: str,
