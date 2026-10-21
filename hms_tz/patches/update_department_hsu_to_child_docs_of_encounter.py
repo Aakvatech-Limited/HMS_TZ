@@ -1,5 +1,13 @@
 import frappe
+from frappe.query_builder import DocType
 from frappe.utils import nowdate
+
+PRESCRIPTION_TEMPLATES = (
+	("Lab Prescription", "Lab Test Template", "lab_test_code"),
+	("Radiology Procedure Prescription", "Radiology Examination Template", "radiology_examination_template"),
+	("Procedure Prescription", "Clinical Procedure Template", "procedure"),
+	("Therapy Plan Detail", "Therapy Type", "therapy_type"),
+)
 
 
 def execute():
@@ -16,53 +24,27 @@ def execute():
 	if len(encounters) == 0:
 		return
 
-	frappe.db.sql(
-		"""
-        UPDATE `tabLab Prescription` lrpt
-        INNER JOIN `tabPatient Encounter` pe ON lrpt.parent = pe.name
-        INNER JOIN `tabLab Test Template` item_template ON lrpt.lab_test_code = item_template.name AND item_template.disabled = 0
-        INNER JOIN `tabHealthcare Company Option` hco ON item_template.name = hco.parent AND hco.company = pe.company
-        SET lrpt.department_hsu = hco.service_unit
-        WHERE pe.name IN ({})
-    """.format(", ".join(["%s"] * len(encounters))),
-		tuple([d for d in encounters]),
-	)
+	pe = DocType("Patient Encounter")
+	hco = DocType("Healthcare Company Option")
+	for prescription_doctype, template_doctype, template_field in PRESCRIPTION_TEMPLATES:
+		lrpt = DocType(prescription_doctype)
+		item_template = DocType(template_doctype)
+		rows = (
+			frappe.qb.from_(lrpt)
+			.inner_join(pe)
+			.on(lrpt.parent == pe.name)
+			.inner_join(item_template)
+			.on((lrpt[template_field] == item_template.name) & (item_template.disabled == 0))
+			.inner_join(hco)
+			.on((item_template.name == hco.parent) & (hco.company == pe.company))
+			.select(lrpt.name, hco.service_unit)
+			.where(pe.name.isin(encounters))
+		).run(as_dict=True)
 
-	frappe.db.sql(
-		"""
-        UPDATE `tabRadiology Procedure Prescription` lrpt
-        INNER JOIN `tabPatient Encounter` pe ON lrpt.parent = pe.name
-        INNER JOIN `tabRadiology Examination Template` item_template ON lrpt.radiology_examination_template = item_template.name
-                AND item_template.disabled = 0
-        INNER JOIN `tabHealthcare Company Option` hco ON item_template.name = hco.parent AND hco.company = pe.company
-        SET lrpt.department_hsu = hco.service_unit
-        WHERE pe.name IN ({})
-    """.format(", ".join(["%s"] * len(encounters))),
-		tuple([d for d in encounters]),
-	)
+		updates = {}
+		for row in rows:
+			updates.setdefault(row.name, {"department_hsu": row.service_unit})
 
-	frappe.db.sql(
-		"""
-        UPDATE `tabProcedure Prescription` lrpt
-        INNER JOIN `tabPatient Encounter` pe ON lrpt.parent = pe.name
-        INNER JOIN `tabClinical Procedure Template` item_template ON lrpt.procedure = item_template.name AND item_template.disabled = 0
-        INNER JOIN `tabHealthcare Company Option` hco ON item_template.name = hco.parent AND hco.company = pe.company
-        SET lrpt.department_hsu = hco.service_unit
-        WHERE pe.name IN ({})
-    """.format(", ".join(["%s"] * len(encounters))),
-		tuple([d for d in encounters]),
-	)
-
-	frappe.db.sql(
-		"""
-        UPDATE `tabTherapy Plan Detail` lrpt
-        INNER JOIN `tabPatient Encounter` pe ON lrpt.parent = pe.name
-        INNER JOIN `tabTherapy Type` item_template ON lrpt.therapy_type = item_template.name AND item_template.disabled = 0
-        INNER JOIN `tabHealthcare Company Option` hco ON item_template.name = hco.parent AND hco.company = pe.company
-        SET lrpt.department_hsu = hco.service_unit
-        WHERE pe.name IN ({})
-    """.format(", ".join(["%s"] * len(encounters))),
-		tuple([d for d in encounters]),
-	)
+		frappe.db.bulk_update(prescription_doctype, updates, update_modified=False)
 
 	frappe.db.commit()

@@ -12,10 +12,10 @@ from hms_tz.hms_tz.doctype.patient_appointment.patient_appointment import make_e
 
 class TestPatientAppointment(unittest.TestCase):
 	def setUp(self):
-		frappe.db.sql("""delete from `tabPatient Appointment`""")
-		frappe.db.sql("""delete from `tabFee Validity Reference`""")
-		frappe.db.sql("""delete from `tabFee Validity`""")
-		frappe.db.sql("""delete from `tabPatient Encounter`""")
+		frappe.qb.from_("Patient Appointment").delete().run()
+		frappe.qb.from_("Fee Validity Reference").delete().run()
+		frappe.qb.from_("Fee Validity").delete().run()
+		frappe.qb.from_("Patient Encounter").delete().run()
 
 	def test_status(self):
 		patient, medical_department, practitioner = create_healthcare_docs()

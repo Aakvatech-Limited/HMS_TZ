@@ -17,7 +17,7 @@ from hms_tz.hms_tz.doctype.inpatient_record.inpatient_record import (
 
 class TestInpatientRecord(unittest.TestCase):
 	def test_admit_and_discharge(self):
-		frappe.db.sql("""delete from `tabInpatient Record`""")
+		frappe.qb.from_("Inpatient Record").delete().run()
 		patient = create_patient()
 		# Schedule Admission
 		ip_record = create_inpatient(patient)
@@ -68,7 +68,7 @@ class TestInpatientRecord(unittest.TestCase):
 		)
 
 	def test_validate_overlap_admission(self):
-		frappe.db.sql("""delete from `tabInpatient Record`""")
+		frappe.qb.from_("Inpatient Record").delete().run()
 		patient = create_patient()
 
 		ip_record = create_inpatient(patient)
@@ -82,7 +82,7 @@ class TestInpatientRecord(unittest.TestCase):
 		admit_patient(ip_record, service_unit, now_datetime())
 		ip_record_new = create_inpatient(patient)
 		self.assertRaises(frappe.ValidationError, ip_record_new.save)
-		frappe.db.sql("""delete from `tabInpatient Record`""")
+		frappe.qb.from_("Inpatient Record").delete().run()
 
 
 def mark_invoiced_inpatient_occupancy(ip_record):

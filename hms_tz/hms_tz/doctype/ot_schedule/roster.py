@@ -5,6 +5,7 @@ import json
 
 import frappe
 from frappe import _
+from frappe.query_builder.functions import Trim
 from frappe.utils import getdate, today
 
 
@@ -188,23 +189,15 @@ def search_patients(search_text: str = "", limit: int = 20) -> list:
 
 	term = f"%{search_text.strip()}%"
 
-	# Use raw SQL so we can apply TRIM() and search across both name and patient_name
-	results = frappe.db.sql(
-		"""
-        SELECT name, patient_name
-        FROM `tabPatient`
-        WHERE
-            status = 'Active'
-            AND (
-                TRIM(patient_name) LIKE %(term)s
-                OR name LIKE %(term)s
-            )
-        ORDER BY TRIM(patient_name) ASC
-        LIMIT %(limit)s
-        """,
-		{"term": term, "limit": int(limit)},
-		as_dict=True,
-	)
+	patient = frappe.qb.DocType("Patient")
+	patient_name = Trim(patient.patient_name)
+	results = (
+		frappe.qb.from_(patient)
+		.select(patient.name, patient.patient_name)
+		.where((patient.status == "Active") & (patient_name.like(term) | patient.name.like(term)))
+		.orderby(patient_name)
+		.limit(int(limit))
+	).run(as_dict=True)
 	return results
 
 

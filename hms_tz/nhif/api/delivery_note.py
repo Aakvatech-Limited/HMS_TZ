@@ -99,21 +99,23 @@ def onload(doc, method):
 
 
 def set_prescribed(doc):
+	dn = DocType("Delivery Note")
+	dni = DocType("Delivery Note Item")
 	for item in doc.items:
-		items_list = frappe.db.sql(
-			f"""
-            SELECT dn.posting_date, dni.item_code, dni.stock_qty, dni.uom
-            FROM `tabDelivery Note` dn
-            INNER JOIN `tabDelivery Note Item` dni on dni.parent = dn.name
-            WHERE dni.item_code = {frappe.db.escape(item.item_code)}
-                AND dn.patient = {frappe.db.escape(doc.patient)}
-                AND dn.name != {frappe.db.escape(doc.name)}
-                AND dn.docstatus = 1
-            ORDER BY posting_date desc
-            LIMIT 1
-        """,
-			as_dict=1,
-		)
+		items_list = (
+			frappe.qb.from_(dn)
+			.inner_join(dni)
+			.on(dni.parent == dn.name)
+			.select(dn.posting_date, dni.item_code, dni.stock_qty, dni.uom)
+			.where(
+				(dni.item_code == (item.item_code or ""))
+				& (dn.patient == (doc.patient or ""))
+				& (dn.name != (doc.name or ""))
+				& (dn.docstatus == 1)
+			)
+			.orderby(dn.posting_date, order=frappe.qb.desc)
+			.limit(1)
+		).run(as_dict=True)
 
 		if len(items_list):
 			item.last_qty_prescribed = items_list[0].get("stock_qty")
@@ -154,22 +156,28 @@ def validate_medication_class(doc, row):
 	if not medication_class:
 		return
 
-	medication_class_list = frappe.db.sql(
-		f"""
-        SELECT dn.posting_date, dni.item_code, mc.prescribed_after as valid_days
-        FROM `tabDelivery Note` dn
-        INNER JOIN `tabDelivery Note Item` dni on dni.parent = dn.name
-        INNER JOIN `tabMedication` m on m.item = dni.item_code
-        INNER JOIN `tabMedication Class` mc on mc.name = m.medication_class
-        WHERE dn.docstatus = 1
-            AND dn.patient = {frappe.db.escape(doc.patient)}
-            AND dn.name != {frappe.db.escape(doc.name)}
-            AND mc.name = {frappe.db.escape(medication_class)}
-        ORDER BY posting_date desc
-        LIMIT 1
-    """,
-		as_dict=1,
-	)
+	dn = DocType("Delivery Note")
+	dni = DocType("Delivery Note Item")
+	m = DocType("Medication")
+	mc = DocType("Medication Class")
+	medication_class_list = (
+		frappe.qb.from_(dn)
+		.inner_join(dni)
+		.on(dni.parent == dn.name)
+		.inner_join(m)
+		.on(m.item == dni.item_code)
+		.inner_join(mc)
+		.on(mc.name == m.medication_class)
+		.select(dn.posting_date, dni.item_code, mc.prescribed_after.as_("valid_days"))
+		.where(
+			(dn.docstatus == 1)
+			& (dn.patient == (doc.patient or ""))
+			& (dn.name != (doc.name or ""))
+			& (mc.name == medication_class)
+		)
+		.orderby(dn.posting_date, order=frappe.qb.desc)
+		.limit(1)
+	).run(as_dict=True)
 
 	if len(medication_class_list) == 0:
 		return

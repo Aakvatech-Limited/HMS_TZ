@@ -7,6 +7,8 @@ import math
 
 import frappe
 from frappe import _
+from frappe.query_builder import DocType
+from frappe.query_builder.functions import Now
 from frappe.utils import cstr, getdate, nowdate, rounded, time_diff_in_hours
 from frappe.utils.formatters import format_value
 from healthcare.healthcare.doctype.fee_validity.fee_validity import create_fee_validity
@@ -188,21 +190,19 @@ def get_lab_tests_to_invoice(patient, company):
 						"service": item,
 					}
 				)
-	lab_prescriptions = frappe.db.sql(
-		"""
-			SELECT
-				lp.name, lp.lab_test_code
-			FROM
-				`tabPatient Encounter` et, `tabLab Prescription` lp
-			WHERE
-				et.patient=%s
-				and lp.parent=et.name
-				and lp.lab_test_created=0
-				and lp.invoiced=0
-		""",
-		(patient.name),
-		as_dict=1,
-	)
+	encounter = DocType("Patient Encounter")
+	lab_prescription = DocType("Lab Prescription")
+	lab_prescriptions = (
+		frappe.qb.from_(lab_prescription)
+		.inner_join(encounter)
+		.on(lab_prescription.parent == encounter.name)
+		.select(lab_prescription.name, lab_prescription.lab_test_code)
+		.where(
+			(encounter.patient == patient.name)
+			& (lab_prescription.lab_test_created == 0)
+			& (lab_prescription.invoiced == 0)
+		)
+	).run(as_dict=True)
 
 	for prescription in lab_prescriptions:
 		item, is_billable = frappe.get_cached_value(
@@ -291,22 +291,20 @@ def get_clinical_procedures_to_invoice(patient, company):
 				}
 			)
 
-	procedure_prescriptions = frappe.db.sql(
-		"""
-			SELECT
-				pp.name, pp.procedure
-			FROM
-				`tabPatient Encounter` et, `tabProcedure Prescription` pp
-			WHERE
-				et.patient=%s
-				and pp.parent=et.name
-				and pp.procedure_created=0
-				and pp.invoiced=0
-				and pp.appointment_booked=0
-		""",
-		(patient.name),
-		as_dict=1,
-	)
+	encounter = DocType("Patient Encounter")
+	procedure_prescription = DocType("Procedure Prescription")
+	procedure_prescriptions = (
+		frappe.qb.from_(procedure_prescription)
+		.inner_join(encounter)
+		.on(procedure_prescription.parent == encounter.name)
+		.select(procedure_prescription.name, procedure_prescription.procedure)
+		.where(
+			(encounter.patient == patient.name)
+			& (procedure_prescription.procedure_created == 0)
+			& (procedure_prescription.invoiced == 0)
+			& (procedure_prescription.appointment_booked == 0)
+		)
+	).run(as_dict=True)
 
 	for prescription in procedure_prescriptions:
 		item, is_billable = frappe.get_cached_value(
@@ -328,22 +326,20 @@ def get_clinical_procedures_to_invoice(patient, company):
 
 def get_inpatient_services_to_invoice(patient, company):
 	services_to_invoice = []
-	inpatient_services = frappe.db.sql(
-		"""
-			SELECT
-				io.*
-			FROM
-				`tabInpatient Record` ip, `tabInpatient Occupancy` io
-			WHERE
-				ip.patient=%s
-				and ip.company=%s
-				and io.parent=ip.name
-				and io.left=1
-				and io.invoiced=0
-		""",
-		(patient.name, company),
-		as_dict=1,
-	)
+	inpatient_record = DocType("Inpatient Record")
+	inpatient_occupancy = DocType("Inpatient Occupancy")
+	inpatient_services = (
+		frappe.qb.from_(inpatient_occupancy)
+		.inner_join(inpatient_record)
+		.on(inpatient_occupancy.parent == inpatient_record.name)
+		.select(inpatient_occupancy.star)
+		.where(
+			(inpatient_record.patient == patient.name)
+			& (inpatient_record.company == company)
+			& (inpatient_occupancy.left == 1)
+			& (inpatient_occupancy.invoiced == 0)
+		)
+	).run(as_dict=True)
 
 	for inpatient_occupancy in inpatient_services:
 		service_unit_type = frappe.get_cached_value(
@@ -780,6 +776,14 @@ def get_drugs_to_invoice(encounter):
 				validate_customer_created(patient)
 
 
+def get_union_all_query(queries):
+	query = queries[0]
+	for part in queries[1:]:
+		query = query.union_all(part)
+
+	return query
+
+
 @frappe.whitelist()
 def get_children(doctype, parent, company, is_root=False):
 	parent_fieldname = "parent_" + doctype.lower().replace(" ", "_")
@@ -807,23 +811,21 @@ def get_children(doctype, parent, company, is_root=False):
 	hc_service_units = frappe.get_list(doctype, fields=fields, filters=filters)
 
 	if doctype == "Healthcare Service Unit":
+		service_unit = DocType("Healthcare Service Unit")
 		for each in hc_service_units:
 			occupancy_msg = ""
 			if each["expandable"] == 1:
 				occupied = False
 				vacant = False
-				child_list = frappe.db.sql(
-					"""
-						SELECT
-							name, occupancy_status
-						FROM
-							`tabHealthcare Service Unit`
-						WHERE
-							inpatient_occupancy = 1
-							and lft > %s and rgt < %s
-					""",
-					(each["lft"], each["rgt"]),
-				)
+				child_list = (
+					frappe.qb.from_(service_unit)
+					.select(service_unit.name, service_unit.occupancy_status)
+					.where(
+						(service_unit.inpatient_occupancy == 1)
+						& (service_unit.lft > each["lft"])
+						& (service_unit.rgt < each["rgt"])
+					)
+				).run()
 
 				for child in child_list:
 					if not occupied:
@@ -946,30 +948,27 @@ def update_item_from_doc(doc, item_name):
 
 
 def updating_item(doc, item_name):
-	frappe.db.sql(
-		"""
-			UPDATE
-				`tabItem`
-			SET
-				item_name=%s, item_group=%s, disabled=0,
-				description=%s, modified=NOW()
-			WHERE
-				item_code=%s""",
-		(item_name, doc.item_group, doc.description, doc.item),
-	)
+	item = DocType("Item")
+	(
+		frappe.qb.update(item)
+		.set(item.item_name, item_name)
+		.set(item.item_group, doc.item_group)
+		.set(item.disabled, 0)
+		.set(item.description, doc.description)
+		.set(item.modified, Now())
+		.where(item.item_code == doc.item)
+	).run()
 
 
 def updating_rate(doc, item_name):
-	frappe.db.sql(
-		"""
-			UPDATE
-				`tabItem Price`
-			SET
-				item_name=%s, price_list_rate=%s, modified=NOW()
-			WHERE
-				item_code=%s""",
-		(item_name, doc.rate, doc.item),
-	)
+	item_price = DocType("Item Price")
+	(
+		frappe.qb.update(item_price)
+		.set(item_price.item_name, item_name)
+		.set(item_price.price_list_rate, doc.rate)
+		.set(item_price.modified, Now())
+		.where(item_price.item_code == doc.item)
+	).run()
 
 
 def on_trash_doc_having_item_reference(doc):
@@ -1023,12 +1022,15 @@ def check_if_healthcare_doc_is_linked(doc, method):
 
 
 def delete_medical_record(reference_doc, reference_name):
-	query = """
-		delete from
-			`tabPatient Medical Record`
-		where
-			reference_doctype = %s and reference_name = %s"""
-	frappe.db.sql(query, (reference_doc, reference_name))
+	medical_record = DocType("Patient Medical Record")
+	(
+		frappe.qb.from_(medical_record)
+		.delete()
+		.where(
+			(medical_record.reference_doctype == reference_doc)
+			& (medical_record.reference_name == reference_name)
+		)
+	).run()
 
 
 # make_healthcare_service_order

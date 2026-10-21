@@ -7,6 +7,7 @@ import json
 
 import frappe
 from frappe.model.document import Document
+from frappe.query_builder import DocType
 from frappe.utils import getdate
 
 
@@ -49,9 +50,8 @@ def create_practitioner_availability_detail(pa_doc, date):
 
 
 def delelte_all_related_practitioner_availability_detail(pa_doc):
-	frappe.db.sql(
-		f"DELETE FROM `tabPractitioner Availability Detail` WHERE practitioner_availability = '{pa_doc.name}'"
-	)
+	detail = DocType("Practitioner Availability Detail")
+	frappe.qb.from_(detail).delete().where(detail.practitioner_availability == pa_doc.name).run()
 
 
 @frappe.whitelist()

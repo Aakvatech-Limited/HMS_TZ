@@ -5,6 +5,7 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
+from frappe.query_builder import DocType
 from frappe.utils import cstr, get_link_to_form, getdate
 
 
@@ -484,10 +485,12 @@ def update_lab_test_medical_record(doc):
 
 
 def delete_lab_test_from_medical_record(self):
-	medical_record_id = frappe.db.sql(
-		"select name from `tabPatient Medical Record` where reference_name=%s",
-		(self.name),
-	)
+	medical_record = DocType("Patient Medical Record")
+	medical_record_id = (
+		frappe.qb.from_(medical_record)
+		.select(medical_record.name)
+		.where(medical_record.reference_name == self.name)
+	).run()
 
 	if medical_record_id and medical_record_id[0][0]:
 		frappe.delete_doc(
@@ -499,27 +502,25 @@ def delete_lab_test_from_medical_record(self):
 
 @frappe.whitelist()
 def get_lab_test_prescribed(patient):
-	return frappe.db.sql(
-		"""
-			select
-				lp.name,
-				lp.lab_test_code,
-				lp.parent,
-				lp.invoiced,
-				pe.practitioner,
-				pe.practitioner_name,
-				pe.encounter_date,
-				pe.source,
-				pe.referring_practitioner
-			from
-				`tabPatient Encounter` pe, `tabLab Prescription` lp
-			where
-				pe.patient=%s
-				and lp.parent=pe.name
-				and lp.lab_test_created=0
-		""",
-		(patient),
-	)
+	encounter = DocType("Patient Encounter")
+	lab_prescription = DocType("Lab Prescription")
+	return (
+		frappe.qb.from_(encounter)
+		.inner_join(lab_prescription)
+		.on(lab_prescription.parent == encounter.name)
+		.select(
+			lab_prescription.name,
+			lab_prescription.lab_test_code,
+			lab_prescription.parent,
+			lab_prescription.invoiced,
+			encounter.practitioner,
+			encounter.practitioner_name,
+			encounter.encounter_date,
+			encounter.source,
+			encounter.referring_practitioner,
+		)
+		.where((encounter.patient == patient) & (lab_prescription.lab_test_created == 0))
+	).run()
 
 
 def make_insurance_claim(doc):

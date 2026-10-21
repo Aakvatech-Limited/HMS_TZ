@@ -1709,24 +1709,30 @@ def validate_medication_class(company, encounter, patient, drug_item, caller="Ba
 	if not medication_class:
 		return
 
-	medication_class_list = frappe.db.sql(
-		f"""
-        SELECT dp.drug_code, pe.name, pe.encounter_date, mc.prescribed_after as valid_days
-        FROM `tabDrug Prescription` dp
-        INNER JOIN `tabMedication` m ON m.name = dp.drug_code
-        INNER JOIN `tabMedication Class` mc ON mc.name = m.medication_class
-        INNER JOIN `tabPatient Encounter` pe ON pe.name = dp.parent
-        WHERE dp.is_cancelled = 0
-            AND dp.is_not_available_inhouse = 0
-            AND dp.dn_detail != ""
-            AND dp.parent != {frappe.db.escape(encounter)}
-            AND mc.name = {frappe.db.escape(medication_class)}
-            AND pe.docstatus = 1
-            AND pe.patient = {frappe.db.escape(patient)}
-        order by pe.encounter_date Desc
-    """,
-		as_dict=1,
-	)
+	dp = DocType("Drug Prescription")
+	m = DocType("Medication")
+	mc = DocType("Medication Class")
+	pe = DocType("Patient Encounter")
+	medication_class_list = (
+		frappe.qb.from_(dp)
+		.inner_join(m)
+		.on(m.name == dp.drug_code)
+		.inner_join(mc)
+		.on(mc.name == m.medication_class)
+		.inner_join(pe)
+		.on(pe.name == dp.parent)
+		.select(dp.drug_code, pe.name, pe.encounter_date, mc.prescribed_after.as_("valid_days"))
+		.where(
+			(dp.is_cancelled == 0)
+			& (dp.is_not_available_inhouse == 0)
+			& (dp.dn_detail != "")
+			& (dp.parent != (encounter or ""))
+			& (mc.name == medication_class)
+			& (pe.docstatus == 1)
+			& (pe.patient == (patient or ""))
+		)
+		.orderby(pe.encounter_date, order=frappe.qb.desc)
+	).run(as_dict=True)
 
 	if len(medication_class_list) == 0:
 		return
@@ -1895,32 +1901,24 @@ def get_filterd_drug(doctype, txt, searchfield, start, page_len, filters):
 	Get filtered drug based on the search criteria
 	and retrun Mediction if it is not disabled and allowed price list is set
 	"""
-	conditions = "MD.disabled = 0"
-	if txt:
-		conditions += f" AND MD.name LIKE '%{txt}%'"
-	if filters.get("price_list"):
-		conditions += f" AND APL.price_list = '{filters.get('price_list')}'"
-
-	data = frappe.db.sql(
-		f"""
-        SELECT
-            MD.name, MD.national_drug_code, MD.generic_name, MD.strength_text
-        FROM
-            `tabMedication` MD
-        inner join
-            `tabAllowed Price List` APL
-        on
-            MD.name = APL.parent
-        WHERE
-              {conditions}
-        ORDER BY
-            name ASC
-        LIMIT
-            {start}, {page_len}
-    """
+	md = DocType("Medication")
+	apl = DocType("Allowed Price List")
+	query = (
+		frappe.qb.from_(md)
+		.inner_join(apl)
+		.on(md.name == apl.parent)
+		.select(md.name, md.national_drug_code, md.generic_name, md.strength_text)
+		.where(md.disabled == 0)
+		.orderby(md.name)
+		.limit(cint(page_len))
+		.offset(cint(start))
 	)
+	if txt:
+		query = query.where(md.name.like(f"%{txt}%"))
+	if filters.get("price_list"):
+		query = query.where(apl.price_list == filters.get("price_list"))
 
-	return data
+	return query.run()
 
 
 @frappe.whitelist()
