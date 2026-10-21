@@ -2401,7 +2401,7 @@ def update_invoice_reference_in_lrpmt_childs(child, item, fieldname=""):
 	)
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def auto_submit_nhif_patient_claim(setting_dict=None):
 	"""Routine to submit patient claims and will be triggered:
 	1. Every 00:01 am at night by cron job
