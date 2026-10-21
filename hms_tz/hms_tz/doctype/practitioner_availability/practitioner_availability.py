@@ -9,6 +9,8 @@ from frappe.query_builder import Criterion, DatePart, DocType
 from frappe.query_builder.functions import Extract, IfNull
 from frappe.utils import formatdate, getdate, time_diff_in_seconds
 
+WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
+
 
 class PractitionerAvailability(Document):
 	def validate(self):
@@ -101,10 +103,17 @@ def validate_service_unit_capacity(doc):
 			frappe.throw(_(f"Not Allowed - Maximum Capacity {service_unit_capacity}"))
 
 
+def get_event_weekdays(doc) -> list[str]:
+	"""Weekdays the event uses: its flagged days if it repeats every day, else its date's weekday."""
+	if doc.repeat_this_event and doc.repeat_on == "Every Day":
+		return [day for day in WEEKDAYS if doc.get(day)]
+
+	return [WEEKDAYS[getdate(doc.from_date).weekday()]]
+
+
 def get_repeating_event_overlap(doc, availability):
 	repeat_till = IfNull(availability.repeat_till, "3000-01-01")
 	doc_repeat_till = doc.repeat_till or "3000-01-01"
-	weekdays = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
 	return (
 		(availability.repeat_this_event == 1)
 		& (
@@ -115,7 +124,7 @@ def get_repeating_event_overlap(doc, availability):
 		& (
 			(
 				(availability.repeat_on == "Every Day")
-				& Criterion.any(availability[day] == doc.get(day) for day in weekdays)
+				& Criterion.any(availability[day] == 1 for day in get_event_weekdays(doc))
 			)
 			| (
 				(availability.repeat_on == "Every Month")
