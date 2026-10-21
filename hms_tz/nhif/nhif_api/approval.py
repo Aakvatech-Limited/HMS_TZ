@@ -291,7 +291,7 @@ def update_service_approval(
 		)
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def issue_approved_service(
 	doc,
 	approval_number,
