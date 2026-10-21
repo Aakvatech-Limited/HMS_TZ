@@ -10,13 +10,13 @@ from hms_tz.hms_tz.doctype.patient_appointment.test_patient_appointment import c
 
 class TestPatient(unittest.TestCase):
 	def test_customer_created(self):
-		frappe.db.sql("""delete from `tabPatient`""")
+		frappe.qb.from_("Patient").delete().run()
 		frappe.db.set_single_value("Healthcare Settings", "link_customer_to_patient", 1)
 		patient = create_patient()
 		self.assertTrue(frappe.get_cached_value("Patient", patient, "customer"))
 
 	def test_patient_registration(self):
-		frappe.db.sql("""delete from `tabPatient`""")
+		frappe.qb.from_("Patient").delete().run()
 		settings = frappe.get_single("Healthcare Settings")
 		settings.collect_registration_fee = 1
 		settings.registration_fee = 500
