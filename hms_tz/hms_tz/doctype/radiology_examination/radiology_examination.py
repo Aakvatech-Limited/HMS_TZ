@@ -5,6 +5,7 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
+from frappe.query_builder import DocType
 from frappe.utils import cstr
 
 
@@ -63,23 +64,34 @@ def insert_to_medical_record(doc):
 
 @frappe.whitelist()
 def get_radiology_procedure_prescribed(patient, encounter_practitioner=False):
-	query = f"""
-		SELECT
-			cp.name, cp.radiology_examination_template, cp.parent, ct.invoiced, ct.encounter_date, ct.source, ct.referring_practitioner,
-			ct.practitioner, cp.radiology_test_comment
-		FROM
-			`tabPatient Encounter` ct, `tabRadiology Procedure Prescription` cp
-		WHERE
-			ct.patient='{patient}' and cp.parent=ct.name and cp.radiology_examination_created=0 and cp.appointment_booked=0
-	"""
+	encounter = DocType("Patient Encounter")
+	prescription = DocType("Radiology Procedure Prescription")
+	query = (
+		frappe.qb.from_(encounter)
+		.inner_join(prescription)
+		.on(prescription.parent == encounter.name)
+		.select(
+			prescription.name,
+			prescription.radiology_examination_template,
+			prescription.parent,
+			encounter.invoiced,
+			encounter.encounter_date,
+			encounter.source,
+			encounter.referring_practitioner,
+			encounter.practitioner,
+			prescription.radiology_test_comment,
+		)
+		.where(
+			(encounter.patient == patient)
+			& (prescription.radiology_examination_created == 0)
+			& (prescription.appointment_booked == 0)
+		)
+		.orderby(encounter.creation, order=frappe.qb.desc)
+	)
 	if encounter_practitioner:
-		query += f""" and ct.practitioner={encounter_practitioner}"""
+		query = query.where(encounter.practitioner == encounter_practitioner)
 
-	query += """
-		ORDER BY
-			ct.creation desc"""
-
-	return frappe.db.sql(query)
+	return query.run()
 
 
 @frappe.whitelist()
