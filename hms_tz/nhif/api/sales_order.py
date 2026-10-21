@@ -5,12 +5,12 @@ from frappe.query_builder.functions import CombineDatetime
 from frappe.utils import nowdate
 
 from hms_tz.hms_tz.doctype.hms_tz_setting.hms_tz_setting import is_cash_inpatient_deposit_allowed
-from hms_tz.nhif.api.healthcare_utils import msgThrow
+from hms_tz.nhif.api.healthcare_utils import get_warehouse_from_service_unit, msgThrow
 
 
 def validate(doc, method):
 	for item in doc.items:
-		validate_stock_item(item, doc.set_warehouse, method)
+		validate_stock_item(item, item.warehouse, method)
 
 
 def before_submit(doc, method):
@@ -22,48 +22,24 @@ def before_submit(doc, method):
 		)
 
 	for item in doc.items:
-		validate_stock_item(item, doc.set_warehouse, method)
+		validate_stock_item(item, item.warehouse, method)
 
 
 def create_sales_order(doc, method):
 	if doc.mode_of_payment and doc.inpatient_record and is_cash_inpatient_deposit_allowed(doc.company):
 		return
 
-	company_details = frappe.get_cached_value(
-		"HMS TZ Setting",
-		doc.company,
-		[
-			"auto_create_sales_order_from_encounter",
-			"sales_order_opd_pharmacy",
-			"sales_order_ipd_pharmacy",
-		],
-		as_dict=True,
-	)
-	if not company_details or company_details.auto_create_sales_order_from_encounter == 0:
+	if not frappe.get_cached_value("HMS TZ Setting", doc.company, "auto_create_sales_order_from_encounter"):
 		return
 
-	if not company_details.sales_order_opd_pharmacy and not company_details.sales_order_ipd_pharmacy:
-		frappe.throw(
-			f"Please set Sales Order OPD Pharmacy or \
-                Sales Order IPD Pharmacy in Company: {doc.company}"
-		)
-
-	warehouse = ""
-	if doc.inpatient_record:
-		warehouse = company_details.sales_order_ipd_pharmacy
-	else:
-		warehouse = company_details.sales_order_opd_pharmacy
-
-	drug_items, lrpt_items = get_items_from_encounter(doc, warehouse)
+	drug_items, lrpt_items = get_items_from_encounter(doc)
 	if len(drug_items) > 0:
-		drug_order_name = create_sales_order_from_encounter(
-			doc, drug_items, warehouse, allow_md_change_request=True
-		)
+		drug_order_name = create_sales_order_from_encounter(doc, drug_items, allow_md_change_request=True)
 		if drug_order_name:
 			frappe.msgprint("<b>Sales Order for Drug Items created Successfully</b>")
 
 	if len(lrpt_items) > 0:
-		lrpt_order_name = create_sales_order_from_encounter(doc, lrpt_items, warehouse)
+		lrpt_order_name = create_sales_order_from_encounter(doc, lrpt_items)
 		if lrpt_order_name:
 			frappe.msgprint(
 				"<b>Sales Order for Lab/Radiology/Procedure/Therapy \
@@ -71,7 +47,7 @@ def create_sales_order(doc, method):
 			)
 
 
-def get_items_from_encounter(doc, warehouse):
+def get_items_from_encounter(doc):
 	drug_items = []
 	lrpt_items = []
 	for field in get_childs_map():
@@ -101,7 +77,6 @@ def get_items_from_encounter(doc, warehouse):
 				"description": item_description,
 				"qty": 1,
 				"delivery_date": nowdate(),
-				"warehouse": warehouse,
 				"reference_dt": row.get("doctype"),
 				"reference_dn": row.get("name"),
 				"healthcare_practitioner": doc.get("practitioner"),
@@ -123,6 +98,7 @@ def get_items_from_encounter(doc, warehouse):
 					{
 						"dosage_info": dosage_info,
 						"qty": row.quantity - row.quantity_returned,
+						"warehouse": get_warehouse_from_service_unit(row.healthcare_service_unit),
 					}
 				)
 				drug_items.append(new_row)
@@ -139,7 +115,7 @@ def get_items_from_encounter(doc, warehouse):
 	return drug_items, lrpt_items
 
 
-def create_sales_order_from_encounter(doc, items, warehouse, allow_md_change_request=False):
+def create_sales_order_from_encounter(doc, items, allow_md_change_request=False):
 	price_list = frappe.get_cached_value("Mode of Payment", doc.get("mode_of_payment"), "price_list")
 	if not price_list:
 		price_list = frappe.get_cached_value(
@@ -154,6 +130,7 @@ def create_sales_order_from_encounter(doc, items, warehouse, allow_md_change_req
 
 	mobile = frappe.get_cached_value("Patient", doc.get("patient"), "mobile")
 	customer = frappe.get_cached_value("Patient", doc.get("patient"), "customer")
+	warehouses = {item.get("warehouse") for item in items}
 	order_doc = frappe.new_doc("Sales Order")
 	order_doc.update(
 		{
@@ -164,7 +141,7 @@ def create_sales_order_from_encounter(doc, items, warehouse, allow_md_change_req
 			"patient_mobile_number": mobile,
 			"transaction_date": nowdate(),
 			"delivery_date": nowdate(),
-			"set_warehouse": warehouse,
+			"set_warehouse": warehouses.pop() if len(warehouses) == 1 else None,
 			"selling_price_list": price_list,
 			"patient_encounter": doc.name,
 			"allow_med_change_request": allow_md_change_request,
