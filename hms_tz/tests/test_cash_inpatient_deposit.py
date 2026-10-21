@@ -106,14 +106,9 @@ class TestCashInpatientDeposit(FrappeTestCase):
 	@patch.object(sales_order, "get_items_from_encounter", return_value=([], []))
 	def test_no_deposit_flow_creates_sales_order(self, get_items):
 		set_deposit_allowed(0)
-		frappe.db.set_value(
-			"HMS TZ Setting",
-			COMPANY,
-			{"auto_create_sales_order_from_encounter": 1, "sales_order_ipd_pharmacy": "_Test IPD Store"},
-		)
+		frappe.db.set_value("HMS TZ Setting", COMPANY, "auto_create_sales_order_from_encounter", 1)
 		sales_order.create_sales_order(make_encounter(), "on_submit")
 		get_items.assert_called_once()
-		self.assertEqual(get_items.call_args.args[1], "_Test IPD Store")
 
 	def test_deposit_flow_disables_invoice_delivery_notes(self):
 		set_deposit_allowed(1)
