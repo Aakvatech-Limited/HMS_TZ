@@ -9,6 +9,16 @@ from frappe import _
 from frappe.contacts.address_and_contact import load_address_and_contact
 from frappe.model.document import Document
 from frappe.model.naming import set_name_by_naming_series
+from frappe.query_builder import DocType, Interval
+from frappe.query_builder.functions import (
+	Cast_,
+	Count,
+	CurDate,
+	CustomFunction,
+	IfNull,
+	Max,
+	UnixTimestamp,
+)
 from frappe.utils import cint, cstr, flt, getdate
 from frappe.utils.nestedset import get_root_of
 from healthcare.healthcare.doctype.healthcare_settings.healthcare_settings import (
@@ -16,6 +26,8 @@ from healthcare.healthcare.doctype.healthcare_settings.healthcare_settings impor
 	get_receivable_account,
 	send_registration_sms,
 )
+
+SubstringIndex = CustomFunction("SUBSTRING_INDEX", ["string", "delimiter", "count"])
 
 
 class Patient(Document):
@@ -125,12 +137,13 @@ class Patient(Document):
 		self.set_full_name()
 		name = self.patient_name
 		if frappe.get_cached_value("Patient", name):
-			count = frappe.db.sql(
-				"""select ifnull(MAX(CAST(SUBSTRING_INDEX(name, ' ', -1) AS UNSIGNED)), 0) from tabPatient
-                 where name like %s""",
-				f"%{name} - %",
-				as_list=1,
-			)[0][0]
+			patient = DocType("Patient")
+			name_suffix = Cast_(SubstringIndex(patient.name, " ", -1), "UNSIGNED")
+			count = (
+				frappe.qb.from_(patient)
+				.select(IfNull(Max(name_suffix), 0))
+				.where(patient.name.like(f"%{name} - %"))
+			).run()[0][0]
 			count = cint(count) + 1
 			return f"{name} - {cstr(count)}"
 
@@ -284,15 +297,21 @@ def make_invoice(patient, company):
 
 @frappe.whitelist()
 def get_patient_detail(patient):
-	patient_dict = frappe.db.sql("""select * from tabPatient where name=%s""", (patient), as_dict=1)
+	patient_table = DocType("Patient")
+	patient_dict = (
+		frappe.qb.from_(patient_table).select(patient_table.star).where(patient_table.name == patient)
+	).run(as_dict=True)
 	if not patient_dict:
 		frappe.throw(_("Patient not found"))
-	vital_sign = frappe.db.sql(
-		"""select * from `tabVital Signs` where patient=%s
-        order by signs_date desc limit 1""",
-		(patient),
-		as_dict=1,
-	)
+
+	vital_signs = DocType("Vital Signs")
+	vital_sign = (
+		frappe.qb.from_(vital_signs)
+		.select(vital_signs.star)
+		.where(vital_signs.patient == patient)
+		.orderby(vital_signs.signs_date, order=frappe.qb.desc)
+		.limit(1)
+	).run(as_dict=True)
 
 	details = patient_dict[0]
 	if vital_sign:
@@ -347,19 +366,17 @@ def get_patient_billing_info(patient, ip_billing_info=False):
 
 def get_timeline_data(doctype, name):
 	"""Return timeline data from medical records"""
+	medical_record = DocType("Patient Medical Record")
 	return dict(
-		frappe.db.sql(
-			"""
-        SELECT
-            unix_timestamp(communication_date), count(*)
-        FROM
-            `tabPatient Medical Record`
-        WHERE
-            patient=%s
-            and `communication_date` > date_sub(curdate(), interval 1 year)
-        GROUP BY communication_date""",
-			name,
-		)
+		(
+			frappe.qb.from_(medical_record)
+			.select(UnixTimestamp(medical_record.communication_date), Count("*"))
+			.where(
+				(medical_record.patient == name)
+				& (medical_record.communication_date > CurDate() - Interval(years=1))
+			)
+			.groupby(medical_record.communication_date)
+		).run()
 	)
 
 
