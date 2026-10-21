@@ -910,7 +910,6 @@ class JubileePatientClaim(Document):
 		self.folio_no = get_or_create_folio_counter(self, "Jubilee")
 		self.db_set("folio_no", self.folio_no)
 
-	@frappe.whitelist()
 	def send_jubilee_claim(self):
 		json_data, json_data_wo_files = self.get_payload()
 		setting_doc = frappe.get_cached_doc("HMS TZ Setting", self.company)
