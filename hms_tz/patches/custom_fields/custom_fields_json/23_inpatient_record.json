@@ -1425,7 +1425,7 @@
         "collapsible": 0,
         "non_negative": 0,
         "reqd": 0,
-        "unique": 0,
+        "unique": 1,
         "is_virtual": 0,
         "read_only": 1,
         "ignore_user_permissions": 0,
