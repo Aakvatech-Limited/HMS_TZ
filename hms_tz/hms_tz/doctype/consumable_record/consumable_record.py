@@ -87,6 +87,12 @@ class ConsumableRecord(Document):
 		  if any billable cash items are uninvoiced,
 		  hold DN until Sales Invoice is created and paid.
 		"""
+		# the Sales Invoice calls this again for items already delivered on submit
+		if self.delivery_note and frappe.db.exists(
+			"Delivery Note", {"name": self.delivery_note, "docstatus": ["!=", 2]}
+		):
+			return
+
 		is_inpatient_without_deposit = self.inpatient_record and not is_cash_inpatient_deposit_allowed(
 			self.company
 		)
