@@ -13,7 +13,16 @@ import frappe
 import requests
 from frappe import _
 from frappe.query_builder import DocType
-from frappe.utils import date_diff, flt, get_fullname, get_link_to_form, getdate, nowdate
+from frappe.utils import (
+	date_diff,
+	escape_html,
+	flt,
+	fmt_money,
+	get_fullname,
+	get_link_to_form,
+	getdate,
+	nowdate,
+)
 
 from hms_tz.jubilee.doctype.jubilee_response_log.jubilee_response_log import add_jubilee_log
 
@@ -398,6 +407,9 @@ def add_service_request_comment(hsr_doc, title, result):
 	if result.get("description"):
 		lines.append(f"Response: <b>{result['description']}</b>")
 
+	if result.get("details_table"):
+		lines.append(result["details_table"])
+
 	hsr_doc.add_comment(comment_type="Comment", text="<br>".join(lines))
 
 
@@ -491,6 +503,7 @@ def get_service_request_preauth_status(service_request_name):
 	result = {"status": "ERROR", "description": "", "service_request": hsr_doc.name}
 	approval_status, approval_description, approved_amount = "", "", 0
 	requested_amount = 0
+	details_table = ""
 	response = None
 
 	try:
@@ -516,6 +529,10 @@ def get_service_request_preauth_status(service_request_name):
 			approval_description = str(description.get("details") or "")
 			requested_amount = flt(description.get("amount") or 0)
 			approved_amount = flt(description.get("approvedAmount") or 0)
+			service_names = {
+				row.item_code: row.service_name for row in get_jubilee_payment_rows(hsr_doc.appointment)
+			}
+			details_table = get_preauth_details_table(description.get("details"), service_names)
 		else:
 			approval_status = status
 			approval_description = str(description)
@@ -526,6 +543,7 @@ def get_service_request_preauth_status(service_request_name):
 				"description": approval_description or approval_status,
 				"amount": requested_amount,
 				"approved_amount": approved_amount,
+				"details_table": details_table,
 			}
 		)
 	except Exception:
@@ -564,10 +582,44 @@ def get_service_request_preauth_status(service_request_name):
 	add_service_request_comment(
 		hsr_doc,
 		"Jubilee approval status checked",
-		{"status": approval_status, "description": desc},
+		{"status": approval_status, "description": desc, "details_table": details_table},
 	)
 
 	return result
+
+
+def get_preauth_details_table(details, service_names):
+	"""HTML table of Jubilee's per-item status, with declined rows in red.
+
+	`service_names` maps the insurer item code to the hospital's service name.
+	"""
+	if not details or not isinstance(details, list):
+		return ""
+
+	rows = []
+	for line in details:
+		style = ""
+		if line.get("LineStatus") == "Declined":
+			style = ' style="color: var(--red-700); background-color: var(--red-50)"'
+
+		cells = [
+			service_names.get(line.get("ItemCode")) or line.get("ItemName"),
+			line.get("Quantity"),
+			fmt_money(line.get("Amount") or 0),
+			line.get("LineStatus"),
+			line.get("RejectionReason"),
+		]
+		rows.append(
+			f"<tr{style}>" + "".join(f"<td>{escape_html(str(cell or ''))}</td>" for cell in cells) + "</tr>"
+		)
+
+	headers = ["Service Name", "Qty", "Amount", "Status", "Rejection Reason"]
+	header_row = "".join(f"<th>{_(label)}</th>" for label in headers)
+
+	return (
+		'<table class="table table-bordered table-condensed">'
+		f"<thead><tr>{header_row}</tr></thead><tbody>{''.join(rows)}</tbody></table>"
+	)
 
 
 def get_benefit_record(appointment, benefit_code):
