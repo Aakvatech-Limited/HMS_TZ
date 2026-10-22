@@ -76,7 +76,8 @@
    "fieldtype": "Link",
    "label": "Inpatient Record",
    "options": "Inpatient Record",
-   "read_only": 1
+   "read_only": 1,
+   "search_index": 1
   },
   {
    "fieldname": "naming_series",
@@ -466,7 +467,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2023-05-17 22:38:58.921042",
+ "modified": "2026-10-22 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Hms Tz",
  "name": "Patient Encounter",
