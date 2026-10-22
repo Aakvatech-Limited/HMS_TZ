@@ -16,13 +16,23 @@ def execute(filters=None):
 
 	if filters.get("summarized_view") == 1:
 		columns = get_summarized_columns()
-
 		data, dashboard = get_summarized_data(args)
+	else:
+		columns = get_columns()
+		data, dashboard = get_data(args)
 
-		return columns, data, None, None, dashboard
-
-	columns = get_columns()
-	data, dashboard = get_data(args)
+	if not data:
+		frappe.msgprint(
+			_(
+				"No records found for Patient: {0}, Appointment: {1}, Patient Type: {2}, From Date: {3} and To Date: {4}. Change the filters and try again."
+			).format(
+				frappe.bold(args.patient),
+				frappe.bold(args.appointment_no),
+				frappe.bold(args.patient_type),
+				frappe.bold(args.from_date),
+				frappe.bold(args.to_date),
+			)
+		)
 
 	return columns, data, None, None, dashboard
 
@@ -151,11 +161,6 @@ def get_summarized_data(args):
 
 	transactions = get_transaction_data(args)
 	if len(transactions) == 0:
-		frappe.msgprint(
-			f"No Record found for the Fitlters:  Patient: {frappe.bold(args.patient)}, Appointment: {frappe.bold(args.appointment_no)},\
-			Patient Type: {frappe.bold(args.patient_type)} From Date: {frappe.bold(args.from_date)} and To Date: {frappe.bold(args.to_date)}\
-			you specified..., Please change your filters and try again..!!"
-		)
 		return [], []
 
 	for record in transactions:
@@ -296,7 +301,7 @@ def get_encounter_service_query(args, service, amount_column, amount):
 		.where(service.is_not_available_inhouse == 0)
 		.where(service.is_cancelled == 0)
 		.where(service.invoiced == 0)
-		.groupby(encounter.encounter_date)
+		.groupby(Date(encounter.encounter_date))
 	)
 
 
@@ -473,9 +478,6 @@ def get_data(args):
 		if len(cash_lrpmt_data) > 0:
 			data += cash_lrpmt_data
 
-		# insurance_lrpmt_data = get_insurance_lrpmt_transaction(args)
-		# if insurance_lrpmt_data: data += insurance_lrpmt_data
-
 		ipd_beds = get_ipd_occupancy_transactions(args)
 		if len(ipd_beds) > 0:
 			data += ipd_beds
@@ -487,31 +489,9 @@ def get_data(args):
 			data += consumables
 
 	if len(data) == 0:
-		frappe.msgprint(
-			f"No Record found for the args Patient: {frappe.bold(args.patient)}, Appointment: {frappe.bold(args.appointment_no)},\
-			Patient Type: {frappe.bold(args.patient_type)} From Date: {frappe.bold(args.from_date)} and To Date: {frappe.bold(args.to_date)}\
-            you specified..., Please change your filters and try again..!!"
-		)
 		return [], []
 
 	return get_report_summary(args, data, is_summary=False)
-
-
-def get_conditions(filters, appointment):
-	conditions = []
-	if filters.get("patient"):
-		conditions.append(appointment.patient == filters.get("patient"))
-
-	if filters.get("appointment_no"):
-		conditions.append(appointment.name == filters.get("appointment_no"))
-
-	if filters.get("from_date"):
-		conditions.append(appointment.appointment_date >= filters.get("from_date"))
-
-	if filters.get("to_date"):
-		conditions.append(appointment.appointment_date <= filters.get("to_date"))
-
-	return Criterion.all(conditions)
 
 
 def get_enc_conditions(filters, encounter):
@@ -593,33 +573,6 @@ def get_appointment_columns(appointment, inpatient_record):
 		Date(inpatient_record.admitted_datetime).as_("admitted_date"),
 		inpatient_record.discharge_date.as_("discharge_date"),
 	]
-
-
-def get_appointment_consultancy(filters):
-	appointment = DocType("Patient Appointment")
-	item = DocType("Item")
-	inpatient_record = DocType("Inpatient Record")
-
-	return (
-		frappe.qb.from_(appointment)
-		.inner_join(item)
-		.on(appointment.billing_item == item.item_name)
-		.left_join(inpatient_record)
-		.on(appointment.name == inpatient_record.patient_appointment)
-		.select(
-			appointment.appointment_date.as_("date"),
-			item.item_group.as_("category"),
-			appointment.billing_item.as_("description"),
-			ValueWrapper(1).as_("quantity"),
-			appointment.paid_amount.as_("rate"),
-			appointment.paid_amount.as_("total_amount"),
-			*get_appointment_columns(appointment, inpatient_record),
-		)
-		.where(appointment.status == "Closed")
-		.where(appointment.follow_up == 0)
-		.where(get_conditions(filters, appointment))
-		.run(as_dict=True)
-	)
 
 
 def get_ipd_occupancy_transactions(filters):
@@ -721,14 +674,6 @@ def get_consumable_transactions(filters):
 
 
 def get_cash_lrpmt_transaction(filters):
-	return get_lrpmt_query(filters, is_insurance=False).run(as_dict=True)
-
-
-def get_insurance_lrpmt_transaction(filters):
-	return get_lrpmt_query(filters, is_insurance=True).run(as_dict=True)
-
-
-def get_lrpmt_query(filters, is_insurance):
 	lab = DocType("Lab Prescription")
 	lab_template = DocType("Lab Test Template")
 	radiology = DocType("Radiology Procedure Prescription")
@@ -741,16 +686,11 @@ def get_lrpmt_query(filters, is_insurance):
 	therapy_type = DocType("Therapy Type")
 	encounter = DocType("Patient Encounter")
 
-	encounters = get_encounter_subquery(filters)
-	if is_insurance:
-		encounters = encounters.where(encounter.insurance_coverage_plan != "")
-	else:
-		encounters = encounters.where(encounter.mode_of_payment != "")
+	encounters = get_encounter_subquery(filters).where(encounter.mode_of_payment != "")
 
 	queries = [
 		get_prescription_query(
 			encounters,
-			is_insurance,
 			lab,
 			lab_template,
 			lab.lab_test_code,
@@ -764,7 +704,6 @@ def get_lrpmt_query(filters, is_insurance):
 		),
 		get_prescription_query(
 			encounters,
-			is_insurance,
 			radiology,
 			radiology_template,
 			radiology.radiology_examination_template,
@@ -778,7 +717,6 @@ def get_lrpmt_query(filters, is_insurance):
 		),
 		get_prescription_query(
 			encounters,
-			is_insurance,
 			procedure,
 			procedure_template,
 			procedure.procedure,
@@ -792,7 +730,6 @@ def get_lrpmt_query(filters, is_insurance):
 		),
 		get_prescription_query(
 			encounters,
-			is_insurance,
 			drug,
 			medication,
 			drug.drug_code,
@@ -806,7 +743,6 @@ def get_lrpmt_query(filters, is_insurance):
 		),
 		get_prescription_query(
 			encounters,
-			is_insurance,
 			therapy,
 			therapy_type,
 			therapy.therapy_type,
@@ -820,15 +756,15 @@ def get_lrpmt_query(filters, is_insurance):
 		),
 	]
 
-	return get_union_all_query(queries)
+	return get_union_all_query(queries).run(as_dict=True)
 
 
-def get_prescription_query(encounters, is_insurance, prescription, template, template_link, columns):
+def get_prescription_query(encounters, prescription, template, template_link, columns):
 	encounter = DocType("Patient Encounter")
 	appointment = DocType("Patient Appointment")
 	inpatient_record = DocType("Inpatient Record")
 
-	query = (
+	return (
 		frappe.qb.from_(prescription)
 		.inner_join(template)
 		.on(template_link == template.name)
@@ -846,12 +782,9 @@ def get_prescription_query(encounters, is_insurance, prescription, template, tem
 			*columns,
 			*get_appointment_columns(appointment, inpatient_record),
 		)
-		.where(prescription.prescribe == (0 if is_insurance else 1))
+		.where(prescription.prescribe == 1)
 		.where(prescription.is_cancelled == 0)
 		.where(prescription.is_not_available_inhouse == 0)
+		.where(prescription.invoiced == 0)
 		.where(prescription.parent.isin(encounters))
 	)
-	if not is_insurance:
-		query = query.where(prescription.invoiced == 0)
-
-	return query
