@@ -22,19 +22,21 @@ def execute(filters=None):
 		data, dashboard = get_data(args)
 
 	if not data:
-		frappe.msgprint(
-			_(
-				"No records found for Patient: {0}, Appointment: {1}, Patient Type: {2}, From Date: {3} and To Date: {4}. Change the filters and try again."
-			).format(
-				frappe.bold(args.patient),
-				frappe.bold(args.appointment_no),
-				frappe.bold(args.patient_type),
-				frappe.bold(args.from_date),
-				frappe.bold(args.to_date),
-			)
-		)
+		frappe.msgprint(get_no_records_message(args))
 
 	return columns, data, None, None, dashboard
+
+
+def get_no_records_message(args) -> str:
+	filters = {
+		_("Patient"): args.patient,
+		_("Appointment"): args.appointment_no,
+		_("Patient Type"): args.patient_type,
+		_("From Date"): args.from_date,
+		_("To Date"): args.to_date,
+	}
+	applied_filters = ", ".join(f"{label}: {frappe.bold(value)}" for label, value in filters.items() if value)
+	return _("No records found for {0}. Change the filters and try again.").format(applied_filters)
 
 
 def get_summarized_columns():
@@ -359,7 +361,9 @@ def get_report_summary(args, summary_data, is_summary=False):
 	customer = frappe.get_cached_value("Patient", {"name": args.patient}, "customer")
 	cash_limit = frappe.get_cached_value("Inpatient Record", args.inpatient_record, "cash_limit")
 
-	deposit_balance = get_balance_on(party_type="Customer", party=customer, company=args.company)
+	deposit_balance = 0
+	if customer:
+		deposit_balance = get_balance_on(party_type="Customer", party=customer, company=args.company)
 	sorted_data = sorted(summary_data, key=lambda x: x["date"])
 
 	total_amount_used = 0
