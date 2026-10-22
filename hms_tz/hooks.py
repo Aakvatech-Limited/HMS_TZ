@@ -223,6 +223,7 @@ doc_events = {
 		"before_insert": "hms_tz.nhif.api.inpatient_record.before_insert",
 		"before_save": "hms_tz.nhif.api.inpatient_record.before_save",
 		"after_insert": "hms_tz.nhif.api.inpatient_record.after_insert",
+		"on_update": "hms_tz.nhif.api.inpatient_record.on_update",
 	},
 	"Prescription Dosage": {
 		"before_insert": "hms_tz.nhif.api.prescription_dosage.before_insert",
