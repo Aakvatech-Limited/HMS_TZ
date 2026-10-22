@@ -6,6 +6,7 @@ from frappe.query_builder.functions import Date, Sum
 from frappe.utils import flt
 from pypika.terms import Criterion, ValueWrapper
 
+from hms_tz.hms_tz.doctype.consumable_item.consumable_item import get_billable_qty_column
 from hms_tz.hms_tz.utils import get_union_all_query
 
 
@@ -352,6 +353,7 @@ def get_consumable_amount_query(args):
 		.where(record.docstatus == 1)
 		.where(record.payment_type == "Cash")
 		.where(item.invoiced == 0)
+		.where(item.is_billable == 1)
 		.where(record.inpatient_record == args.get("inpatient_record"))
 		.groupby(Date(record.posting_date))
 	)
@@ -663,7 +665,7 @@ def get_consumable_transactions(filters):
 			record.posting_date.as_("date"),
 			ValueWrapper("Consumables").as_("category"),
 			item.item_name.as_("description"),
-			item.qty_requested.as_("quantity"),
+			get_billable_qty_column(item).as_("quantity"),
 			item.rate.as_("rate"),
 			item.amount.as_("total_amount"),
 			*get_appointment_columns(appointment, inpatient_record),

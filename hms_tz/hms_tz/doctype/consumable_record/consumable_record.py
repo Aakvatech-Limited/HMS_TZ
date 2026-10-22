@@ -6,6 +6,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import flt, nowdate, nowtime
 
+from hms_tz.hms_tz.doctype.consumable_item.consumable_item import get_billable_qty
 from hms_tz.hms_tz.doctype.hms_tz_setting.hms_tz_setting import is_cash_inpatient_deposit_allowed
 from hms_tz.nhif.api.patient_encounter import validate_patient_balance_vs_patient_costs
 
@@ -41,8 +42,7 @@ class ConsumableRecord(Document):
 		"""Calculate amount per item and total amount."""
 		total = 0
 		for item in self.items:
-			qty = flt(item.qty_used) or flt(item.qty_dispensed) or flt(item.qty_requested)
-			item.amount = flt(qty * flt(item.rate))
+			item.amount = flt(get_billable_qty(item) * flt(item.rate))
 			total += flt(item.amount)
 
 		self.total_amount = total
@@ -153,7 +153,7 @@ class ConsumableRecord(Document):
 				dn_item.item_code = row.item_code
 				dn_item.item_name = item_name
 				dn_item.warehouse = warehouse
-				dn_item.qty = flt(row.qty_requested)
+				dn_item.qty = get_billable_qty(row)
 				dn_item.rate = flt(row.rate)
 				dn_item.price_list_rate = flt(row.rate)
 				dn_item.reference_doctype = row.doctype

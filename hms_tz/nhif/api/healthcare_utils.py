@@ -21,6 +21,7 @@ from frappe.utils import (
 	nowtime,
 )
 
+from hms_tz.hms_tz.doctype.consumable_item.consumable_item import get_billable_qty_column
 from hms_tz.hms_tz.doctype.hms_tz_setting.hms_tz_setting import is_cash_inpatient_deposit_allowed
 from hms_tz.hms_tz.utils import manage_fee_validity
 
@@ -228,7 +229,7 @@ def get_healthcare_services_to_invoice(
 		.on(cr.name == ci.parent)
 		.select(
 			ci.item_code,
-			ci.qty_requested,
+			get_billable_qty_column(ci).as_("qty"),
 			ci.rate,
 			ci.name.as_("consumable_item_name"),
 			cr.name.as_("consumable_record"),
@@ -248,7 +249,7 @@ def get_healthcare_services_to_invoice(
 		new_row["reference_name"] = row.consumable_item_name
 		new_row["service"] = row.item_code
 		new_row["rate"] = row.rate
-		new_row["qty"] = row.qty_requested
+		new_row["qty"] = row.qty
 		new_row["service_request"] = ""
 
 		services_to_invoice.append(new_row)
