@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
@@ -34,5 +36,27 @@ class TestInpatientRecordActiveAdmission(FrappeTestCase):
 
 	def test_discharged_admission_allows_new_record(self):
 		insert("Inpatient Record", EXISTING_RECORD, patient=PATIENT, status="Discharged")
+
+		validate_new_admission()
+
+	def test_patient_row_is_locked_while_checking(self):
+		with patch.object(frappe.db, "get_value", wraps=frappe.db.get_value) as get_value:
+			validate_new_admission()
+
+		get_value.assert_any_call("Patient", PATIENT, "inpatient_record", for_update=True)
+
+	def test_active_admission_on_patient_blocks_new_record(self):
+		insert("Inpatient Record", EXISTING_RECORD, patient=PATIENT, status="Admitted")
+		frappe.db.set_value(
+			"Patient", PATIENT, {"inpatient_record": EXISTING_RECORD, "inpatient_status": "Admitted"}
+		)
+
+		with self.assertRaisesRegex(frappe.ValidationError, f"Already Admitted .*{EXISTING_RECORD}"):
+			validate_new_admission()
+
+	def test_pointer_to_deleted_record_does_not_block(self):
+		frappe.db.set_value(
+			"Patient", PATIENT, {"inpatient_record": "_Test AA Deleted", "inpatient_status": "Admitted"}
+		)
 
 		validate_new_admission()
