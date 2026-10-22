@@ -52,6 +52,24 @@ def before_save(doc, method):
 	create_inpatient_revenue_entries(doc)
 
 
+def on_update(doc, method):
+	if doc.has_value_changed("status"):
+		update_latest_encounter_status(doc.name, doc.status)
+
+
+def update_latest_encounter_status(inpatient_record: str, status: str):
+	"""Keep the inpatient status of the current encounter in the chain equal to the Inpatient Record."""
+	encounter = frappe.db.get_value(
+		"Patient Encounter",
+		{"inpatient_record": inpatient_record, "duplicated": 0, "docstatus": ["!=", 2]},
+		"name",
+		order_by="creation desc",
+	)
+	if encounter:
+		# keep modified so a draft encounter open in a browser can still be saved
+		frappe.db.set_value("Patient Encounter", encounter, "inpatient_status", status, update_modified=False)
+
+
 def validate_inpatient_occupancies(doc):
 	if doc.is_new():
 		return

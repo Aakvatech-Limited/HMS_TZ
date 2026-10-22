@@ -36,7 +36,7 @@ frappe.ui.form.on("Patient Encounter", {
             schedule_discharge(frm);
           });
         } else if (
-          frm.doc.inpatient_status != "Discharge Scheduled" &&
+          !frm.doc.inpatient_record &&
           !frm.doc.healthcare_package_order
         ) {
           frm
