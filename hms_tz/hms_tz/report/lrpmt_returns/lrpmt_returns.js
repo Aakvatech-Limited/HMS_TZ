@@ -17,8 +17,8 @@ frappe.query_reports["LRPMT returns"] = {
       reqd: 1,
     },
     {
-      fieldname: "practitioner_name",
-      label: __("Practitioner Name"),
+      fieldname: "practitioner",
+      label: __("Practitioner"),
       fieldtype: "Link",
       options: "Healthcare Practitioner",
     },
