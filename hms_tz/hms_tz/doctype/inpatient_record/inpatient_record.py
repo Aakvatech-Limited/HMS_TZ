@@ -10,6 +10,8 @@ from frappe.model.document import Document
 from frappe.query_builder import DocType
 from frappe.utils import get_datetime, getdate, now_datetime, today
 
+ACTIVE_STATUSES = ("Admission Scheduled", "Admitted", "Discharge Scheduled")
+
 
 class InpatientRecord(Document):
 	def before_insert(self):
@@ -41,14 +43,7 @@ class InpatientRecord(Document):
 				"Inpatient Record",
 				{
 					"patient": self.patient,
-					"status": [
-						"in",
-						[
-							"Admitted",
-							"Admission Scheduled",
-							"Discharge Scheduled",
-						],
-					],
+					"status": ["in", ACTIVE_STATUSES],
 					"name": ["!=", self.name],
 				},
 			):
@@ -70,20 +65,17 @@ class InpatientRecord(Document):
 				frappe.throw(_(f"Row #{entry.idx}: Check Out datetime cannot be less than Check In datetime"))
 
 	def validate_already_scheduled_or_admitted(self):
-		inpatient_record = DocType("Inpatient Record")
-		ip_record = (
-			frappe.qb.from_(inpatient_record)
-			.select(inpatient_record.name, inpatient_record.status)
-			.where(
-				(inpatient_record.status.isin(["Admitted", "Admission Scheduled"]))
-				& (inpatient_record.patient == self.patient)
-			)
-		).run(as_dict=True)
+		ip_record = frappe.db.get_value(
+			"Inpatient Record",
+			{"patient": self.patient, "status": ["in", ACTIVE_STATUSES]},
+			["name", "status"],
+			as_dict=True,
+		)
 
-		if len(ip_record) > 0:
+		if ip_record:
 			msg = _(
-				f"""Already {ip_record[0].status} Patient {self.patient} with Inpatient Record: \
-                    <b><a href="#Form/Inpatient Record/{ip_record[0].name}">{ip_record[0].name}</a></b>"""
+				f"""Already {ip_record.status} Patient {self.patient} with Inpatient Record: \
+                    <b><a href="#Form/Inpatient Record/{ip_record.name}">{ip_record.name}</a></b>"""
 			)
 			frappe.throw(msg)
 
