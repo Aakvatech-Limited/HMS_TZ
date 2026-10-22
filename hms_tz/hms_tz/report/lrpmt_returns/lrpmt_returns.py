@@ -4,8 +4,14 @@
 import frappe
 from frappe import _
 from frappe.query_builder import DocType
-from frappe.query_builder.functions import Cast_
+from frappe.query_builder.functions import Cast_, Date
 from frappe.query_builder.terms import ParameterizedValueWrapper
+
+ITEM_TEMPLATE_DOCTYPES = (
+	"Lab Test Template",
+	"Radiology Examination Template",
+	"Clinical Procedure Template",
+)
 
 
 def execute(filters=None):
@@ -83,7 +89,7 @@ def get_columns():
 def get_data(filters):
 	returns = DocType("LRPMT Returns")
 	encounter = DocType("Patient Encounter")
-	query = get_item_return_query(returns, encounter, filters).union(
+	query = get_item_return_query(returns, encounter, filters).union_all(
 		get_medication_return_query(returns, encounter, filters)
 	)
 	return query.run(as_dict=True)
@@ -97,7 +103,7 @@ def get_item_return_query(returns, encounter, filters):
 		criteria &= item_return.reference_doctype == filters.get("reference_doctype")
 
 	if filters.get("item"):
-		criteria &= item_return.item_name == filters.get("item")
+		criteria &= item_return.item_name.isin(get_item_return_names(filters.get("item")))
 
 	if filters.get("reason"):
 		criteria &= item_return.reason == filters.get("reason")
@@ -122,6 +128,15 @@ def get_item_return_query(returns, encounter, filters):
 		)
 		.where(criteria)
 	)
+
+
+def get_item_return_names(item: str) -> list[str]:
+	"""Item Return stores the template name, so match templates billed with this item."""
+	names = [item]
+	for doctype in ITEM_TEMPLATE_DOCTYPES:
+		names += frappe.get_all(doctype, filters={"item": item}, pluck="name")
+
+	return names
 
 
 def get_medication_return_query(returns, encounter, filters):
@@ -166,9 +181,9 @@ def get_return_criteria(returns, encounter, filters):
 	criteria = returns.docstatus == 1
 
 	if filters.get("from_date") and filters.get("to_date"):
-		criteria &= returns.modified.between(filters.get("from_date"), filters.get("to_date"))
+		criteria &= Date(returns.modified).between(filters.get("from_date"), filters.get("to_date"))
 
-	if filters.get("practitioner_name"):
-		criteria &= encounter.practitioner_name == filters.get("practitioner_name")
+	if filters.get("practitioner"):
+		criteria &= encounter.practitioner == filters.get("practitioner")
 
 	return criteria
