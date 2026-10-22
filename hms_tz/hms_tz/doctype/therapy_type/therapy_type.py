@@ -70,6 +70,8 @@ class TherapyType(Document):
 
 	def get_exercises_for_body_parts(self):
 		body_parts = [entry.body_part for entry in self.therapy_for]
+		if not body_parts:
+			return []
 
 		exercise_type = DocType("Exercise Type")
 		body_part_link = DocType("Body Part Link")
