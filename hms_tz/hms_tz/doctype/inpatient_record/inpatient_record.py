@@ -14,6 +14,7 @@ from frappe.utils import get_datetime, getdate, now_datetime, today
 class InpatientRecord(Document):
 	def before_insert(self):
 		self.validate_already_scheduled_or_admitted()
+		self.validate_appointment_not_admitted()
 
 	def after_insert(self):
 		frappe.db.set_value("Patient", self.patient, "inpatient_record", self.name)
@@ -85,6 +86,25 @@ class InpatientRecord(Document):
                     <b><a href="#Form/Inpatient Record/{ip_record[0].name}">{ip_record[0].name}</a></b>"""
 			)
 			frappe.throw(msg)
+
+	def validate_appointment_not_admitted(self):
+		"""One Patient Appointment has one Inpatient Record; a readmission needs a new appointment."""
+		if not self.patient_appointment:
+			return
+
+		existing_record = frappe.db.get_value(
+			"Inpatient Record", {"patient_appointment": self.patient_appointment}, "name"
+		)
+		if existing_record:
+			frappe.throw(
+				_(
+					"Patient Appointment {0} already has Inpatient Record {1}. Create a new Patient Appointment to admit the patient again."
+				).format(
+					frappe.bold(self.patient_appointment),
+					frappe.utils.get_link_to_form("Inpatient Record", existing_record),
+				),
+				title=_("Appointment Already Has an Admission"),
+			)
 
 	@frappe.whitelist()
 	def admit(
