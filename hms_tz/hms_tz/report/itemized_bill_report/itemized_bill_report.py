@@ -11,6 +11,8 @@ from frappe.query_builder.functions import Coalesce
 from frappe.utils import add_days, flt, getdate, nowdate
 from pypika.terms import Case, ValueWrapper
 
+from hms_tz.hms_tz.doctype.consumable_item.consumable_item import get_billable_qty_column
+
 
 def execute(filters=None):
 	if not filters:
@@ -609,7 +611,7 @@ def get_consumable_transactions(filters):
 			cr.posting_date.as_("date"),
 			ValueWrapper("Consumables").as_("category"),
 			ci.item_name.as_("description"),
-			ci.qty_requested.as_("quantity"),
+			get_billable_qty_column(ci).as_("quantity"),
 			ci.rate.as_("rate"),
 			ci.amount.as_("amount"),
 			pa.patient.as_("patient"),
