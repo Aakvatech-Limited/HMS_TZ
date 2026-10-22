@@ -1,4 +1,5 @@
 import frappe
+from frappe.handler import run_doc_method
 from frappe.tests.utils import FrappeTestCase
 
 BODY_PART = "_Test Exercise Knee"
@@ -31,3 +32,15 @@ class TestTherapyTypeExercises(FrappeTestCase):
 		therapy_type.add_exercises()
 
 		self.assertEqual([row.exercise_type for row in therapy_type.exercises], [self.exercise.name])
+
+	def test_add_exercises_button_runs_from_form(self):
+		previous_request = getattr(frappe.local, "request", None)
+		self.addCleanup(setattr, frappe.local, "request", previous_request)
+		frappe.local.request = frappe._dict(method="POST")
+		therapy_type = frappe.new_doc("Therapy Type")
+		therapy_type.append("therapy_for", {"body_part": BODY_PART})
+
+		run_doc_method("add_exercises", docs=frappe.as_json(therapy_type.as_dict()))
+
+		exercises = frappe.response.docs[-1].exercises
+		self.assertEqual([row.exercise_type for row in exercises], [self.exercise.name])
