@@ -825,6 +825,7 @@ def execute():
 				insert_after="admission_encounter",
 				options="Patient Appointment",
 				fetch_from="admission_encounter.appointment",
+				unique=1,
 			),
 			dict(
 				fieldtype="HTML",
