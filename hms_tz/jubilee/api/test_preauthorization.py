@@ -9,6 +9,7 @@ from hms_tz.jubilee.api.preauthorization import (
 	get_bill_no,
 	get_jubilee_payment_rows,
 	get_normalized_disease_code,
+	get_preauth_details_table,
 	get_preauth_endpoint,
 	get_preauth_entities,
 	get_service_request_items,
@@ -435,3 +436,45 @@ class TestJubileePreauthorization(FrappeTestCase):
 
 		for field in ("ItemCode", "OtherDetails", "ItemQuantity", "UnitPrice", "AmountClaimed"):
 			self.assertEqual(jar_items[0][field], hsr_items[0][field])
+
+	def test_details_table_shows_declined_item_and_reason(self):
+		html = get_preauth_details_table(
+			[
+				{
+					"ItemCode": "64967317",
+					"ItemName": "T3-Lab Fees",
+					"Quantity": 1,
+					"Amount": 30000,
+					"LineStatus": "Declined",
+					"RejectionReason": "Investigations do not tally with Diagnosis",
+				},
+				{
+					"ItemCode": "64967335",
+					"ItemName": "Urine Routine-Lab Fees",
+					"Quantity": 1,
+					"Amount": 5000,
+					"LineStatus": "Processed",
+					"RejectionReason": "",
+				},
+			],
+			{"64967317": "Triiodothyronine (T3)", "64967335": "Urine <b>Routine</b>"},
+		)
+
+		self.assertNotIn("64967317", html)
+		self.assertIn(
+			'<tr style="color: var(--red-700); background-color: var(--red-50)"><td>Triiodothyronine (T3)</td>',
+			html,
+		)
+		self.assertIn("Investigations do not tally with Diagnosis", html)
+		self.assertIn("<tr><td>Urine &lt;b&gt;Routine&lt;/b&gt;</td>", html)
+
+	def test_details_table_falls_back_to_insurer_item_name(self):
+		html = get_preauth_details_table(
+			[{"ItemCode": "999", "ItemName": "CBC Mwanza-Lab Fees", "LineStatus": "Processed"}], {}
+		)
+
+		self.assertIn("<td>CBC Mwanza-Lab Fees</td>", html)
+
+	def test_details_table_is_empty_without_item_lines(self):
+		self.assertEqual(get_preauth_details_table(None, {}), "")
+		self.assertEqual(get_preauth_details_table("Approved", {}), "")
