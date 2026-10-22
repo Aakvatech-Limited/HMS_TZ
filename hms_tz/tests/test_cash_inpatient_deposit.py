@@ -175,6 +175,26 @@ class TestCashInpatientDeposit(FrappeTestCase):
 			record.try_create_delivery_note()
 		create_dn.assert_called_once()
 
+	def test_existing_delivery_note_is_not_created_again(self):
+		set_deposit_allowed(1)
+		frappe.get_doc(doctype="Delivery Note", name="_Test CR Delivery Note").db_insert()
+		record = self.make_consumable_record(invoiced=1)
+		record.delivery_note = "_Test CR Delivery Note"
+		with patch.object(record, "db_set"), patch.object(record, "_create_delivery_note") as create_dn:
+			record.try_create_delivery_note()
+		create_dn.assert_not_called()
+
+	def test_cancelled_delivery_note_is_created_again(self):
+		set_deposit_allowed(1)
+		frappe.get_doc(
+			doctype="Delivery Note", name="_Test CR Cancelled Delivery Note", docstatus=2
+		).db_insert()
+		record = self.make_consumable_record(invoiced=1)
+		record.delivery_note = "_Test CR Cancelled Delivery Note"
+		with patch.object(record, "db_set"), patch.object(record, "_create_delivery_note") as create_dn:
+			record.try_create_delivery_note()
+		create_dn.assert_called_once()
+
 	def make_submitted_encounter(self):
 		lab_row = frappe._dict(
 			doctype="Lab Prescription",
