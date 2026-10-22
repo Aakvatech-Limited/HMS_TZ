@@ -65,12 +65,26 @@ class InpatientRecord(Document):
 				frappe.throw(_(f"Row #{entry.idx}: Check Out datetime cannot be less than Check In datetime"))
 
 	def validate_already_scheduled_or_admitted(self):
-		ip_record = frappe.db.get_value(
-			"Inpatient Record",
-			{"patient": self.patient, "status": ["in", ACTIVE_STATUSES]},
-			["name", "status"],
-			as_dict=True,
-		)
+		# the row lock makes admissions of one patient run one at a time, and locking
+		# reads see the admission another request has just committed
+		ip_record = None
+		patient_record = frappe.db.get_value("Patient", self.patient, "inpatient_record", for_update=True)
+		if patient_record:
+			ip_record = frappe.db.get_value(
+				"Inpatient Record",
+				{"name": patient_record, "status": ["in", ACTIVE_STATUSES]},
+				["name", "status"],
+				as_dict=True,
+				for_update=True,
+			)
+
+		if not ip_record:
+			ip_record = frappe.db.get_value(
+				"Inpatient Record",
+				{"patient": self.patient, "status": ["in", ACTIVE_STATUSES]},
+				["name", "status"],
+				as_dict=True,
+			)
 
 		if ip_record:
 			msg = _(
