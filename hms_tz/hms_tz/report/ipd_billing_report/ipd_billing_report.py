@@ -304,6 +304,7 @@ def get_encounter_service_query(args, service, amount_column, amount):
 		.where(service.is_not_available_inhouse == 0)
 		.where(service.is_cancelled == 0)
 		.where(service.invoiced == 0)
+		.where(get_date_range_condition(Date(encounter.encounter_date), args))
 		.groupby(Date(encounter.encounter_date))
 	)
 
@@ -322,6 +323,7 @@ def get_occupancy_charges_query(args):
 		.where(occupancy.is_confirmed == 1)
 		.where(occupancy.invoiced == 0)
 		.where(occupancy.parent == args.get("inpatient_record"))
+		.where(get_date_range_condition(Date(occupancy.check_in), args))
 		.groupby(Date(occupancy.check_in))
 	)
 
@@ -336,6 +338,7 @@ def get_consultancy_charges_query(args):
 		.where(consultancy.is_confirmed == 1)
 		.where(consultancy.hms_tz_invoiced == 0)
 		.where(consultancy.parent == args.get("inpatient_record"))
+		.where(get_date_range_condition(Date(consultancy.date), args))
 		.groupby(Date(consultancy.date))
 	)
 
@@ -355,8 +358,21 @@ def get_consumable_amount_query(args):
 		.where(item.invoiced == 0)
 		.where(item.is_billable == 1)
 		.where(record.inpatient_record == args.get("inpatient_record"))
+		.where(get_date_range_condition(Date(record.posting_date), args))
 		.groupby(Date(record.posting_date))
 	)
+
+
+def get_date_range_condition(date_column, args):
+	"""Keep summary rows between the From Date and To Date filters."""
+	conditions = []
+	if args.get("from_date"):
+		conditions.append(date_column >= args.get("from_date"))
+
+	if args.get("to_date"):
+		conditions.append(date_column <= args.get("to_date"))
+
+	return Criterion.all(conditions)
 
 
 def get_report_summary(args, summary_data, is_summary=False):
@@ -531,12 +547,6 @@ def get_ipd_conditions(filters, inpatient_record):
 	if filters.get("appointment_no"):
 		conditions.append(inpatient_record.patient_appointment == filters.get("appointment_no"))
 
-	if filters.get("from_date"):
-		conditions.append(Date(inpatient_record.admitted_datetime) >= filters.get("from_date"))
-
-	if filters.get("to_date"):
-		conditions.append(Date(inpatient_record.admitted_datetime) <= filters.get("to_date"))
-
 	return Criterion.all(conditions)
 
 
@@ -565,6 +575,11 @@ def get_encounter_subquery(filters):
 		.where(encounter.docstatus == 1)
 		.where(get_enc_conditions(filters, encounter))
 	)
+
+
+def get_undated_filters(filters):
+	"""Filters without the date range, for rows that are limited by their own charge date."""
+	return frappe._dict(filters, from_date=None, to_date=None)
 
 
 def get_appointment_columns(appointment, inpatient_record):
@@ -609,8 +624,11 @@ def get_ipd_occupancy_transactions(filters):
 		)
 		.where(occupancy.is_confirmed == 1)
 		.where(occupancy.invoiced == 0)
-		.where(inpatient_record.admission_encounter.isin(get_encounter_subquery(filters)))
+		.where(
+			inpatient_record.admission_encounter.isin(get_encounter_subquery(get_undated_filters(filters)))
+		)
 		.where(get_ipd_conditions(filters, inpatient_record))
+		.where(get_date_range_condition(Date(occupancy.check_in), filters))
 		.run(as_dict=True)
 	)
 
@@ -640,8 +658,9 @@ def get_ipd_consultancy_transactions(filters):
 		)
 		.where(consultancy.is_confirmed == 1)
 		.where(consultancy.hms_tz_invoiced == 0)
-		.where(consultancy.encounter.isin(get_encounter_subquery(filters)))
+		.where(consultancy.encounter.isin(get_encounter_subquery(get_undated_filters(filters))))
 		.where(get_ipd_conditions(filters, inpatient_record))
+		.where(get_date_range_condition(consultancy.date, filters))
 		.run(as_dict=True)
 	)
 

@@ -19,6 +19,10 @@ def insert(doctype, name, **values):
 	doc.db_insert()
 
 
+def get_dates(rows):
+	return [str(row["date"]) for row in rows if row.get("date") not in (None, "Total")]
+
+
 class TestIPDBillingReport(FrappeTestCase):
 	def setUp(self):
 		self.company = get_default_company()
@@ -56,7 +60,7 @@ class TestIPDBillingReport(FrappeTestCase):
 	def tearDown(self):
 		frappe.db.rollback()
 
-	def run_report(self, summarized_view):
+	def run_report(self, summarized_view, **date_filters):
 		filters = {
 			"patient": PATIENT,
 			"appointment_no": APPOINTMENT,
@@ -64,6 +68,7 @@ class TestIPDBillingReport(FrappeTestCase):
 			"company": self.company,
 			"patient_type": "In-Patient",
 			"summarized_view": summarized_view,
+			**date_filters,
 		}
 		return execute(frappe._dict(filters))
 
@@ -74,6 +79,29 @@ class TestIPDBillingReport(FrappeTestCase):
 
 				self.assertEqual(str(dashboard["Total Deposited Amount"]), "0")
 				self.assertEqual(dashboard["Total Amount Used"], BED_AMOUNT)
+
+	def test_both_views_apply_date_range_to_bed_charges(self):
+		frappe.db.set_value("Inpatient Record", INPATIENT_RECORD, "admitted_datetime", "2026-01-05 09:00:00")
+		frappe.db.set_value("Patient Encounter", ENCOUNTER, "encounter_date", "2026-01-05")
+		insert(
+			"Inpatient Occupancy",
+			frappe.generate_hash(),
+			parent=INPATIENT_RECORD,
+			parenttype="Inpatient Record",
+			parentfield="inpatient_occupancies",
+			service_unit=SERVICE_UNIT,
+			check_in="2026-01-07 10:00:00",
+			amount=BED_AMOUNT,
+			is_confirmed=1,
+		)
+
+		for summarized_view in (0, 1):
+			with self.subTest(summarized_view=summarized_view):
+				all_days = self.run_report(summarized_view)[1]
+				one_day = self.run_report(summarized_view, from_date="2026-01-07", to_date="2026-01-07")[1]
+
+				self.assertEqual(get_dates(all_days), ["2026-01-05", "2026-01-07"])
+				self.assertEqual(get_dates(one_day), ["2026-01-07"])
 
 	def test_no_records_message_lists_only_set_filters(self):
 		message = get_no_records_message(frappe._dict(patient=PATIENT, from_date="2026-01-01"))
