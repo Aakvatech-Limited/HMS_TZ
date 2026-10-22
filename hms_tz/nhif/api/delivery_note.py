@@ -199,24 +199,11 @@ def validate_medication_class(doc, row):
 
 
 def set_missing_values(doc):
-	if doc.form_sales_invoice:
-		if not doc.hms_tz_appointment_no or not doc.healthcare_practitioner:
-			si_reference_dn = frappe.get_cached_value(
-				"Sales Invoice Item", doc.items[0].si_detail, "reference_dn"
-			)
+	if doc.form_sales_invoice and not (
+		doc.reference_name and doc.hms_tz_appointment_no and doc.healthcare_practitioner
+	):
+		set_encounter_from_sales_invoice(doc)
 
-			if si_reference_dn:
-				parent_encounter = frappe.get_cached_value("Drug Prescription", si_reference_dn, "parent")
-				doc.reference_name = parent_encounter
-				doc.reference_doctype = "Patient Encounter"
-				(
-					doc.hms_tz_appointment_no,
-					doc.healthcare_practitioner,
-				) = frappe.get_cached_value(
-					"Patient Encounter",
-					parent_encounter,
-					["appointment", "practitioner"],
-				)
 	if (
 		not doc.patient
 		and doc.reference_doctype
@@ -227,6 +214,35 @@ def set_missing_values(doc):
 
 	if not doc.hms_tz_phone_no and doc.patient:
 		doc.hms_tz_phone_no = frappe.get_cached_value("Patient", doc.patient, "mobile")
+
+
+def set_encounter_from_sales_invoice(doc):
+	"""Link a Delivery Note made from a Sales Invoice to the encounter of its first drug item."""
+	for item in doc.items:
+		reference_dt, reference_dn = frappe.get_cached_value(
+			"Sales Invoice Item", item.si_detail, ["reference_dt", "reference_dn"]
+		) or (None, None)
+		if reference_dt != "Drug Prescription" or not reference_dn:
+			continue
+
+		encounter = frappe.get_cached_value("Drug Prescription", reference_dn, "parent")
+		if not encounter:
+			continue
+
+		encounter_details = frappe.get_cached_value(
+			"Patient Encounter", encounter, ["appointment", "practitioner"]
+		)
+		if not encounter_details:
+			continue
+
+		appointment, practitioner = encounter_details
+		if not doc.reference_name:
+			doc.reference_doctype = "Patient Encounter"
+			doc.reference_name = encounter
+
+		doc.hms_tz_appointment_no = doc.hms_tz_appointment_no or appointment
+		doc.healthcare_practitioner = doc.healthcare_practitioner or practitioner
+		return
 
 
 def before_submit(doc, method):
