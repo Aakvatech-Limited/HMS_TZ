@@ -243,7 +243,11 @@ var call_approval_check = (frm, method, freeze_message) => {
           indicator: "green",
         });
 
-        frappe.msgprint(amount_note);
+        frappe.msgprint({
+          title: __("Pre-Authorization"),
+          message: amount_note + (data.details_table || ""),
+          wide: !!data.details_table,
+        });
       } else {
         frappe.utils.play_sound("error");
         frappe.msgprint({
