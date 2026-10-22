@@ -1538,7 +1538,7 @@ def get_insurance_ipd_beds_data(filters, appoints):
 		)
 	else:
 		insurance_ipd_beds_query = insurance_ipd_beds_query.where(
-			io.check_in.between(filters.from_date, filters.to_date)
+			Date(io.check_in).between(filters.from_date, filters.to_date)
 		)
 
 	if filters.service_type:
@@ -1955,7 +1955,7 @@ def get_cancelled_lab_items(filters):
 		)
 		.where(
 			(lreturn.company == filters.company)
-			& (lreturn.modified.between(filters.from_date, filters.to_date))
+			& (Date(lreturn.modified).between(filters.from_date, filters.to_date))
 			& (lreturn.docstatus == 1)
 			& (lp.is_cancelled == 1)
 			& (ireturn.reference_doctype == "Lab Test")
@@ -2025,7 +2025,7 @@ def get_cancelled_radiology_items(filters):
 		)
 		.where(
 			(lreturn.company == filters.company)
-			& (lreturn.modified.between(filters.from_date, filters.to_date))
+			& (Date(lreturn.modified).between(filters.from_date, filters.to_date))
 			& (lreturn.docstatus == 1)
 			& (rpp.is_cancelled == 1)
 			& (ireturn.reference_doctype == "Radiology Examination")
@@ -2095,7 +2095,7 @@ def get_cancelled_procedure_items(filters):
 		)
 		.where(
 			(lreturn.company == filters.company)
-			& (lreturn.modified.between(filters.from_date, filters.to_date))
+			& (Date(lreturn.modified).between(filters.from_date, filters.to_date))
 			& (lreturn.docstatus == 1)
 			& (pp.is_cancelled == 1)
 			& (ireturn.reference_doctype == "Clinical Procedure")
@@ -2164,7 +2164,7 @@ def get_cancelled_drug_items(filters):
 		)
 		.where(
 			(lreturn.company == filters.company)
-			& (lreturn.modified.between(filters.from_date, filters.to_date))
+			& (Date(lreturn.modified).between(filters.from_date, filters.to_date))
 			& (lreturn.docstatus == 1)
 			& (dp.is_cancelled == 1)
 			& (mreturn.encounter_no.isnotnull())
