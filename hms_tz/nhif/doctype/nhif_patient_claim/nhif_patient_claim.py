@@ -430,7 +430,7 @@ class NHIFPatientClaim(Document):
 		new_row.item_code = hsr_row.item_code
 		new_row.item_quantity = (hsr_row.qty or 0) - (hsr_row.qty_returned or 0)
 		new_row.unit_price = hsr_row.rate
-		new_row.amount_claimed = hsr_row.amount
+		new_row.percent_covered = hsr_row.percent_covered
 		new_row.status = get_LRPMT_status(hsr_row)
 		new_row.ref_doctype = hsr_row.ref_doctype
 		new_row.ref_docname = hsr_row.ref_docname
@@ -634,7 +634,7 @@ class NHIFPatientClaim(Document):
 	def calculate_totals(self):
 		self.total_amount = 0
 		for item in self.nhif_patient_claim_item:
-			item.amount_claimed = item.unit_price * item.item_quantity
+			item.amount_claimed = item.unit_price * item.item_quantity * (item.percent_covered or 100) / 100
 			self.total_amount += item.amount_claimed
 
 	@frappe.whitelist()
