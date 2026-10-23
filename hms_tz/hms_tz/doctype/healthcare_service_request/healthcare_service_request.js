@@ -14,13 +14,15 @@ frappe.ui.form.on("Healthcare Service Request", {
     set_preauth_headline(frm);
     frm.trigger("send_approval_request");
     frm.trigger("get_approval_status");
+    frm.trigger("record_email_approval");
   },
   send_approval_request: (frm) => {
     if (
       frm.is_new() ||
       frm.doc.docstatus !== 0 ||
       !frm.doc.requires_approval ||
-      frm.doc.submission_id
+      frm.doc.submission_id ||
+      frm.doc.approval_method === "Email"
     ) {
       return;
     }
@@ -38,7 +40,11 @@ frappe.ui.form.on("Healthcare Service Request", {
     );
   },
   get_approval_status: (frm) => {
-    if (frm.is_new() || !frm.doc.submission_id) {
+    if (
+      frm.is_new() ||
+      !frm.doc.submission_id ||
+      frm.doc.approval_method === "Email"
+    ) {
       return;
     }
 
@@ -50,6 +56,34 @@ frappe.ui.form.on("Healthcare Service Request", {
           "get_approval_status",
           __("Checking Pre-Auth Status...")
         );
+      },
+      __("Jubilee")
+    );
+  },
+  record_email_approval: (frm) => {
+    // Shown to roles with write access on approval_method's permlevel,
+    // which each hospital sets with a property setter.
+    let permlevel = frm.get_docfield("approval_method").permlevel;
+
+    if (
+      frm.is_new() ||
+      frm.doc.docstatus !== 0 ||
+      !frm.doc.requires_approval ||
+      !frm.perm[permlevel]?.write
+    ) {
+      return;
+    }
+
+    frm.add_custom_button(
+      __("Record Email Approval"),
+      () => {
+        if (frm.is_dirty()) {
+          frappe.msgprint(__("Please save the Service Request first."));
+          return;
+        }
+        frm
+          .call("get_jubilee_total_amount")
+          .then((r) => show_email_approval_dialog(frm, r.message || 0));
       },
       __("Jubilee")
     );
@@ -262,6 +296,83 @@ var call_approval_check = (frm, method, freeze_message) => {
   });
 };
 
+var show_email_approval_dialog = (frm, requested_amount) => {
+  let dialog = new frappe.ui.Dialog({
+    title: __("Record Email Approval"),
+    fields: [
+      {
+        fieldname: "requested_amount",
+        fieldtype: "Currency",
+        label: __("Requested Amount"),
+        default: requested_amount,
+        read_only: 1,
+      },
+      {
+        fieldtype: "Column Break",
+      },
+      {
+        fieldname: "approved_amount",
+        fieldtype: "Currency",
+        label: __("Approved Amount"),
+        default: 0,
+      },
+      {
+        fieldtype: "Column Break",
+      },
+      {
+        fieldname: "approval_status",
+        fieldtype: "Select",
+        label: __("Approval Status"),
+        options: ["", "Approved", "Processed", "Declined", "Rejected"],
+        reqd: 1,
+      },
+      {
+        fieldtype: "Section Break",
+      },
+      {
+        fieldname: "supportive_document",
+        fieldtype: "Attach",
+        label: __("Supportive Document"),
+        reqd: 1,
+        options: {
+          doctype: frm.doctype,
+          docname: frm.doc.name,
+          fieldname: "supportive_document",
+        },
+      },
+      {
+        fieldtype: "Column Break",
+      },
+      {
+        fieldname: "approval_description",
+        fieldtype: "Small Text",
+        label: __("Description"),
+      },
+    ],
+    primary_action_label: __("Record Approval"),
+    primary_action: (values) => {
+      frm
+        .call({
+          method: "record_email_approval",
+          doc: frm.doc,
+          args: {
+            approval_status: values.approval_status,
+            approved_amount: values.approved_amount || 0,
+            supportive_document: values.supportive_document,
+            approval_description: values.approval_description,
+          },
+          freeze: true,
+        })
+        .then(() => {
+          dialog.hide();
+          frm.reload_doc();
+        });
+    },
+  });
+
+  dialog.show();
+};
+
 var get_amount_note = (data) => {
   if (!data.amount && !data.approved_amount) {
     return "";
@@ -285,7 +396,10 @@ var set_preauth_headline = (frm) => {
     frm.doc.insurance_company,
   ]);
 
-  if (frm.doc.approval_status === "ERROR") {
+  if (frm.doc.approval_method === "Email") {
+    color = "green";
+    text = __("Pre-Auth {0} by Email", [frm.doc.approval_status]);
+  } else if (frm.doc.approval_status === "ERROR") {
     color = "red";
     text = __("Pre-Auth Failed: {0}", [frm.doc.approval_description || ""]);
   } else if (frm.doc.approval_status) {

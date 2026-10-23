@@ -422,6 +422,7 @@ def send_service_request_preauthorization(service_request_name):
 	"""
 
 	hsr_doc = frappe.get_doc("Healthcare Service Request", service_request_name)
+	hsr_doc.validate_api_approval_method()
 	setting_doc = get_jubilee_setting(hsr_doc.company)
 
 	cycle_reference = get_preauth_cycle_reference(hsr_doc.appointment)
@@ -487,6 +488,7 @@ def send_service_request_preauthorization(service_request_name):
 def get_service_request_preauth_status(service_request_name):
 	"""Fetch and persist the pre-auth status for a Healthcare Service Request."""
 	hsr_doc = frappe.get_doc("Healthcare Service Request", service_request_name)
+	hsr_doc.validate_api_approval_method()
 	if not hsr_doc.submission_id:
 		frappe.throw(
 			_("This Service Request has no Pre-Auth Submission ID. Please send the pre-authorization first.")

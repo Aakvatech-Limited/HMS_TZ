@@ -6,11 +6,12 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 from frappe.query_builder import DocType
-from frappe.utils import flt, fmt_money, get_link_to_form
+from frappe.utils import escape_html, flt, fmt_money, get_link_to_form
 
 from hms_tz.nhif.api.healthcare_utils import *
 
 UNRESOLVED_PREAUTH_STATUSES = ("", "ERROR", "PENDING")
+EMAIL_APPROVAL_STATUSES = ("Approved", "Processed", "Declined", "Rejected")
 
 
 class HealthcareServiceRequest(Document):
@@ -266,7 +267,7 @@ class HealthcareServiceRequest(Document):
 		A rejected Approval does not block: the billing team moves the
 		rejected services to cash payment rows and submits.
 		"""
-		if not self.requires_approval:
+		if not self.requires_approval or self.approval_method == "Email":
 			return
 
 		if not self.submission_id:
@@ -294,9 +295,7 @@ class HealthcareServiceRequest(Document):
 		if not self.requires_approval:
 			return
 
-		from hms_tz.jubilee.api.preauthorization import get_jubilee_payment_rows
-
-		total_amount = sum(flt(row.amount) for row in get_jubilee_payment_rows(self.appointment))
+		total_amount = self.get_jubilee_total_amount()
 
 		if total_amount > flt(self.approved_amount):
 			frappe.throw(
@@ -306,6 +305,13 @@ class HealthcareServiceRequest(Document):
 					"Please move the extra services to cash payment or cancel them before submitting."
 				)
 			)
+
+	@frappe.whitelist()
+	def get_jubilee_total_amount(self):
+		"""Live total of the Jubilee insurance rows across every Service Request on this appointment."""
+		from hms_tz.jubilee.api.preauthorization import get_jubilee_payment_rows
+
+		return sum(flt(row.amount) for row in get_jubilee_payment_rows(self.appointment))
 
 	@frappe.whitelist()
 	def send_approval_request(self):
@@ -326,6 +332,77 @@ class HealthcareServiceRequest(Document):
 		self.reload()
 
 		return result
+
+	def validate_api_approval_method(self):
+		"""Keep an API call from overwriting an approval recorded from email."""
+		if self.approval_method == "Email":
+			frappe.throw(
+				_(
+					"Approval for this Service Request was recorded from email.<br>"
+					f"{self.insurance_company} API actions are not allowed."
+				)
+			)
+
+	@frappe.whitelist()
+	def record_email_approval(
+		self, approval_status, approved_amount, supportive_document, approval_description=None
+	):
+		"""Record an insurer approval received by email in place of the API status."""
+		from hms_tz.jubilee.api.preauthorization import add_service_request_comment
+
+		self.validate_email_approval(approval_status, approved_amount, supportive_document)
+
+		self.update(
+			{
+				"approval_method": "Email",
+				"approval_status": approval_status,
+				"approved_amount": flt(approved_amount),
+				"approval_description": approval_description,
+				"supportive_document": supportive_document,
+			}
+		)
+		self.save()
+
+		document_url = escape_html(supportive_document)
+		add_service_request_comment(
+			self,
+			"Approval recorded from email",
+			{
+				"status": approval_status,
+				"description": escape_html(approval_description or ""),
+				"details_table": (
+					f"Approved Amount: <b>{fmt_money(self.approved_amount)}</b><br>"
+					f"Supportive Document: <a href='{document_url}' target='_blank'>"
+					f"{document_url.rsplit('/', 1)[-1]}</a>"
+				),
+			},
+		)
+
+	def validate_email_approval(self, approval_status, approved_amount, supportive_document):
+		"""Guard record_email_approval: a whitelisted entry point, so check every input."""
+		if not self.has_permlevel_access_to("approval_method", permission_type="write"):
+			frappe.throw(_("You are not permitted to record an email approval"), frappe.PermissionError)
+
+		if self.docstatus != 0 or not self.requires_approval:
+			frappe.throw(
+				_("Email approval can only be recorded on a draft Service Request that requires approval")
+			)
+
+		if approval_status not in EMAIL_APPROVAL_STATUSES:
+			frappe.throw(_(f"Approval Status must be one of: {', '.join(EMAIL_APPROVAL_STATUSES)}"))
+
+		if flt(approved_amount) < 0:
+			frappe.throw(_("Approved Amount cannot be negative"))
+
+		if not isinstance(supportive_document, str) or not frappe.db.exists(
+			"File",
+			{
+				"file_url": supportive_document,
+				"attached_to_doctype": self.doctype,
+				"attached_to_name": self.name,
+			},
+		):
+			frappe.throw(_("Please attach the Supportive Document to this Service Request"))
 
 	def create_healthcare_service_docs(self):
 		"""
