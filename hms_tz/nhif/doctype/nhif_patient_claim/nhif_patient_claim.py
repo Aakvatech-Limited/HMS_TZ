@@ -438,7 +438,7 @@ class NHIFPatientClaim(Document):
 		new_row.patient_encounter = d.encounter
 		new_row.item_crt_by = d.practitioner
 		new_row.approval_ref_no = get_approval_number_from_LRPMT(
-			hsr_row.lrpmt_doctype, hsr_row.lrpmt_docname, hsr_row.dn_detail
+			hsr_row.lrpmt_doctype, hsr_row.lrpmt_docname, hsr_row.dn_detail, hsr_row.ref_docname
 		)
 
 	def add_occupancy_claim_item(self, occupancy, admission_encounter):
