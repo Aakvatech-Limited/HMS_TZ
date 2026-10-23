@@ -1917,14 +1917,33 @@ def msgPrint(msg, method="throw", alert=False):
 		frappe.msgprint(msg, alert=alert)
 
 
-def get_approval_number_from_LRPMT(ref_doctype=None, ref_docname=None, dn_detail=None):
+def get_approval_number_from_LRPMT(ref_doctype=None, ref_docname=None, dn_detail=None, ref_childname=None):
 	if dn_detail:
 		return frappe.get_cached_value("Delivery Note Item", dn_detail, "service_reference_no")
 
 	if not ref_doctype or not ref_docname:
 		return None
 
+	if ref_doctype == "Therapy Plan":
+		return get_therapy_service_reference_nos(ref_docname, ref_childname)
+
 	return frappe.get_cached_value(ref_doctype, ref_docname, "service_reference_no")
+
+
+def get_therapy_service_reference_nos(therapy_plan, ref_childname):
+	"""Service reference numbers are issued per Therapy Session, not on the Therapy Plan."""
+	reference_nos = frappe.get_all(
+		"Therapy Session",
+		filters={
+			"therapy_plan": therapy_plan,
+			"hms_tz_ref_childname": ref_childname,
+			"docstatus": ["!=", 2],
+			"service_reference_no": ["is", "set"],
+		},
+		order_by="creation asc",
+		pluck="service_reference_no",
+	)
+	return ",".join(reference_nos)
 
 
 def set_uninvoiced_so_closed():
