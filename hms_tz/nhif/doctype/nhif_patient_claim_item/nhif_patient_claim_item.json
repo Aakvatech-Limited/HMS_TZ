@@ -10,6 +10,7 @@
   "item_code",
   "item_quantity",
   "unit_price",
+  "percent_covered",
   "amount_claimed",
   "item_crt_by",
   "column_break_8",
@@ -151,6 +152,13 @@
    "search_index": 1
   },
   {
+   "default": "100",
+   "fieldname": "percent_covered",
+   "fieldtype": "Percent",
+   "label": "Percent Covered",
+   "read_only": 1
+  },
+  {
    "columns": 1,
    "fieldname": "amount_claimed",
    "fieldtype": "Float",
@@ -179,7 +187,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-06-22 12:44:08.095947",
+ "modified": "2026-10-23 15:00:00.000000",
  "modified_by": "Administrator",
  "module": "NHIF",
  "name": "NHIF Patient Claim Item",

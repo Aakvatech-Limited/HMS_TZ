@@ -454,14 +454,14 @@ class HealthcareServiceRequest(Document):
 				lab_service = self.get_sorted_service(values)
 				if not lab_service:
 					continue
-				encounter_child = frappe.get_cached_doc(lab_service.ref_doctype, lab_service.ref_docname)
+				encounter_child = frappe.get_doc(lab_service.ref_doctype, lab_service.ref_docname)
 				create_individual_lab_test(encounter_doc, encounter_child, lab_service)
 
 			elif service_type == "Radiology Examination Template":
 				radiology_service = self.get_sorted_service(values)
 				if not radiology_service:
 					continue
-				encounter_child = frappe.get_cached_doc(
+				encounter_child = frappe.get_doc(
 					radiology_service.ref_doctype,
 					radiology_service.ref_docname,
 				)
@@ -471,7 +471,7 @@ class HealthcareServiceRequest(Document):
 				procedure_service = self.get_sorted_service(values)
 				if not procedure_service:
 					continue
-				encounter_child = frappe.get_cached_doc(
+				encounter_child = frappe.get_doc(
 					procedure_service.ref_doctype,
 					procedure_service.ref_docname,
 				)
@@ -490,7 +490,7 @@ class HealthcareServiceRequest(Document):
 
 				therapy_map[therapy_service.ref_docname] = therapy_service
 
-				therapy = frappe.get_cached_doc(therapy_service.ref_doctype, therapy_service.ref_docname)
+				therapy = frappe.get_doc(therapy_service.ref_doctype, therapy_service.ref_docname)
 				therapies.append(therapy)
 
 		# Create delivery notes for medications

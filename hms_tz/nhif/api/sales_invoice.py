@@ -172,7 +172,7 @@ def create_healthcare_docs(doc, method):
 
 			if len(healthcare_service_parents) > 0:
 				for row in healthcare_service_parents:
-					hsr_doc = frappe.get_cached_doc("Healthcare Service Request", row.service_request_no)
+					hsr_doc = frappe.get_doc("Healthcare Service Request", row.service_request_no)
 					hsr_doc.create_healthcare_service_docs()
 
 		if len(consumable_item_ids) > 0:
