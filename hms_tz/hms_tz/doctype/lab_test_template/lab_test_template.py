@@ -26,7 +26,6 @@ class LabTestTemplate(Document):
 			frappe.throw(_("Standard Selling Rate should be greater than zero."))
 
 		self.validate_conversion_factor()
-		self.enable_disable_item()
 
 	def on_update(self):
 		# If change_in_item update Item and Price List
@@ -47,9 +46,6 @@ class LabTestTemplate(Document):
 
 			self.db_set("change_in_item", 0)
 
-		elif not self.is_billable and self.item:
-			frappe.db.set_value("Item", self.item, "disabled", 1)
-
 		self.reload()
 
 	def on_trash(self):
@@ -62,13 +58,6 @@ class LabTestTemplate(Document):
 			except Exception:
 				frappe.throw(_("Not permitted. Please disable the Lab Test Template"))
 
-	def enable_disable_item(self):
-		if self.is_billable:
-			if self.disabled:
-				frappe.db.set_value("Item", self.item, "disabled", 1)
-			else:
-				frappe.db.set_value("Item", self.item, "disabled", 0)
-
 	def update_item(self):
 		item = frappe.get_cached_doc("Item", self.item)
 		if item:
@@ -76,7 +65,6 @@ class LabTestTemplate(Document):
 				{
 					"item_name": self.lab_test_name,
 					"item_group": self.lab_test_group,
-					"disabled": 0,
 					"standard_rate": self.lab_test_rate,
 					"description": self.lab_test_description,
 				}
@@ -124,7 +112,6 @@ def create_item_from_template(doc):
 			"include_item_in_manufacturing": 0,
 			"show_in_website": 0,
 			"is_pro_applicable": 0,
-			"disabled": (0 if doc.is_billable and not doc.disabled else doc.disabled),
 			"stock_uom": uom,
 		}
 	).insert(ignore_permissions=True, ignore_mandatory=True)
