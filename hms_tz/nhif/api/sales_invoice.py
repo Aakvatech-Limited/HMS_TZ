@@ -2,20 +2,27 @@
 # For license information, please see license.txt
 
 
+from collections import defaultdict
+
 import frappe
 from frappe import _
 from frappe.query_builder import DocType
 
 from hms_tz.hms_tz.doctype.hms_tz_setting.hms_tz_setting import is_cash_inpatient_deposit_allowed
 from hms_tz.nhif.api.healthcare_utils import (
+	INVOICED_FIELDS,
 	create_individual_lab_test,
 	create_individual_procedure_prescription,
 	create_individual_radiology_examination,
 	create_therapy_plan,
+	get_healthcare_docs_job_id,
 	update_dimensions,
 	update_invoice_reference_in_lrpmt_childs,
 )
 from hms_tz.nhif.api.sales_order import validate_stock_item
+
+# billed rows without an LRPMT document, so their invoice item is complete at submit
+NO_SERVICE_DOCTYPES = ("Inpatient Occupancy", "Inpatient Consultancy", "Consumable Item")
 
 
 def validate(doc, method):
@@ -56,9 +63,10 @@ def validate_create_delivery_note(doc):
 
 
 @frappe.whitelist()
-def create_pending_healthcare_docs(doc_name):
-	doc = frappe.get_cached_doc("Sales Invoice", doc_name)
-	create_healthcare_docs(doc, "From Front End")
+def create_pending_healthcare_docs(doc_name: str):
+	frappe.has_permission("Sales Invoice", "write", doc_name, throw=True)
+	enqueue_healthcare_docs(doc_name)
+	frappe.msgprint(_("Pending healthcare services are being created in the background."))
 
 
 def before_submit(doc, method):
@@ -82,6 +90,7 @@ def before_submit(doc, method):
 			if frappe.get_cached_value("Item", row.item_code, "is_stock_item") == 1:
 				validate_stock_item(row, row.warehouse, method)
 
+	# healthcare's on_submit rejects rows still marked invoiced, then marks them again, so on_submit resets too
 	if doc.is_return == 1:
 		reset_invoiced_status(doc)
 
@@ -91,17 +100,69 @@ def on_submit(doc, method):
 		reset_invoiced_status(doc)
 		return
 
-	create_healthcare_docs(doc, method)
+	set_invoiced_references(doc, doc.name)
+	mark_items_without_services(doc)
 	update_drug_prescription(doc)
+	enqueue_healthcare_docs(doc.name)
 
 
-def create_healthcare_docs(doc, method):
-	if doc.docstatus != 1 or method not in ["on_submit", "From Front End"]:
-		frappe.msgprint(
-			_(
-				f"No LRPMTs were created. Alert the IT Team!<b><br>DOCSTATUS = {doc.docstatus}<br>METHOD {method}</b>"
-			)
-		)
+def set_invoiced_references(doc, invoice: str):
+	"""Set the invoice on the rows the invoice bills, with one update per doctype."""
+	references = defaultdict(list)
+	for item in doc.items:
+		if item.get("service_request"):
+			references["Healthcare Service Request Payment"].append(item.service_request)
+
+		if item.reference_dt in INVOICED_FIELDS and item.reference_dn:
+			references[item.reference_dt].append(item.reference_dn)
+
+	for doctype, names in references.items():
+		set_references_invoiced(doctype, names, invoice)
+
+
+def set_references_invoiced(doctype: str, names: list[str], invoice: str):
+	"""An empty invoice marks the rows as not invoiced."""
+	table = DocType(doctype)
+	(
+		frappe.qb.update(table)
+		.set(table[INVOICED_FIELDS.get(doctype, "invoiced")], 1 if invoice else 0)
+		.set(table.sales_invoice_number, invoice)
+		.where(table.name.isin(names))
+	).run()
+
+
+def mark_items_without_services(doc):
+	item_names = [item.name for item in doc.items if item.reference_dt in NO_SERVICE_DOCTYPES]
+	if not item_names:
+		return
+
+	invoice_item = DocType("Sales Invoice Item")
+	(
+		frappe.qb.update(invoice_item)
+		.set(invoice_item.hms_tz_is_lrp_item_created, 1)
+		.where(invoice_item.name.isin(item_names))
+	).run()
+
+
+def enqueue_healthcare_docs(invoice: str):
+	frappe.enqueue(
+		"hms_tz.nhif.api.sales_invoice.create_invoice_healthcare_docs",
+		queue="short",
+		timeout=300,
+		job_id=get_healthcare_docs_job_id(invoice),
+		deduplicate=True,
+		enqueue_after_commit=True,
+		invoice=invoice,
+	)
+
+
+def create_invoice_healthcare_docs(invoice: str):
+	create_healthcare_docs(frappe.get_doc("Sales Invoice", invoice))
+
+
+def create_healthcare_docs(doc):
+	"""Create the services the invoice paid for, committing after each item so a rerun resumes."""
+	if doc.docstatus != 1:
 		return
 
 	therapy_items = []
@@ -112,28 +173,24 @@ def create_healthcare_docs(doc, method):
 			if not item.reference_dt or not item.reference_dn:
 				continue
 
-			# check if item is from Service Request
-			# its service document will be created from Healthcare Service
-			# Request
+			# its service document will be created from the Healthcare Service Request
 			if item.get("service_request"):
-				frappe.db.set_value(
-					"Healthcare Service Request Payment",
-					item.get("service_request"),
-					{
-						"sales_invoice_number": doc.name,
-						"invoiced": 1,
-					},
-				)
 				service_request_ids.append(item.get("service_request"))
 				continue
 
-			child = frappe.get_doc(item.reference_dt, item.reference_dn)
+			if item.reference_dt == "Consumable Item":
+				consumable_item_ids.append(item.reference_dn)
+				continue
 
-			if item.reference_dt and item.reference_dt in [
+			if item.hms_tz_is_lrp_item_created:
+				continue
+
+			if item.reference_dt in [
 				"Lab Prescription",
 				"Radiology Procedure Prescription",
 				"Procedure Prescription",
 			]:
+				child = frappe.get_doc(item.reference_dt, item.reference_dn)
 				patient_encounter_doc = frappe.get_doc("Patient Encounter", child.parent)
 				if child.doctype == "Lab Prescription":
 					create_individual_lab_test(patient_encounter_doc, child)
@@ -143,19 +200,10 @@ def create_healthcare_docs(doc, method):
 					create_individual_procedure_prescription(patient_encounter_doc, child)
 
 				update_invoice_reference_in_lrpmt_childs(child, item)
+				frappe.db.commit()  # nosemgrep
 
-			elif item.reference_dt and item.reference_dt == "Therapy Plan Detail":
+			elif item.reference_dt == "Therapy Plan Detail":
 				therapy_items.append(item)
-
-			elif item.reference_dt and item.reference_dt in [
-				"Inpatient Occupancy",
-				"Inpatient Consultancy",
-				"Consumable Item",
-			]:
-				update_invoice_reference_in_lrpmt_childs(child, item)
-
-				if item.reference_dt == "Consumable Item":
-					consumable_item_ids.append(item.reference_dn)
 
 		create_therapy_plan(invoice_therapy_dict=therapy_items)
 
@@ -191,36 +239,27 @@ def create_healthcare_docs(doc, method):
 					cons_doc = frappe.get_doc("Consumable Record", row.consumable_record_no)
 					cons_doc.try_create_delivery_note()
 
-	if method == "From Front End":
-		frappe.db.commit()
-
 
 def update_drug_prescription(doc):
 	if not doc.patient:
 		return
 
-	for item in doc.items:
-		if item.reference_dn and item.reference_dt and item.reference_dt == "Drug Prescription":
-			frappe.db.set_value(
-				"Drug Prescription",
-				item.reference_dn,
-				{
-					"sales_invoice_number": doc.name,
-					"drug_prescription_created": 1,
-					"invoiced": 1,
-				},
-				update_modified=False,
-			)
+	drug_names = [
+		item.reference_dn
+		for item in doc.items
+		if item.reference_dt == "Drug Prescription" and item.reference_dn
+	]
+	if not drug_names:
+		return
 
-			dn_name = frappe.get_cached_value("Delivery Note", {"form_sales_invoice": doc.name}, "name")
-			if dn_name:
-				frappe.db.set_value(
-					"Drug Prescription",
-					item.reference_dn,
-					"delivery_note",
-					dn_name,
-					update_modified=False,
-				)
+	drug = DocType("Drug Prescription")
+	query = frappe.qb.update(drug).set(drug.drug_prescription_created, 1).where(drug.name.isin(drug_names))
+
+	delivery_note = frappe.db.get_value("Delivery Note", {"form_sales_invoice": doc.name}, "name")
+	if delivery_note:
+		query = query.set(drug.delivery_note, delivery_note)
+
+	query.run()
 
 
 @frappe.whitelist()
@@ -236,53 +275,17 @@ def get_discount_items(invoice_no):
 
 def reset_invoiced_status(doc):
 	"""Remove invoiced status on items because a return invoice is created"""
+	set_invoiced_references(doc, "")
 
-	for row in doc.items:
-		if row.reference_dt and row.reference_dn:
-			if row.reference_dt == "Patient Appointment":
-				appointment = frappe.qb.DocType("Patient Appointment")
-				(
-					frappe.qb.update(appointment)
-					.set(appointment.invoiced, 0)
-					.set(appointment.ref_sales_invoice, "")
-					.where(appointment.name == row.reference_dn)
-				).run()
-
-			elif row.reference_dt in [
-				"Lab Prescription",
-				"Radiology Procedure Prescription",
-				"Procedure Prescription",
-				"Drug Prescription",
-				"Therapy Plan Detail",
-				"Inpatient Occupancy",
-			]:
-				frappe.db.set_value(
-					row.reference_dt,
-					row.reference_dn,
-					{
-						"invoiced": 0,
-						"sales_invoice_number": "",
-					},
-				)
-				if row.get("service_request") and row.reference_dt != "Inpatient Occupancy":
-					frappe.db.set_value(
-						"Healthcare Service Request Payment",
-						row.get("service_request"),
-						{
-							"invoiced": 0,
-							"sales_invoice_number": "",
-						},
-					)
-
-			elif row.reference_dt == "Inpatient Consultancy":
-				frappe.db.set_value(
-					row.reference_dt,
-					row.reference_dn,
-					{
-						"hms_tz_invoiced": 0,
-						"sales_invoice_number": "",
-					},
-				)
+	appointments = [row.reference_dn for row in doc.items if row.reference_dt == "Patient Appointment"]
+	if appointments:
+		appointment = DocType("Patient Appointment")
+		(
+			frappe.qb.update(appointment)
+			.set(appointment.invoiced, 0)
+			.set(appointment.ref_sales_invoice, "")
+			.where(appointment.name.isin(appointments))
+		).run()
 
 
 @frappe.whitelist()
