@@ -58,3 +58,4 @@ hms_tz.patches.add_unique_index_on_insurance_folio_counter
 hms_tz.patches.unique_patient_appointment_on_inpatient_record
 hms_tz.patches.sync_latest_encounter_inpatient_status
 hms_tz.patches.set_missing_invoiced_references
+hms_tz.patches.custom_fields.hide_request_approval_no_on_lrpt_docs
