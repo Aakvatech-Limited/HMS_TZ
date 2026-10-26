@@ -13,9 +13,6 @@ from frappe.utils import cint
 
 
 class TherapyType(Document):
-	def validate(self):
-		self.enable_disable_item()
-
 	def after_insert(self):
 		try:
 			create_item_from_therapy(self)
@@ -26,20 +23,12 @@ class TherapyType(Document):
 		if self.change_in_item:
 			self.update_item_and_item_price()
 
-	def enable_disable_item(self):
-		if self.is_billable:
-			if self.disabled:
-				frappe.db.set_value("Item", self.item, "disabled", 1)
-			else:
-				frappe.db.set_value("Item", self.item, "disabled", 0)
-
 	def update_item_and_item_price(self):
 		if self.is_billable and self.item:
 			item_doc = frappe.get_cached_doc("Item", {"item_code": self.item})
 			item_doc.item_name = self.item_name
 			item_doc.item_group = self.item_group
 			item_doc.description = self.description
-			item_doc.disabled = 0
 			item_doc.ignore_mandatory = True
 			item_doc.save(ignore_permissions=True)
 
@@ -49,9 +38,6 @@ class TherapyType(Document):
 				item_price.price_list_name = self.rate
 				item_price.ignore_mandatory = True
 				item_price.save()
-
-		elif not self.is_billable and self.item:
-			frappe.db.set_value("Item", self.item, "disabled", 1)
 
 		self.db_set("change_in_item", 0)
 
@@ -87,10 +73,6 @@ class TherapyType(Document):
 
 
 def create_item_from_therapy(doc):
-	disabled = doc.disabled
-	if doc.is_billable and not doc.disabled:
-		disabled = 0
-
 	uom = frappe.db.exists("UOM", "Unit") or frappe.db.get_single_value("Stock Settings", "stock_uom")
 
 	item = frappe.get_doc(
@@ -106,7 +88,6 @@ def create_item_from_therapy(doc):
 			"is_stock_item": 0,
 			"show_in_website": 0,
 			"is_pro_applicable": 0,
-			"disabled": disabled,
 			"stock_uom": uom,
 		}
 	).insert(ignore_permissions=True, ignore_mandatory=True)
