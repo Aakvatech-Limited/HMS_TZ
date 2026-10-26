@@ -2,14 +2,14 @@
 # For license information, please see license.txt
 
 
-from time import sleep
-
 import frappe
 from frappe import _
 from frappe.model.document import Document
 from frappe.model.workflow import apply_workflow
 from frappe.query_builder import DocType
 from frappe.utils import get_fullname, get_url_to_form, nowdate
+from frappe.utils.background_jobs import create_job_id, get_queue
+from rq.utils import as_text, current_timestamp
 
 from hms_tz.hms_tz.doctype.healthcare_service_request.healthcare_service_request import (
 	get_discount_percent,
@@ -32,6 +32,8 @@ from hms_tz.hms_tz.doctype.hospital_revenue_entry.hospital_revenue_entry import 
 	update_returned_or_cancelled_revenue_entry,
 )
 from hms_tz.nhif.api.delivery_note import update_drug_prescription
+
+HSR_UPDATE_QUEUE = "short"
 
 
 class MedicationChangeRequest(Document):
@@ -693,9 +695,30 @@ class MedicationChangeRequest(Document):
 		frappe.enqueue(
 			"hms_tz.nhif.doctype.medication_change_request.medication_change_request.update_hsr_hre_for_mcr",
 			timeout=300,
-			queue="short",
+			queue=HSR_UPDATE_QUEUE,
+			job_id=get_hsr_update_job_prefix(self.delivery_note) + self.name,
+			enqueue_after_commit=True,
 			mcr_name=self.name,
 		)
+
+
+def get_hsr_update_job_prefix(delivery_note: str) -> str:
+	return f"mcr_hsr::{delivery_note}::"
+
+
+def get_pending_hsr_update_requests(delivery_note: str) -> list[str]:
+	"""Medication Change Requests of the Delivery Note whose Healthcare Service Request update is queued or running"""
+	prefix = create_job_id(get_hsr_update_job_prefix(delivery_note))
+	queue = get_queue(HSR_UPDATE_QUEUE)
+
+	# read the started registry directly, rq's get_job_ids() runs its cleanup in this request
+	with queue.connection.pipeline(transaction=False) as pipe:
+		pipe.lrange(queue.key, 0, -1)
+		pipe.zrangebyscore(queue.started_job_registry.key, current_timestamp(), "+inf")
+		queued, started = pipe.execute()
+
+	job_ids = [as_text(job_id) for job_id in queued + started]
+	return [job_id.removeprefix(prefix) for job_id in job_ids if job_id.startswith(prefix)]
 
 
 @frappe.whitelist()
@@ -951,8 +974,6 @@ def update_hsr_hre_for_mcr(mcr_name):
 	Args:
 	    mcr_name: Medication Change Request name
 	"""
-
-	sleep(60)
 
 	# Reload MCR document fresh from database
 	mcr_doc = frappe.get_doc("Medication Change Request", mcr_name)
