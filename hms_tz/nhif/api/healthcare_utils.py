@@ -20,6 +20,7 @@ from frappe.utils import (
 	nowdate,
 	nowtime,
 )
+from frappe.utils.background_jobs import is_job_enqueued
 
 from hms_tz.hms_tz.doctype.consumable_item.consumable_item import get_billable_qty_column
 from hms_tz.hms_tz.doctype.hms_tz_setting.hms_tz_setting import is_cash_inpatient_deposit_allowed
@@ -2158,6 +2159,22 @@ def return_quatity_or_cancel_delivery_note_via_lrpmt_returns(source_doc, method)
 		target_doc.submit()
 
 
+INVOICED_FIELDS = {
+	"Lab Prescription": "invoiced",
+	"Radiology Procedure Prescription": "invoiced",
+	"Procedure Prescription": "invoiced",
+	"Drug Prescription": "invoiced",
+	"Therapy Plan Detail": "invoiced",
+	"Inpatient Occupancy": "invoiced",
+	"Inpatient Consultancy": "hms_tz_invoiced",
+	"Consumable Item": "invoiced",
+}
+
+
+def get_healthcare_docs_job_id(invoice: str) -> str:
+	return f"create_healthcare_docs::{invoice}"
+
+
 def create_invoiced_items_if_not_created(from_date="", to_date=""):
 	"""create pending LRP item(s) after submission of sales invoice"""
 
@@ -2180,6 +2197,9 @@ def create_invoiced_items_if_not_created(from_date="", to_date=""):
 	si_invoices = query.run(as_dict=1)
 
 	for invoice in si_invoices:
+		if is_job_enqueued(get_healthcare_docs_job_id(invoice.name)):
+			continue
+
 		si_doc = frappe.get_doc("Sales Invoice", invoice.name)
 
 		therapy_items = []
@@ -2395,13 +2415,8 @@ def create_invoiced_items_if_not_created(from_date="", to_date=""):
 def update_invoice_reference_in_lrpmt_childs(child, item, fieldname=""):
 	fields = {
 		"sales_invoice_number": item.parent,
+		INVOICED_FIELDS[item.reference_dt]: 1,
 	}
-
-	invoiced_field = "invoiced"
-	if frappe.get_meta(item.reference_dt).get_field("hms_tz_invoiced"):
-		invoiced_field = "hms_tz_invoiced"
-
-	fields[invoiced_field] = 1
 
 	if fieldname:
 		fields[fieldname] = 1
