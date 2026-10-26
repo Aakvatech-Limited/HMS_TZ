@@ -8,7 +8,7 @@ from hms_tz.hms_tz.doctype.healthcare_service_request.test_healthcare_service_re
 	add_payment,
 	make_request,
 )
-from hms_tz.nhif.api.sales_invoice import create_healthcare_docs
+from hms_tz.nhif.api.sales_invoice import create_healthcare_docs, set_invoiced_references
 
 TEMPLATE = "_Test Copayment X-Ray"
 REQUEST_ID = "_test_copay_request"
@@ -70,7 +70,8 @@ def invoice_cash_row(hsr):
 	invoice.update({"name": "_Test Copayment Invoice", "docstatus": 1})
 	invoice.items = [item]
 
-	create_healthcare_docs(invoice, "on_submit")
+	set_invoiced_references(invoice, invoice.name)
+	create_healthcare_docs(invoice)
 
 
 class TestHSRCopaymentInvoice(FrappeTestCase):
