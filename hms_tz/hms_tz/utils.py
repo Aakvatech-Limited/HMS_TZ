@@ -887,10 +887,6 @@ def update_address_link(address, method):
 
 
 def create_item_from_doc(doc, item_name):
-	if doc.is_billable == 1:
-		disabled = 0
-	else:
-		disabled = 1
 	# insert item
 	item = frappe.get_doc(
 		{
@@ -905,7 +901,6 @@ def create_item_from_doc(doc, item_name):
 			"is_stock_item": 0,
 			"show_in_website": 0,
 			"is_pro_applicable": 0,
-			"disabled": disabled,
 			"stock_uom": "Unit",
 		}
 	).insert(ignore_permissions=True)
@@ -943,8 +938,6 @@ def update_item_from_doc(doc, item_name):
 		updating_item(doc, item_name)
 		if doc.rate != 0.0:
 			updating_rate(doc, item_name)
-	elif doc.is_billable == 0 and doc.item:
-		frappe.db.set_value("Item", doc.item, "disabled", 1)
 
 
 def updating_item(doc, item_name):
@@ -953,7 +946,6 @@ def updating_item(doc, item_name):
 		frappe.qb.update(item)
 		.set(item.item_name, item_name)
 		.set(item.item_group, doc.item_group)
-		.set(item.disabled, 0)
 		.set(item.description, doc.description)
 		.set(item.modified, Now())
 		.where(item.item_code == doc.item)
