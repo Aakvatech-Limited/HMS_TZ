@@ -11,9 +11,6 @@ from frappe.model.rename_doc import rename_doc
 
 
 class Medication(Document):
-	def validate(self):
-		self.enable_disable_item()
-
 	def after_insert(self):
 		try:
 			create_item_from_medication(self)
@@ -24,13 +21,6 @@ class Medication(Document):
 		if self.change_in_item:
 			self.update_item_and_item_price()
 
-	def enable_disable_item(self):
-		if self.is_billable:
-			if self.disabled:
-				frappe.db.set_value("Item", self.item, "disabled", 1)
-			else:
-				frappe.db.set_value("Item", self.item, "disabled", 0)
-
 	def update_item_and_item_price(self):
 		if self.is_billable and self.item:
 			item_doc = frappe.get_cached_doc("Item", {"item_code": self.item})
@@ -38,7 +28,6 @@ class Medication(Document):
 			item_doc.item_group = self.item_group
 			item_doc.description = self.description
 			item_doc.stock_uom = self.stock_uom
-			item_doc.disabled = 0
 			item_doc.save(ignore_permissions=True)
 
 			if self.rate:
@@ -47,17 +36,10 @@ class Medication(Document):
 				item_price.price_list_rate = self.rate
 				item_price.save()
 
-		elif not self.is_billable and self.item:
-			frappe.db.set_value("Item", self.item, "disabled", 1)
-
 		self.db_set("change_in_item", 0)
 
 
 def create_item_from_medication(doc):
-	disabled = doc.disabled
-	if doc.is_billable and not doc.disabled:
-		disabled = 0
-
 	uom = doc.stock_uom or frappe.db.get_single_value("Stock Settings", "stock_uom")
 	item = frappe.get_doc(
 		{
@@ -72,7 +54,6 @@ def create_item_from_medication(doc):
 			"is_stock_item": 1,
 			"show_in_website": 0,
 			"is_pro_applicable": 0,
-			"disabled": disabled,
 			"stock_uom": uom,
 		}
 	).insert(ignore_permissions=True, ignore_mandatory=True)

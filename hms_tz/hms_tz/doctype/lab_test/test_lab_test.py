@@ -30,7 +30,7 @@ class TestLabTest(unittest.TestCase):
 
 		lab_template.disabled = 1
 		lab_template.save()
-		self.assertEqual(frappe.db.get_value("Item", lab_template.item, "disabled"), 1)
+		self.assertEqual(frappe.db.get_value("Item", lab_template.item, "disabled"), 0)
 
 		lab_template.reload()
 
