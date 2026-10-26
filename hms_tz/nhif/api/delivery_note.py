@@ -246,6 +246,8 @@ def set_encounter_from_sales_invoice(doc):
 
 
 def before_submit(doc, method):
+	validate_pending_medication_change_requests(doc)
+
 	if doc.hms_tz_all_items_out_of_stock == 1:
 		frappe.throw(
 			"<h4 class='font-weight-bold bg-warning text-center'>\
@@ -270,6 +272,26 @@ def before_submit(doc, method):
 	doc.hms_tz_submitted_by = get_fullname(frappe.session.user)
 	doc.hms_tz_user_id = frappe.session.user
 	doc.hms_tz_submitted_date = nowdate()
+
+
+def validate_pending_medication_change_requests(doc):
+	"""Block submit while a Medication Change Request is still updating the Healthcare Service Request"""
+	if doc.get("workflow_state") != "Changes Made":
+		return
+
+	# imported here because medication_change_request imports this module
+	from hms_tz.nhif.doctype.medication_change_request.medication_change_request import (
+		get_pending_hsr_update_requests,
+	)
+
+	pending_requests = get_pending_hsr_update_requests(doc.name)
+	if pending_requests:
+		frappe.throw(
+			_(
+				"Healthcare Service Request is still being updated from Medication Change Request: {0}. Please try again in a moment."
+			).format(", ".join(frappe.bold(name) for name in pending_requests)),
+			title=_("Medication Change Request Pending"),
+		)
 
 
 def on_submit(doc, method):
