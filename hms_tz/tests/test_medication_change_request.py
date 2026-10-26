@@ -5,7 +5,11 @@ from unittest.mock import MagicMock, patch
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
+from frappe.utils.background_jobs import create_job_id, get_redis_conn
+from rq import Queue
+from rq.utils import as_text, current_timestamp
 
+from hms_tz.nhif.api import delivery_note
 from hms_tz.nhif.doctype.medication_change_request import medication_change_request as mcr
 
 STORE_A = "_Test MCR Store A"
@@ -121,3 +125,78 @@ class TestMedicationChangeRequestSalesOrder(FrappeTestCase):
 	def test_one_warehouse_sets_header_warehouse(self):
 		order = self.update_sales_order("_Test MCR Pharmacy A", "_Test MCR Pharmacy A")
 		self.assertEqual(order.set_warehouse, STORE_A)
+
+
+class TestDeliveryNotePendingMedicationChange(FrappeTestCase):
+	def setUp(self):
+		# private queue name, so a running worker cannot take the test jobs
+		self.queue = Queue("hms-tz-test-mcr-hsr", connection=get_redis_conn())
+		queue_patch = patch.object(mcr, "get_queue", return_value=self.queue)
+		queue_patch.start()
+		self.addCleanup(queue_patch.stop)
+		self.addCleanup(self.clear_queue)
+
+	def clear_queue(self):
+		self.queue.empty()
+		registry = self.queue.started_job_registry
+		for job_id in self.queue.connection.zrange(registry.key, 0, -1):
+			registry.remove(as_text(job_id), delete_job=True)
+
+	def queue_job(self, job_id):
+		return self.queue.enqueue_call("frappe.ping", job_id=create_job_id(job_id))
+
+	def queue_request_job(self, delivery_note_name, request_name):
+		return self.queue_job(mcr.get_hsr_update_job_prefix(delivery_note_name) + request_name)
+
+	def start_job(self, job, score):
+		self.queue.remove(job)
+		self.queue.connection.zadd(self.queue.started_job_registry.key, {job.id: score})
+
+	def validate(self, workflow_state="Changes Made"):
+		delivery_note.validate_pending_medication_change_requests(
+			frappe._dict(name="_Test MCR DN-1", workflow_state=workflow_state)
+		)
+
+	def test_queued_jobs_block_submit(self):
+		self.queue_request_job("_Test MCR DN-1", "_Test MCR-1")
+		self.queue_request_job("_Test MCR DN-1", "_Test MCR-2")
+
+		with self.assertRaisesRegex(frappe.ValidationError, "_Test MCR-1.*_Test MCR-2"):
+			self.validate()
+
+	def test_running_job_blocks_submit(self):
+		job = self.queue_request_job("_Test MCR DN-1", "_Test MCR-1")
+		self.start_job(job, current_timestamp() + 60)
+
+		with self.assertRaisesRegex(frappe.ValidationError, "_Test MCR-1"):
+			self.validate()
+
+	def test_expired_running_job_is_ignored(self):
+		job = self.queue_request_job("_Test MCR DN-1", "_Test MCR-1")
+		self.start_job(job, current_timestamp() - 10)
+		self.validate()
+
+	def test_job_of_other_delivery_note_is_ignored(self):
+		self.queue_request_job("_Test MCR DN-10", "_Test MCR-1")
+		self.validate()
+
+	def test_draft_delivery_note_is_not_checked(self):
+		self.queue_request_job("_Test MCR DN-1", "_Test MCR-1")
+		self.validate(workflow_state="Draft")
+
+	def test_no_pending_job_allows_submit(self):
+		self.validate()
+
+	def test_request_job_is_queued_after_commit_and_found_by_delivery_note(self):
+		request = frappe.new_doc("Medication Change Request")
+		request.name = "_Test MCR-1"
+		request.delivery_note = "_Test MCR DN-1"
+		with patch.object(mcr.frappe, "enqueue") as enqueue:
+			request.update_hsr_and_hre()
+
+		kwargs = enqueue.call_args.kwargs
+		self.assertTrue(kwargs["enqueue_after_commit"])
+		self.assertEqual(kwargs["queue"], mcr.HSR_UPDATE_QUEUE)
+		self.queue_job(kwargs["job_id"])
+		with self.assertRaisesRegex(frappe.ValidationError, "_Test MCR-1"):
+			self.validate()
