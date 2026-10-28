@@ -2,7 +2,7 @@ from urllib.parse import quote
 
 import frappe
 import requests
-from frappe.utils import escape_html, getdate, nowdate
+from frappe.utils import escape_html, get_fullname, getdate, nowdate
 
 from hms_tz.nhif.doctype.nhif_response_log.nhif_response_log import add_log
 
@@ -45,20 +45,38 @@ def get_nhif_practitioner_login_status():
 @frappe.whitelist(methods=["GET"])
 def get_registered_practitioners(company: str) -> list:
 	"""Return the practitioners NHIF has registered at the facility of the company's token."""
-	return get_nhif_practitioners_response(company, "/api/Practitioners", "GetPractitioners")
+	return make_nhif_practitioners_request(company, "/api/Practitioners", "GetPractitioners")
 
 
 @frappe.whitelist(methods=["GET"])
 def get_practitioner_details(company: str, practitioner_no: str) -> dict:
 	"""Return the NHIF registration details of one practitioner at the facility of the company's token."""
-	return get_nhif_practitioners_response(
+	return make_nhif_practitioners_request(
 		company,
 		f"/api/Practitioners/details/{quote(practitioner_no, safe='')}",
 		"GetPractitionerDetails",
 	)
 
 
-def get_nhif_practitioners_response(company: str, path: str, request_type: str):
+@frappe.whitelist(methods=["POST"])
+def register_practitioner(practitioner: str) -> dict:
+	"""Register the practitioner's MCT number with NHIF at the facility of the practitioner's company."""
+	doc = frappe.get_doc("Healthcare Practitioner", practitioner)
+	doc.check_permission("write")
+	if not doc.tz_mct_code:
+		frappe.throw(f"Please set MCT Code for practitioner: <b>{doc.name}</b>")
+
+	payload = {
+		"practitionerNo": doc.tz_mct_code,
+		"facilityCode": frappe.get_cached_value("HMS TZ Setting", doc.hms_tz_company, "facility_code"),
+		"createdBy": get_fullname(frappe.session.user),
+	}
+	return make_nhif_practitioners_request(
+		doc.hms_tz_company, "/api/Practitioners/register", "RegisterPractitioner", payload
+	)
+
+
+def make_nhif_practitioners_request(company: str, path: str, request_type: str, payload: dict | None = None):
 	frappe.has_permission("Healthcare Practitioner", throw=True)
 
 	settings_doc = frappe.get_cached_doc("HMS TZ Setting", company)
@@ -68,12 +86,13 @@ def get_nhif_practitioners_response(company: str, path: str, request_type: str):
 		"Authorization": f"Bearer {settings_doc.get_nhif_token()}",
 	}
 
-	r = requests.request("Get", url, headers=headers, timeout=60)
+	body = frappe.as_json(payload) if payload else ""
+	r = requests.request("Post" if payload else "Get", url, headers=headers, data=body, timeout=60)
 	add_log(
 		request_type=request_type,
 		request_url=url,
 		request_header=headers,
-		request_body="",
+		request_body=body,
 		response_data=r.text,
 		status_code=r.status_code,
 		company=company,
@@ -91,4 +110,4 @@ def get_nhif_practitioners_response(company: str, path: str, request_type: str):
 			msg=f"<b>{escape_html(message)}</b><br><br>Status Code: {r.status_code}",
 		)
 
-	return r.json()
+	return r.json() if r.text else {}
