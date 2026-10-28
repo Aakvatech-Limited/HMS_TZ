@@ -669,6 +669,13 @@ frappe.ui.form.on("Patient Appointment", {
     });
   },
   check_for_cancelled_appointment: (frm) => {
+    const message = frm.doc.__onload?.cancelled_appointment_message;
+    if (message) {
+      frm.dashboard.set_headline(
+        `<span class="indicator red">${message}</span>`
+      );
+    }
+
     if (frm.doc.status == "Cancelled" && !frm.doc.authorization_number) {
       frm.set_df_property("get_authorization_number", "hidden", 1);
       frm.set_df_property("authorization_number", "hidden", 1);
