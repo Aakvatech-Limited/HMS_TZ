@@ -67,6 +67,11 @@ frappe.ui.form.on("Healthcare Practitioner", {
         () => register_nhif_practitioner(frm),
         __("NHIF")
       );
+      frm.add_custom_button(
+        __("Terminate Practitioner"),
+        () => terminate_nhif_practitioner(frm),
+        __("NHIF")
+      );
     }
   },
   healthcare_practitioner_type: function (frm) {
@@ -384,17 +389,22 @@ let show_nhif_practitioner_details = function (frm, details) {
   dialog.show();
 };
 
-let register_nhif_practitioner = function (frm) {
+let is_ready_for_nhif_update = function (frm) {
   if (!frm.doc.tz_mct_code) {
     frappe.msgprint(__("MCT Code is required..!"));
-    return;
+    return false;
   }
   if (frm.is_dirty()) {
     frappe.msgprint(
-      __("Please save the practitioner before you register it with NHIF")
+      __("Please save the practitioner before you update it at NHIF")
     );
-    return;
+    return false;
   }
+  return true;
+};
+
+let register_nhif_practitioner = function (frm) {
+  if (!is_ready_for_nhif_update(frm)) return;
 
   frappe.confirm(
     __("Register MCT Code {0} to NHIF at this facility?", [
@@ -412,6 +422,49 @@ let register_nhif_practitioner = function (frm) {
         },
       })
   );
+};
+
+let terminate_nhif_practitioner = function (frm) {
+  if (!is_ready_for_nhif_update(frm)) return;
+
+  let dialog = new frappe.ui.Dialog({
+    title: __("Terminate MCT Code {0} at NHIF", [
+      frappe.utils.escape_html(frm.doc.tz_mct_code),
+    ]),
+    fields: [
+      {
+        fieldname: "termination_reasons",
+        fieldtype: "Small Text",
+        label: __("Termination Reasons"),
+        reqd: 1,
+      },
+    ],
+    primary_action_label: __("Terminate"),
+    primary_action: function (values) {
+      dialog.hide();
+      frappe.call({
+        method:
+          "hms_tz.nhif.nhif_api.healthcare_practitioner.terminate_practitioner",
+        args: {
+          practitioner: frm.doc.name,
+          termination_reasons: values.termination_reasons,
+        },
+        freeze: true,
+        freeze_message: __("Terminating practitioner at NHIF..."),
+        callback: function (r) {
+          frappe.show_alert({
+            message: frappe.utils.escape_html(
+              r.message?.message ||
+                __("The practitioner registration is terminated at NHIF")
+            ),
+            indicator: "green",
+          });
+        },
+      });
+    },
+  });
+  dialog.get_primary_btn().removeClass("btn-primary").addClass("btn-danger");
+  dialog.show();
 };
 
 let show_nhif_registration_result = function (frm, result) {
