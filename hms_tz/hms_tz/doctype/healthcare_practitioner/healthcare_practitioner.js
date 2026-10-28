@@ -62,6 +62,11 @@ frappe.ui.form.on("Healthcare Practitioner", {
         () => view_nhif_practitioner_details(frm),
         __("NHIF")
       );
+      frm.add_custom_button(
+        __("Register Practitioner"),
+        () => register_nhif_practitioner(frm),
+        __("NHIF")
+      );
     }
   },
   healthcare_practitioner_type: function (frm) {
@@ -377,6 +382,61 @@ let show_nhif_practitioner_details = function (frm, details) {
       </tbody>
     </table>`);
   dialog.show();
+};
+
+let register_nhif_practitioner = function (frm) {
+  if (!frm.doc.tz_mct_code) {
+    frappe.msgprint(__("MCT Code is required..!"));
+    return;
+  }
+  if (frm.is_dirty()) {
+    frappe.msgprint(
+      __("Please save the practitioner before you register it with NHIF")
+    );
+    return;
+  }
+
+  frappe.confirm(
+    __("Register MCT Code {0} to NHIF at this facility?", [
+      frappe.utils.escape_html(frm.doc.tz_mct_code).bold(),
+    ]),
+    () =>
+      frappe.call({
+        method:
+          "hms_tz.nhif.nhif_api.healthcare_practitioner.register_practitioner",
+        args: { practitioner: frm.doc.name },
+        freeze: true,
+        freeze_message: __("Registering practitioner with NHIF..."),
+        callback: function (r) {
+          show_nhif_registration_result(frm, r.message || {});
+        },
+      })
+  );
+};
+
+let show_nhif_registration_result = function (frm, result) {
+  let escape = frappe.utils.escape_html;
+  frappe.msgprint({
+    title: __("NHIF Registration Completed"),
+    indicator: "green",
+    message: `
+      <p>${escape(
+        result.message ||
+          __("The practitioner is registered with NHIF at this facility.")
+      )}</p>
+      <table class="table table-bordered">
+        <tbody>
+          <tr>
+            <th>${__("Practitioner No")}</th>
+            <td>${escape(result.practitionerNo || frm.doc.tz_mct_code)}</td>
+          </tr>
+          <tr>
+            <th>${__("Facility Code")}</th>
+            <td>${escape(result.facilityCode || "")}</td>
+          </tr>
+        </tbody>
+      </table>`,
+  });
 };
 
 let practicing_status_class = function (key, value) {
