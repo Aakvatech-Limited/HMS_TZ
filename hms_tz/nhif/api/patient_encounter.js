@@ -2027,7 +2027,7 @@ var nhif_btns = (frm) => {
   const encounter = frm.doc.name;
   frappe.call({
     method:
-      "hms_tz.nhif.api.healthcare_practitioner.get_nhif_practitioner_login_status",
+      "hms_tz.nhif.nhif_api.healthcare_practitioner.get_nhif_practitioner_login_status",
     args: {},
     callback: (r) => {
       if (frm.doc.name !== encounter || !is_insurance(frm, "NHIF")) {
