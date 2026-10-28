@@ -47,6 +47,14 @@ frappe.ui.form.on("Healthcare Practitioner", {
     manage_internal_external_practitioner(frm);
     set_query_service_item(frm, "inpatient_visit_charge_item");
     set_query_service_item(frm, "op_consulting_charge_item");
+
+    if (!frm.is_new() && frm.doc.hms_tz_company) {
+      frm.add_custom_button(
+        __("View Practitioners"),
+        () => view_nhif_practitioners(frm),
+        __("NHIF")
+      );
+    }
   },
   healthcare_practitioner_type: function (frm) {
     manage_internal_external_practitioner(frm);
@@ -212,6 +220,103 @@ frappe.ui.form.on("Healthcare Practitioner", "supplier", function (frm) {
     });
   }
 });
+
+let view_nhif_practitioners = function (frm) {
+  frappe.call({
+    method:
+      "hms_tz.nhif.nhif_api.healthcare_practitioner.get_registered_practitioners",
+    type: "GET",
+    args: { company: frm.doc.hms_tz_company },
+    freeze: true,
+    freeze_message: __("Fetching practitioners from NHIF..."),
+    callback: function (r) {
+      show_nhif_practitioners(frm, r.message || []);
+    },
+  });
+};
+
+let show_nhif_practitioners = function (frm, practitioners) {
+  practitioners = practitioners.map((p) => ({
+    ...p,
+    full_name: [p.firstName, p.middleName, p.lastName]
+      .filter(Boolean)
+      .join(" "),
+  }));
+
+  let dialog = new frappe.ui.Dialog({
+    title: __("NHIF Registered Practitioners ({0})", [practitioners.length]),
+    size: "large",
+    fields: [
+      { fieldtype: "Column Break" },
+      { fieldtype: "Column Break" },
+      {
+        fieldname: "search",
+        fieldtype: "Data",
+        label: __("Search by Registration No or Name"),
+        onchange: () => render_rows(dialog.get_value("search")),
+      },
+      { fieldtype: "Column Break" },
+      { fieldtype: "Section Break" },
+      { fieldname: "practitioners_html", fieldtype: "HTML" },
+    ],
+  });
+
+  let render_rows = function (search_text) {
+    let search = (search_text || "").toLowerCase();
+    let rows = practitioners
+      .filter((p) =>
+        `${p.registrationNo} ${p.full_name}`.toLowerCase().includes(search)
+      )
+      .map((p) => nhif_practitioner_row(p, frm.doc.tz_mct_code))
+      .join("");
+
+    dialog.fields_dict.practitioners_html.$wrapper.html(`
+      <table class="table table-bordered table-hover">
+        <thead>
+          <tr>
+            <th>${__("Registration No")}</th>
+            <th>${__("Name")}</th>
+            <th>${__("Qualification")}</th>
+            <th>${__("Practicing Status")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${
+            rows ||
+            `<tr><td colspan="4" class="text-muted text-center">${__(
+              "No practitioners found"
+            )}</td></tr>`
+          }
+        </tbody>
+      </table>`);
+  };
+
+  render_rows();
+  dialog.show();
+};
+
+let nhif_practitioner_row = function (practitioner, current_registration_no) {
+  let escape = frappe.utils.escape_html;
+  let status = practitioner.practicingStatus;
+  let color = !status
+    ? "gray"
+    : status.toLowerCase() === "allowed"
+    ? "green"
+    : "red";
+  let is_current = practitioner.registrationNo === current_registration_no;
+  let row_class =
+    color === "red" ? "text-danger" : is_current ? "table-info" : "";
+
+  return `
+    <tr class="${row_class} ${is_current ? "font-weight-bold" : ""}">
+      <td>${escape(practitioner.registrationNo || "")}</td>
+      <td>${escape(practitioner.full_name)}</td>
+      <td>${escape(practitioner.qualification || "")}</td>
+      <td><span class="indicator-pill ${color}">${escape(
+    status || __("Not Set")
+  )}</span></td>
+    </tr>`;
+};
 
 var manage_internal_external_practitioner = function (frm) {
   frm.set_df_property("employee", "hidden", 1);
