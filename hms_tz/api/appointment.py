@@ -2,7 +2,12 @@ import frappe
 from frappe.query_builder import DocType
 from frappe.utils import get_time
 
-from hms_tz.nhif.api.patient_appointment import get_cash_amount, get_consulting_charge_item
+from hms_tz.nhif.api.patient_appointment import (
+	add_cancel_comment,
+	get_cash_amount,
+	get_consulting_charge_item,
+	validate_cancellable,
+)
 
 
 @frappe.whitelist()
@@ -85,9 +90,12 @@ def cancel_appointment(appointment_id):
 	if appointment_doc.status == "Cancelled":
 		frappe.throw(f"Appointment {appointment_id} is already cancelled.")
 
+	validate_cancellable(appointment_doc)
 	appointment_doc.status = "Cancelled"
 	appointment_doc.save(ignore_permissions=True)
 	appointment_doc.reload()
+
+	add_cancel_comment(appointment_doc.name)
 
 	# If the appointment has an associated event, update the event status
 	if appointment_doc.get("event"):
