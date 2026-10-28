@@ -55,6 +55,14 @@ frappe.ui.form.on("Healthcare Practitioner", {
         __("NHIF")
       );
     }
+
+    if (!frm.is_new() && frm.doc.hms_tz_company) {
+      frm.add_custom_button(
+        __("Practitioner Details"),
+        () => view_nhif_practitioner_details(frm),
+        __("NHIF")
+      );
+    }
   },
   healthcare_practitioner_type: function (frm) {
     manage_internal_external_practitioner(frm);
@@ -316,6 +324,66 @@ let nhif_practitioner_row = function (practitioner, current_registration_no) {
     status || __("Not Set")
   )}</span></td>
     </tr>`;
+};
+
+let view_nhif_practitioner_details = function (frm) {
+  if (!frm.doc.tz_mct_code) {
+    frappe.msgprint("MCT Code is required..!");
+    return;
+  }
+
+  frappe.call({
+    method:
+      "hms_tz.nhif.nhif_api.healthcare_practitioner.get_practitioner_details",
+    type: "GET",
+    args: {
+      company: frm.doc.hms_tz_company,
+      practitioner_no: frm.doc.tz_mct_code,
+    },
+    freeze: true,
+    freeze_message: __("Fetching practitioner details from NHIF..."),
+    callback: function (r) {
+      show_nhif_practitioner_details(frm, r.message || {});
+    },
+  });
+};
+
+let show_nhif_practitioner_details = function (frm, details) {
+  let escape = frappe.utils.escape_html;
+  let rows = Object.entries(details)
+    .filter(([, value]) => value !== null && typeof value !== "object")
+    .map(
+      ([key, value]) => `
+        <tr class="${practicing_status_class(key, value)}">
+          <th>${escape(frappe.unscrub(key.replace(/([A-Z])/g, "_$1")))}</th>
+          <td>${escape(String(value))}</td>
+        </tr>`
+    )
+    .join("");
+
+  let dialog = new frappe.ui.Dialog({
+    title: __("NHIF Practitioner Details: {0}", [frm.doc.tz_mct_code]),
+    fields: [{ fieldname: "details_html", fieldtype: "HTML" }],
+  });
+  dialog.fields_dict.details_html.$wrapper.html(`
+    <table class="table table-bordered">
+      <tbody>
+        ${
+          rows ||
+          `<tr><td class="text-muted text-center">${__(
+            "No details returned"
+          )}</td></tr>`
+        }
+      </tbody>
+    </table>`);
+  dialog.show();
+};
+
+let practicing_status_class = function (key, value) {
+  if (key !== "practicingStatus") return "";
+  return String(value).toLowerCase() === "allowed"
+    ? "text-success"
+    : "text-danger";
 };
 
 var manage_internal_external_practitioner = function (frm) {
