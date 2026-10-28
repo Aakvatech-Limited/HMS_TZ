@@ -32,8 +32,17 @@ from hms_tz.hms_tz.doctype.healthcare_service_request.healthcare_service_request
 	validate_stock_item,
 )
 from hms_tz.hms_tz.doctype.hospital_revenue_entry.hospital_revenue_entry import create_revenue_entry
-from hms_tz.nhif.api.patient_appointment import calculate_patient_age
+from hms_tz.nhif.api.patient_appointment import (
+	calculate_patient_age,
+	get_cancelled_appointment_message,
+	validate_appointment_not_cancelled,
+)
 from hms_tz.nhif.utils import validate_main_diagnosis_code, validate_point_of_care
+
+
+def onload(doc, method):
+	if doc.appointment:
+		doc.set_onload("cancelled_appointment_message", get_cancelled_appointment_message(doc.appointment))
 
 
 def on_trash(doc, method):
@@ -158,6 +167,9 @@ def set_price_list(doc):
 
 
 def on_submit_validation(doc, method):
+	if doc.appointment:
+		validate_appointment_not_cancelled(doc.appointment)
+
 	child_tables = {
 		"lab_test_prescription": "lab_test_code",
 		"radiology_procedure_prescription": "radiology_examination_template",
@@ -922,6 +934,9 @@ def update_inpatient_record_consultancy(doc):
 
 
 def before_submit(doc, method):
+	if doc.appointment:
+		validate_appointment_not_cancelled(doc.appointment)
+
 	if doc.insurance_company and "NHIF" in doc.insurance_company:
 		validate_main_diagnosis_code(doc)
 
