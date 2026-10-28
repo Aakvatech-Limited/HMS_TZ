@@ -30,6 +30,62 @@ def before_insert(doc, method):
 		create_customer(patient_doc)
 
 
+def onload(doc, method):
+	doc.set_onload("is_cancellable", is_cancellable(doc))
+	if doc.status == "Cancelled":
+		doc.set_onload("cancelled_appointment_message", get_cancelled_appointment_message(doc.name))
+
+
+def is_cancellable(appointment) -> bool:
+	"""Open or Scheduled, or Closed while its Initial Patient Encounter is still a draft."""
+	if appointment.status in ("Open", "Scheduled"):
+		return True
+
+	if appointment.status != "Closed":
+		return False
+
+	encounter_docstatuses = frappe.get_all(
+		"Patient Encounter",
+		filters={"appointment": appointment.name, "encounter_type": "Initial", "docstatus": ("<", 2)},
+		pluck="docstatus",
+	)
+	return 0 in encounter_docstatuses and 1 not in encounter_docstatuses
+
+
+def validate_cancellable(appointment):
+	if not is_cancellable(appointment):
+		frappe.throw(
+			_(
+				"Patient Appointment {0} with status {1} cannot be cancelled. A Closed appointment can be cancelled only while its Patient Encounter is a draft."
+			).format(frappe.bold(appointment.name), frappe.bold(appointment.status)),
+			title=_("Cannot Cancel Appointment"),
+		)
+
+
+def get_cancelled_appointment_message(appointment_id) -> str | None:
+	if frappe.db.get_value("Patient Appointment", appointment_id, "status") == "Cancelled":
+		return _(
+			"Patient Appointment {0} is cancelled. You cannot proceed with it. Please contact reception for assistance."
+		).format(frappe.bold(appointment_id))
+
+
+def validate_appointment_not_cancelled(appointment_id):
+	if message := get_cancelled_appointment_message(appointment_id):
+		frappe.throw(message, title=_("Appointment Cancelled"))
+
+
+def add_cancel_comment(appointment_id) -> None:
+	"""Comment on the appointment and on each of its draft Patient Encounters."""
+	comment = _("Patient Appointment {0} is cancelled.").format(appointment_id)
+	frappe.get_doc("Patient Appointment", appointment_id).add_comment("Comment", comment)
+
+	encounters = frappe.get_all(
+		"Patient Encounter", filters={"appointment": appointment_id, "docstatus": 0}, pluck="name"
+	)
+	for encounter in encounters:
+		frappe.get_doc("Patient Encounter", encounter).add_comment("Comment", comment)
+
+
 def validate_disabled_patient(patient, patient_name):
 	if frappe.get_cached_value("Patient", patient, "status") == "Disabled":
 		frappe.throw(_(f"The patient <b>{patient}-{patient_name}</b> is disabled. Cannot proceed further."))
@@ -298,8 +354,7 @@ def make_encounter(doc, method):
 	if doc.doctype == "Vital Signs":
 		if not doc.appointment or doc.inpatient_record:
 			return
-		if frappe.get_cached_value("Patient Appointment", doc.appointment, "status") == "Cancelled":
-			frappe.throw("<b>Appointment is already cancelled</b>")
+		validate_appointment_not_cancelled(doc.appointment)
 		source_name = doc.appointment
 		_date = doc.signs_date
 

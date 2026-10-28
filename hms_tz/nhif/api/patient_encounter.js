@@ -28,6 +28,7 @@ frappe.ui.form.on("Patient Encounter", {
   refresh: function (frm) {
     insurance_btns(frm);
     control_practitioners_to_submit_others_encounters(frm);
+    set_cancelled_appointment_headline(frm);
 
     frm.fields_dict["drug_prescription"].grid.get_field(
       "healthcare_service_unit"
@@ -2037,39 +2038,7 @@ var nhif_btns = (frm) => {
         login_to_nhif(frm);
 
         frm.set_intro("");
-        frm.disable_form();
-        frm.set_read_only();
-        frm.toggle_display(
-          [
-            "section_break_28",
-            "hms_tz_section_break",
-            "sb_test_prescription",
-            "radiology_procedures_section",
-            "sb_procedures",
-            "medication_action_sb",
-            "sb_drug_prescription",
-            "rehabilitation_section",
-            "diet_recommendation_section",
-            "examination_detail",
-            "copy_from_preliminary_diagnosis",
-          ],
-          false
-        );
-        frm.toggle_enable(
-          [
-            "system_and_symptoms",
-            "patient_encounter_preliminary_diagnosis",
-            "lab_test_prescription",
-            "radiology_procedure_prescription",
-            "patient_encounter_final_diagnosis",
-            "procedure_prescription",
-            "drug_prescription",
-            "therapies",
-            "diet_recommendation",
-            "copy_from_preliminary_diagnosis",
-          ],
-          false
-        );
+        freeze_encounter_form(frm);
         frm.set_intro(
           __(
             `<h5 style="text-align: center; color: #ff7421;">Please login to NHIF first!</h5>`
@@ -2739,3 +2708,49 @@ function show_preauth_dialog(frm, data) {
 
   d.show();
 }
+
+var set_cancelled_appointment_headline = (frm) => {
+  const message = frm.doc.__onload?.cancelled_appointment_message;
+  if (message) {
+    frm.dashboard.set_headline(
+      `<span class="indicator red">${message}</span>`
+    );
+    freeze_encounter_form(frm);
+  }
+};
+
+var freeze_encounter_form = (frm) => {
+  frm.disable_form();
+  frm.set_read_only();
+  frm.toggle_display(
+    [
+      "section_break_28",
+      "hms_tz_section_break",
+      "sb_test_prescription",
+      "radiology_procedures_section",
+      "sb_procedures",
+      "medication_action_sb",
+      "sb_drug_prescription",
+      "rehabilitation_section",
+      "diet_recommendation_section",
+      "examination_detail",
+      "copy_from_preliminary_diagnosis",
+    ],
+    false
+  );
+  frm.toggle_enable(
+    [
+      "system_and_symptoms",
+      "patient_encounter_preliminary_diagnosis",
+      "lab_test_prescription",
+      "radiology_procedure_prescription",
+      "patient_encounter_final_diagnosis",
+      "procedure_prescription",
+      "drug_prescription",
+      "therapies",
+      "diet_recommendation",
+      "copy_from_preliminary_diagnosis",
+    ],
+    false
+  );
+};

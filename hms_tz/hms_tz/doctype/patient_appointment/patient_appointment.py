@@ -55,6 +55,9 @@ class PatientAppointment(Document):
 		)
 
 	def set_status(self):
+		if self.status == "Cancelled":
+			return
+
 		today = getdate()
 		appointment_date = getdate(self.appointment_date)
 
@@ -659,6 +662,12 @@ def remove_events_by_repeat_on(events_list, date):
 
 @frappe.whitelist()
 def update_status(appointment_id, status):
+	if status == "Cancelled":
+		from hms_tz.nhif.api.patient_appointment import add_cancel_comment, validate_cancellable
+
+		validate_cancellable(frappe.get_doc("Patient Appointment", appointment_id))
+		add_cancel_comment(appointment_id)
+
 	frappe.db.set_value("Patient Appointment", appointment_id, "status", status)
 	appointment_booked = True
 	if status == "Cancelled":
