@@ -5,7 +5,10 @@ from unittest.mock import MagicMock, patch
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from hms_tz.nhif.nhif_api.healthcare_practitioner import get_registered_practitioners
+from hms_tz.nhif.nhif_api.healthcare_practitioner import (
+	get_practitioner_details,
+	get_registered_practitioners,
+)
 
 MODULE = "hms_tz.nhif.nhif_api.healthcare_practitioner"
 
@@ -54,3 +57,33 @@ class TestNHIFRegisteredPractitioners(FrappeTestCase):
 			get_registered_practitioners("Test Company")
 
 		self.request.assert_not_called()
+
+	def test_returns_practitioner_details_for_mct_number(self):
+		details = {"registrationNo": "MCT/1", "practicingStatus": "Allowed"}
+		self.request.return_value = response_for(200, frappe.as_json(details))
+
+		result = get_practitioner_details("Test Company", "MCT/1")
+
+		self.assertEqual(result, details)
+		self.assertEqual(
+			self.request.call_args.args[1], "https://nhif.test/api/Practitioners/details/MCT%2F1"
+		)
+		self.assertEqual(self.add_log.call_args.kwargs["request_type"], "GetPractitionerDetails")
+
+	def test_practitioner_not_registered_at_facility_is_raised(self):
+		self.request.return_value = response_for(404, "Practitioner not found")
+
+		with self.assertRaises(frappe.ValidationError):
+			get_practitioner_details("Test Company", "MCT-404")
+
+		self.assertEqual(self.add_log.call_args.kwargs["status_code"], 404)
+
+	def test_error_shows_nhif_message_instead_of_raw_json(self):
+		body = {"status": 404, "message": "Practitioner with Registration No. 4781 is not registered"}
+		self.request.return_value = response_for(404, frappe.as_json(body))
+
+		with self.assertRaises(frappe.ValidationError) as error:
+			get_practitioner_details("Test Company", "4781")
+
+		self.assertIn(body["message"], str(error.exception))
+		self.assertNotIn('"status"', str(error.exception))
