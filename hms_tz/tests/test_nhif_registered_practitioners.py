@@ -8,6 +8,7 @@ from frappe.tests.utils import FrappeTestCase
 from hms_tz.nhif.nhif_api.healthcare_practitioner import (
 	get_practitioner_details,
 	get_registered_practitioners,
+	register_practitioner,
 )
 
 MODULE = "hms_tz.nhif.nhif_api.healthcare_practitioner"
@@ -87,3 +88,44 @@ class TestNHIFRegisteredPractitioners(FrappeTestCase):
 
 		self.assertIn(body["message"], str(error.exception))
 		self.assertNotIn('"status"', str(error.exception))
+
+	def start_register_patches(self, tz_mct_code="4540"):
+		doc = MagicMock(tz_mct_code=tz_mct_code, hms_tz_company="Test Company")
+		doc.name = "HLC-PRAC-0001"
+		self.start_patch("frappe.get_doc", return_value=doc)
+		self.start_patch("frappe.get_cached_value", return_value="FAC01")
+		self.start_patch("get_fullname", return_value="Test User")
+		return doc
+
+	def test_register_posts_practitioner_for_facility(self):
+		doc = self.start_register_patches()
+		self.request.return_value = response_for(200, "")
+
+		result = register_practitioner(doc.name)
+
+		self.assertEqual(result, {})
+		doc.check_permission.assert_called_once_with("write")
+		self.assertEqual(self.request.call_args.args[0], "Post")
+		self.assertEqual(self.request.call_args.args[1], "https://nhif.test/api/Practitioners/register")
+		self.assertEqual(
+			frappe.parse_json(self.request.call_args.kwargs["data"]),
+			{"practitionerNo": "4540", "facilityCode": "FAC01", "createdBy": "Test User"},
+		)
+		self.assertEqual(self.add_log.call_args.kwargs["request_type"], "RegisterPractitioner")
+
+	def test_register_without_mct_code_is_refused(self):
+		doc = self.start_register_patches(tz_mct_code=None)
+
+		with self.assertRaises(frappe.ValidationError):
+			register_practitioner(doc.name)
+
+		self.request.assert_not_called()
+
+	def test_register_without_write_permission_is_refused(self):
+		doc = self.start_register_patches()
+		doc.check_permission.side_effect = frappe.PermissionError
+
+		with self.assertRaises(frappe.PermissionError):
+			register_practitioner(doc.name)
+
+		self.request.assert_not_called()
