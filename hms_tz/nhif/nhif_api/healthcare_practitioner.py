@@ -1,3 +1,5 @@
+from urllib.parse import quote
+
 import frappe
 import requests
 from frappe.utils import escape_html, getdate, nowdate
@@ -43,10 +45,24 @@ def get_nhif_practitioner_login_status():
 @frappe.whitelist(methods=["GET"])
 def get_registered_practitioners(company: str) -> list:
 	"""Return the practitioners NHIF has registered at the facility of the company's token."""
+	return get_nhif_practitioners_response(company, "/api/Practitioners", "GetPractitioners")
+
+
+@frappe.whitelist(methods=["GET"])
+def get_practitioner_details(company: str, practitioner_no: str) -> dict:
+	"""Return the NHIF registration details of one practitioner at the facility of the company's token."""
+	return get_nhif_practitioners_response(
+		company,
+		f"/api/Practitioners/details/{quote(practitioner_no, safe='')}",
+		"GetPractitionerDetails",
+	)
+
+
+def get_nhif_practitioners_response(company: str, path: str, request_type: str):
 	frappe.has_permission("Healthcare Practitioner", throw=True)
 
 	settings_doc = frappe.get_cached_doc("HMS TZ Setting", company)
-	url = f"{settings_doc.nhifservice_url}/api/Practitioners"
+	url = f"{settings_doc.nhifservice_url}{path}"
 	headers = {
 		"Content-Type": "application/json",
 		"Authorization": f"Bearer {settings_doc.get_nhif_token()}",
@@ -54,7 +70,7 @@ def get_registered_practitioners(company: str) -> list:
 
 	r = requests.request("Get", url, headers=headers, timeout=60)
 	add_log(
-		request_type="GetPractitioners",
+		request_type=request_type,
 		request_url=url,
 		request_header=headers,
 		request_body="",
@@ -65,9 +81,14 @@ def get_registered_practitioners(company: str) -> list:
 	)
 
 	if r.status_code != 200:
+		try:
+			message = r.json().get("message") or r.text
+		except (ValueError, AttributeError):
+			message = r.text
+
 		frappe.throw(
 			title="NHIF API Error",
-			msg=f"Failed to get NHIF practitioners<br><br>Status Code: {r.status_code}<br>Response: <b>{escape_html(r.text)}</b>",
+			msg=f"<b>{escape_html(message)}</b><br><br>Status Code: {r.status_code}",
 		)
 
 	return r.json()
