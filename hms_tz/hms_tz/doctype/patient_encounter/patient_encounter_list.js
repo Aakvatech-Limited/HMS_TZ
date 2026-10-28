@@ -27,7 +27,7 @@ var nhif_btns = (listview) => {
 
   frappe.call({
     method:
-      "hms_tz.nhif.api.healthcare_practitioner.get_nhif_practitioner_login_status",
+      "hms_tz.nhif.nhif_api.healthcare_practitioner.get_nhif_practitioner_login_status",
     args: {},
     callback: (r) => {
       let data = r.message;
