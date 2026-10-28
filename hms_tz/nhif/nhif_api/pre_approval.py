@@ -11,6 +11,7 @@ from hms_tz.hms_tz.doctype.healthcare_service_request.healthcare_service_request
 	get_item_rate,
 	get_item_refcode,
 )
+from hms_tz.nhif.api.patient_appointment import validate_appointment_not_cancelled
 from hms_tz.nhif.doctype.nhif_response_log.nhif_response_log import add_log
 from hms_tz.nhif.nhif_api.referral import get_disease_code
 
@@ -24,6 +25,8 @@ def get_service_preapproval(
 ):
 	# source doc can be either Patient Encounter or Medication Change Request
 	source_doc = frappe.get_doc(ref_doctype, ref_docname)
+	if source_doc.get("appointment"):
+		validate_appointment_not_cancelled(source_doc.appointment)
 
 	insurance_company = source_doc.get("insurance_company") or ""
 	if "NHIF" not in insurance_company:
