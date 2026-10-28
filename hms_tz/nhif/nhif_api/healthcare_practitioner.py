@@ -1,5 +1,8 @@
 import frappe
-from frappe.utils import getdate, nowdate
+import requests
+from frappe.utils import escape_html, getdate, nowdate
+
+from hms_tz.nhif.doctype.nhif_response_log.nhif_response_log import add_log
 
 
 @frappe.whitelist()
@@ -35,3 +38,36 @@ def get_nhif_practitioner_login_status():
 		getdate(practitioner_details.date_loggedin_to_nhif) == getdate(nowdate())
 	):
 		return {"show_login": False, "show_logout": True, "show_poc": True}
+
+
+@frappe.whitelist(methods=["GET"])
+def get_registered_practitioners(company: str) -> list:
+	"""Return the practitioners NHIF has registered at the facility of the company's token."""
+	frappe.has_permission("Healthcare Practitioner", throw=True)
+
+	settings_doc = frappe.get_cached_doc("HMS TZ Setting", company)
+	url = f"{settings_doc.nhifservice_url}/api/Practitioners"
+	headers = {
+		"Content-Type": "application/json",
+		"Authorization": f"Bearer {settings_doc.get_nhif_token()}",
+	}
+
+	r = requests.request("Get", url, headers=headers, timeout=60)
+	add_log(
+		request_type="GetPractitioners",
+		request_url=url,
+		request_header=headers,
+		request_body="",
+		response_data=r.text,
+		status_code=r.status_code,
+		company=company,
+		ref_doctype="Healthcare Practitioner",
+	)
+
+	if r.status_code != 200:
+		frappe.throw(
+			title="NHIF API Error",
+			msg=f"Failed to get NHIF practitioners<br><br>Status Code: {r.status_code}<br>Response: <b>{escape_html(r.text)}</b>",
+		)
+
+	return r.json()
