@@ -9,6 +9,7 @@ from hms_tz.nhif.nhif_api.healthcare_practitioner import (
 	get_practitioner_details,
 	get_registered_practitioners,
 	register_practitioner,
+	terminate_practitioner,
 )
 
 MODULE = "hms_tz.nhif.nhif_api.healthcare_practitioner"
@@ -89,7 +90,7 @@ class TestNHIFRegisteredPractitioners(FrappeTestCase):
 		self.assertIn(body["message"], str(error.exception))
 		self.assertNotIn('"status"', str(error.exception))
 
-	def start_register_patches(self, tz_mct_code="4540"):
+	def start_update_patches(self, tz_mct_code="4540"):
 		doc = MagicMock(tz_mct_code=tz_mct_code, hms_tz_company="Test Company")
 		doc.name = "HLC-PRAC-0001"
 		self.start_patch("frappe.get_doc", return_value=doc)
@@ -98,7 +99,7 @@ class TestNHIFRegisteredPractitioners(FrappeTestCase):
 		return doc
 
 	def test_register_posts_practitioner_for_facility(self):
-		doc = self.start_register_patches()
+		doc = self.start_update_patches()
 		self.request.return_value = response_for(200, "")
 
 		result = register_practitioner(doc.name)
@@ -114,7 +115,7 @@ class TestNHIFRegisteredPractitioners(FrappeTestCase):
 		self.assertEqual(self.add_log.call_args.kwargs["request_type"], "RegisterPractitioner")
 
 	def test_register_without_mct_code_is_refused(self):
-		doc = self.start_register_patches(tz_mct_code=None)
+		doc = self.start_update_patches(tz_mct_code=None)
 
 		with self.assertRaises(frappe.ValidationError):
 			register_practitioner(doc.name)
@@ -122,10 +123,45 @@ class TestNHIFRegisteredPractitioners(FrappeTestCase):
 		self.request.assert_not_called()
 
 	def test_register_without_write_permission_is_refused(self):
-		doc = self.start_register_patches()
+		doc = self.start_update_patches()
 		doc.check_permission.side_effect = frappe.PermissionError
 
 		with self.assertRaises(frappe.PermissionError):
 			register_practitioner(doc.name)
+
+		self.request.assert_not_called()
+
+	def test_terminate_posts_reasons_for_facility(self):
+		doc = self.start_update_patches()
+		self.request.return_value = response_for(200, frappe.as_json({"success": True}))
+
+		terminate_practitioner(doc.name, "Left the facility")
+
+		doc.check_permission.assert_called_once_with("write")
+		self.assertEqual(self.request.call_args.args[1], "https://nhif.test/api/Practitioners/terminate")
+		self.assertEqual(
+			frappe.parse_json(self.request.call_args.kwargs["data"]),
+			{
+				"practitionerNo": "4540",
+				"facilityCode": "FAC01",
+				"terminatedBy": "Test User",
+				"terminationReasons": "Left the facility",
+			},
+		)
+		self.assertEqual(self.add_log.call_args.kwargs["request_type"], "TerminatePractitioner")
+
+	def test_plain_text_success_response_is_returned_as_message(self):
+		doc = self.start_update_patches()
+		self.request.return_value = response_for(200, "Practitioner terminated successfully")
+
+		result = terminate_practitioner(doc.name, "He is no longer with us")
+
+		self.assertEqual(result, {"message": "Practitioner terminated successfully"})
+
+	def test_terminate_without_reasons_is_refused(self):
+		doc = self.start_update_patches()
+
+		with self.assertRaises(frappe.ValidationError):
+			terminate_practitioner(doc.name, "")
 
 		self.request.assert_not_called()
