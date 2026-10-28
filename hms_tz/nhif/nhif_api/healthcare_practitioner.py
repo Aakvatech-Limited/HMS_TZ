@@ -61,11 +61,7 @@ def get_practitioner_details(company: str, practitioner_no: str) -> dict:
 @frappe.whitelist(methods=["POST"])
 def register_practitioner(practitioner: str) -> dict:
 	"""Register the practitioner's MCT number with NHIF at the facility of the practitioner's company."""
-	doc = frappe.get_doc("Healthcare Practitioner", practitioner)
-	doc.check_permission("write")
-	if not doc.tz_mct_code:
-		frappe.throw(f"Please set MCT Code for practitioner: <b>{doc.name}</b>")
-
+	doc = get_practitioner_to_update(practitioner)
 	payload = {
 		"practitionerNo": doc.tz_mct_code,
 		"facilityCode": frappe.get_cached_value("HMS TZ Setting", doc.hms_tz_company, "facility_code"),
@@ -74,6 +70,33 @@ def register_practitioner(practitioner: str) -> dict:
 	return make_nhif_practitioners_request(
 		doc.hms_tz_company, "/api/Practitioners/register", "RegisterPractitioner", payload
 	)
+
+
+@frappe.whitelist(methods=["POST"])
+def terminate_practitioner(practitioner: str, termination_reasons: str) -> dict:
+	"""Terminate the practitioner's NHIF registration at the facility of the practitioner's company."""
+	doc = get_practitioner_to_update(practitioner)
+	if not termination_reasons:
+		frappe.throw("Please set the termination reasons")
+
+	payload = {
+		"practitionerNo": doc.tz_mct_code,
+		"facilityCode": frappe.get_cached_value("HMS TZ Setting", doc.hms_tz_company, "facility_code"),
+		"terminatedBy": get_fullname(frappe.session.user),
+		"terminationReasons": termination_reasons,
+	}
+	return make_nhif_practitioners_request(
+		doc.hms_tz_company, "/api/Practitioners/terminate", "TerminatePractitioner", payload
+	)
+
+
+def get_practitioner_to_update(practitioner: str):
+	doc = frappe.get_doc("Healthcare Practitioner", practitioner)
+	doc.check_permission("write")
+	if not doc.tz_mct_code:
+		frappe.throw(f"Please set MCT Code for practitioner: <b>{doc.name}</b>")
+
+	return doc
 
 
 def make_nhif_practitioners_request(company: str, path: str, request_type: str, payload: dict | None = None):
@@ -99,15 +122,16 @@ def make_nhif_practitioners_request(company: str, path: str, request_type: str, 
 		ref_doctype="Healthcare Practitioner",
 	)
 
-	if r.status_code != 200:
-		try:
-			message = r.json().get("message") or r.text
-		except (ValueError, AttributeError):
-			message = r.text
+	try:
+		data = r.json() if r.text else {}
+	except ValueError:
+		data = {"message": r.text}
 
+	if r.status_code != 200:
+		message = data.get("message") if isinstance(data, dict) else None
 		frappe.throw(
 			title="NHIF API Error",
-			msg=f"<b>{escape_html(message)}</b><br><br>Status Code: {r.status_code}",
+			msg=f"<b>{escape_html(message or r.text)}</b><br><br>Status Code: {r.status_code}",
 		)
 
-	return r.json() if r.text else {}
+	return data
