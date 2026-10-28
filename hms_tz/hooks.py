@@ -137,6 +137,7 @@ doc_events = {
 		"autoname": "hms_tz.nhif.api.code_value.autoname",
 	},
 	"Patient Appointment": {
+		"onload": "hms_tz.nhif.api.patient_appointment.onload",
 		"before_insert": "hms_tz.nhif.api.patient_appointment.before_insert",
 		"validate": "hms_tz.nhif.api.patient_appointment.make_next_doc",
 	},
@@ -154,6 +155,7 @@ doc_events = {
 	#     ]
 	# },
 	"Patient Encounter": {
+		"onload": "hms_tz.nhif.api.patient_encounter.onload",
 		"before_submit": "hms_tz.nhif.api.patient_encounter.before_submit",
 		"before_save": "hms_tz.nhif.api.patient_encounter.on_submit_validation",
 		"on_trash": "hms_tz.nhif.api.patient_encounter.on_trash",
