@@ -16,6 +16,7 @@
   "auto_finalize_patient_encounter",
   "valid_days_to_auto_finalize_encounter",
   "stop_change_of_lrpmt_items_after_claim_submission",
+  "minimum_clinical_notes_length",
   "column_break_qsun",
   "auto_set_pharmacy_on_patient_encounter",
   "opd_cash_pharmacy",
@@ -422,6 +423,14 @@
    "label": "Stop Change/Cancel/Return of LRPMT Items After Claim Submission"
   },
   {
+   "default": "20",
+   "description": "Minimum number of letters and digits in the clinical notes  of Patient Encounter before submit. <b>Set 0 to disable.</b>",
+   "fieldname": "minimum_clinical_notes_length",
+   "fieldtype": "Int",
+   "label": "Minimum Clinical Notes Length",
+   "non_negative": 1
+  },
+  {
    "default": "0",
    "description": "If ticked, Cash patient can be discharged even if there are unbilled invoices",
    "fieldname": "allow_discharge_patient_with_pending_unbilled_invoices",
@@ -693,7 +702,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-21 12:00:00.000000",
+ "modified": "2026-10-29 16:28:03.068635",
  "modified_by": "Administrator",
  "module": "Hms Tz",
  "name": "HMS TZ Setting",
