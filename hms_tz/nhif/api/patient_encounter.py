@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 
+import html
 import json
 
 import frappe
@@ -9,7 +10,7 @@ from erpnext.accounts.utils import get_balance_on
 from frappe import _
 from frappe.query_builder import DocType
 from frappe.query_builder.functions import Date
-from frappe.utils import cint, cstr, date_diff, flt, fmt_money, getdate, nowdate, nowtime
+from frappe.utils import cint, cstr, date_diff, flt, fmt_money, getdate, nowdate, nowtime, strip_html
 from healthcare.healthcare.doctype.healthcare_settings.healthcare_settings import (
 	get_income_account,
 	get_receivable_account,
@@ -167,6 +168,7 @@ def set_price_list(doc):
 
 
 def on_submit_validation(doc, method):
+	validate_clinical_notes_length(doc)
 	if doc.appointment:
 		validate_appointment_not_cancelled(doc.appointment)
 
@@ -937,6 +939,8 @@ def before_submit(doc, method):
 	if doc.appointment:
 		validate_appointment_not_cancelled(doc.appointment)
 
+	validate_clinical_notes_length(doc)
+
 	if doc.insurance_company and "NHIF" in doc.insurance_company:
 		validate_main_diagnosis_code(doc)
 
@@ -960,6 +964,30 @@ def before_submit(doc, method):
 
 	if doc.inpatient_record:
 		set_admission_service_type(doc)
+
+
+def validate_clinical_notes_length(doc):
+	"""Block submit when clinical notes have fewer letters and digits than HMS TZ Setting requires."""
+	# Direct: same exemption as the mandatory_depends_on of examination_detail
+	if not doc.appointment or doc.healthcare_package_order or "Direct" in cstr(doc.practitioner):
+		return
+
+	minimum_length = cint(
+		frappe.get_cached_value("HMS TZ Setting", doc.company, "minimum_clinical_notes_length")
+	)
+	if not minimum_length:
+		return
+
+	notes = html.unescape(strip_html(cstr(doc.examination_detail)))
+	notes_length = sum(character.isalnum() for character in notes)
+	if notes_length < minimum_length:
+		msg = f"""<div style="border-left: 4px solid #ffc107; background-color: #fff3cd; padding: 15px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1); margin: 10px;">
+                    <h4 style="font-weight: bold; color: #856404;"><i class="fa fa-exclamation-triangle" aria-hidden="true"></i> {_("Clinical Notes Too Short")}</h4>
+                    <p style="font-size: 14px; font-style: italic; font-weight: bold;">{_("Clinical notes must have at least <strong>{0}</strong> letters. They have <strong>{1}</strong>.").format(minimum_length, notes_length)}</p>
+                    <p style="font-size: 15px;">{_("Please write the clinical notes before you submit this encounter.")}</p>
+                </div>"""
+
+		frappe.throw(msg, title=_("Clinical Notes Too Short"))
 
 
 @frappe.whitelist()
