@@ -109,6 +109,7 @@ class HealthcarePackageOrder(Document):
 	def update_encounter_details(self, encounter, has_items=False):
 		package_doc = frappe.get_cached_doc("Healthcare Package", self.healthcare_package)
 		encounter_doc = frappe.get_cached_doc("Patient Encounter", encounter)
+		encounter_doc.healthcare_package_order = self.name
 		update_encounter_items(encounter_doc, package_doc, has_items)
 		encounter_doc.save(ignore_permissions=True)
 
