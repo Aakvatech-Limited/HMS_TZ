@@ -139,29 +139,29 @@ def get_service_preapproval(
 		msg = "Pre-Approval request were rejected for the following services:<hr>\
             <table class='table table-condensed table-bordered'><tr><th>Service Type</th><th>Service</th><th>Status</th><th>Reason</th></tr>"
 
-		for row, template_name, ref_code in requested_rows:
-			if not ref_code:
+		lines = {d.get("itemCode"): d for d in data.get("services") or []}
+		for ref_code, rows in requested_rows.items():
+			d = lines.get(ref_code) if ref_code else None
+			if not d:
 				continue
 
-			for d in data.get("services"):
-				if d.get("itemCode") == ref_code:
-					row.preapproval_status = d.get("status")
-					row.preapproval_no = data.get("requestNo") if d.get("status") != "REJECTED" else ""
-					row.rejection_reason_code = d.get("rejectionReasonCode")
-					row.rejection_details = d.get("rejectionDetails")
-					row.preapproval_cancel_remarks = ""
-					row.db_update()
-					row.reload()
+			for row, _template_name in rows:
+				row.preapproval_status = d.get("status")
+				row.preapproval_no = data.get("requestNo") if d.get("status") != "REJECTED" else ""
+				row.rejection_reason_code = d.get("rejectionReasonCode")
+				row.rejection_details = d.get("rejectionDetails")
+				row.preapproval_cancel_remarks = ""
+				row.db_update()
 
-					if d.get("status") == "REJECTED":
-						rejected_count += 1
-						msg += f"<tr>\
-                            <td>{row.doctype.split(' ')[0]}</td>\
-                            <td>{template_name}</td>\
-                            <td style='color: red'>{d.get('status')}</td>\
-                            <td>{d.get('rejectionDetails')}</td>\
-                        </tr>"
-					break
+			if d.get("status") == "REJECTED":
+				rejected_count += 1
+				first_row, template_name = rows[0]
+				msg += f"<tr>\
+                    <td>{first_row.doctype.split(' ')[0]}</td>\
+                    <td>{template_name} (x{len(rows)})</td>\
+                    <td style='color: red'>{d.get('status')}</td>\
+                    <td>{d.get('rejectionDetails')}</td>\
+                </tr>"
 
 		source_doc.db_update()
 		source_doc.db_update_all()
@@ -326,7 +326,7 @@ def is_preapproval_required(row):
 		row.get("prescribe")
 		or row.get("is_not_available_inhouse")
 		or row.get("is_cancelled")
-		or row.get("preapproval_status") == "Accepted"
+		or row.get("preapproval_status") in ["Accepted", "WAIT_APPROVAL"]
 	)
 
 
@@ -357,38 +357,44 @@ def get_service_rate(row, item, doc):
 
 
 def get_services(doc, preapproval_no=None):
+	"""Return one NHIF service line per item code, the rows behind each line and the diseases.
+
+	NHIF rejects a repeated item code as a pending duplicate, so repeated rows add to one quantity.
+	"""
 	diseases = []
-	services = []
-	requested_rows = []
+	cancel_services = []
+	services = {}
+	requested_rows = {}
 
 	for row, template_doctype, template_name in get_service_rows(doc, preapproval_no):
 		if not template_name:
 			continue
 
 		if preapproval_no and row.preapproval_no == preapproval_no:
-			services.append(template_name)
+			cancel_services.append(template_name)
 			continue
 
 		if not is_preapproval_required(row):
 			continue
 
 		ref_code, item = get_service_item(template_doctype, template_name, doc.company, doc.insurance_company)
-		item_rate = get_service_rate(row, item, doc)
-
-		services.append(
-			{
+		quantity = row.get("quantity") or 1
+		if ref_code in services:
+			services[ref_code]["quantityRequested"] += quantity
+		else:
+			services[ref_code] = {
 				"itemCode": ref_code,
 				"usage": "",
 				"effectiveDate": nowdate(),
 				"endDate": nowdate(),
-				"quantityRequested": row.get("quantity") or 1,
-				"unitPrice": item_rate,
+				"quantityRequested": quantity,
+				"unitPrice": get_service_rate(row, item, doc),
 				"remarks": "",
 			}
-		)
-		requested_rows.append((row, template_name, ref_code))
+		requested_rows.setdefault(ref_code, []).append((row, template_name))
 
-		if row.doctype != "Inpatient Occupancy":
-			diseases.append(get_disease_row(row))
+		disease = get_disease_row(row) if row.doctype != "Inpatient Occupancy" else None
+		if disease and disease not in diseases:
+			diseases.append(disease)
 
-	return services, requested_rows, diseases
+	return [*cancel_services, *services.values()], requested_rows, diseases
