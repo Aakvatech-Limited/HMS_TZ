@@ -2,23 +2,56 @@ import json
 
 import frappe
 import requests
-from frappe.utils import add_to_date, flt, get_datetime, get_fullname
+from frappe.utils import add_to_date, escape_html, flt, get_datetime, get_fullname
 
 from hms_tz.nhif.doctype.nhif_response_log.nhif_response_log import add_log
+
+# (connect, read) seconds; the user waits on a frozen screen during SignFolio
+SIGN_FOLIO_TIMEOUT = (10, 60)
+# Values NHIF SignFolio accepts for SignedBy: who signed, relative to the patient
+SIGNED_BY_OPTIONS = (
+	"PATIENT",
+	"CHILD",
+	"SPOUSE",
+	"PARENT",
+	"SISTER",
+	"BROTHER",
+	"RELATIVE",
+	"FRIEND",
+	"OTHER",
+)
 
 
 @frappe.whitelist(methods=["POST"])
 def sign_folio(
-	ref_doctype, ref_docname, signature_method="signature", signature=None, fingerprint=None, fpcode=None
+	ref_doctype,
+	ref_docname,
+	signature_method="signature",
+	signature=None,
+	fingerprint=None,
+	fpcode=None,
+	signed_by="PATIENT",
+	signed_by_name=None,
 ):
 	"""
-	Sign folio before submission to NHIF
+	Sign folio before submission to NHIF.
+	`signed_by` is one of SIGNED_BY_OPTIONS, e.g. PARENT when a parent signs for a child.
 	"""
 
-	doc = frappe.get_cached_doc(ref_doctype, ref_docname)
+	if ref_doctype != "NHIF Patient Claim":
+		frappe.throw(f"Sign Folio is not supported for {ref_doctype}")
+
+	doc = frappe.get_doc(ref_doctype, ref_docname)
+	doc.check_permission("write")
+	if doc.folio_signed:
+		frappe.msgprint("Folio is already signed", alert=True)
+		return True
 
 	if signature_method == "signature" and not signature:
 		frappe.throw("Patient signature is required before signing the folio.")
+
+	if signed_by not in SIGNED_BY_OPTIONS:
+		frappe.throw(f"Signed By must be one of: {', '.join(SIGNED_BY_OPTIONS)}")
 
 	if signature_method == "fingerprint":
 		if not fingerprint:
@@ -27,17 +60,20 @@ def sign_folio(
 		if not fpcode:
 			frappe.throw("FPCode is required for biometric signature.")
 
+	signed_by_name = (signed_by_name or "").strip() or " ".join(filter(None, [doc.first_name, doc.last_name]))
+	amount_claimed = sum(flt(item.amount_claimed) for item in doc.nhif_patient_claim_item)
 	payload = {
 		"CardNo": doc.cardno.strip(),
 		"AuthorizationNo": doc.authorization_no,
-		"AmountClaimed": sum([flt(item.amount_claimed) for item in doc.nhif_patient_claim_item]),
-		"SignedBy": doc.first_name + " " + doc.last_name,
+		"AmountClaimed": amount_claimed,
+		"SignedBy": signed_by,
+		"SignedByName": signed_by_name,
 	}
 
 	if signature_method == "signature":
 		payload["SignatureData"] = signature.replace("data:image/png;base64,", "")
 		payload["SignatureMethod"] = "SIGNATURE"
-		payload["FpCode"] = "SIGNATURE"
+		# payload["FpCode"] = ""
 	else:
 		payload["SignatureData"] = fingerprint
 		payload["SignatureMethod"] = "FINGERPRINT"
@@ -53,7 +89,19 @@ def sign_folio(
 		"Authorization": f"Bearer {token}",
 	}
 
-	r = requests.request("Post", url, data=payload, headers=headers, timeout=300)
+	try:
+		r = requests.request("Post", url, data=payload, headers=headers, timeout=SIGN_FOLIO_TIMEOUT)
+	except requests.RequestException as e:
+		frappe.log_error(
+			title="NHIF SignFolio request failed",
+			reference_doctype=doc.doctype,
+			reference_name=doc.name,
+		)
+		frappe.msgprint(
+			f"Could not reach NHIF to sign the folio, please proceed with manual signature.<br><br>{e}"
+		)
+		return "Error"
+
 	if r.status_code != 200:
 		add_log(
 			request_type="SignFolio",
@@ -92,11 +140,14 @@ def sign_folio(
 			ref_docname=doc.name,
 		)
 
-		doc.db_set("folio_signed", 1)
+		values = {"folio_signed": 1, "signed_amount": amount_claimed}
+		if signature_method == "signature":
+			values["patient_signature"] = signature
+		doc.db_set(values)
 
 		doc.add_comment(
 			comment_type="Comment",
-			text=f"Folio signed successfully!<br><br><b>Message from NHIF:</b><br>{data.get('Message')}",
+			text=f"Folio signed successfully by {escape_html(signed_by_name)} ({signed_by})!<br><br><b>Message from NHIF:</b><br>{data.get('Message')}",
 		)
 
 	frappe.msgprint("Folio signed successfully", alert=True)
