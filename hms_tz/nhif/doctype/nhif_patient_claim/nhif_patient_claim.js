@@ -96,13 +96,10 @@ frappe.ui.form.on("NHIF Patient Claim", {
   },
 
   after_save: (frm) => {
-    // if (!frm.doc.allow_changes) {
-    // frm.reload_doc().then(() => {
-    //   if (frm.doc.docstatus === 0 && frm.doc.authorization_no && !frm.doc.folio_signed) {
-    //     show_signature_method_dialog(frm);
-    //   }
-    // });
-    // }
+    if (needs_folio_signature(frm)) {
+      show_signature_method_dialog(frm);
+    }
+    alert_signed_amount_mismatch(frm);
   },
 
   is_ready_for_auto_submission: (frm) => {
@@ -110,6 +107,12 @@ frappe.ui.form.on("NHIF Patient Claim", {
       frm.set_value("reviewed_by", frappe.user.full_name());
     } else {
       frm.set_value("reviewed_by", "");
+    }
+  },
+
+  sign_folio: (frm) => {
+    if (needs_folio_signature(frm)) {
+      show_signature_method_dialog(frm);
     }
   },
 
@@ -148,12 +151,6 @@ frappe.ui.form.on("NHIF Patient Claim", {
     });
   },
 
-  // sign_folio: (frm) => {
-  //   if (frm.doc.docstatus === 0 && frm.doc.authorization_no && !frm.doc.folio_signed) {
-  //     show_signature_method_dialog(frm);
-  //   }
-  // },
-
   bypass_sending_to_nhif: (frm) => {
     if (frm.doc.bypass_sending_to_nhif == 1) {
       frm.set_value("bypassed_by", frappe.user.full_name());
@@ -164,10 +161,44 @@ frappe.ui.form.on("NHIF Patient Claim", {
   },
 });
 
+function alert_signed_amount_mismatch(frm) {
+  const { signed_amount, total_amount } = frm.doc;
+  if (
+    !signed_amount ||
+    !total_amount ||
+    flt(signed_amount, 0) === flt(total_amount, 0)
+  )
+    return;
+
+  frappe.show_alert(
+    {
+      message: __("Signed Amount {0} is different from Total Amount {1}", [
+        format_number(signed_amount, null, 0),
+        format_number(total_amount, null, 0),
+      ]),
+      indicator: "orange",
+    },
+    10
+  );
+}
+
+function needs_folio_signature(frm) {
+  return (
+    frm.doc.docstatus === 0 &&
+    !frm.doc.patient_signature &&
+    !frm.doc.folio_signed
+  );
+}
+
 /**
  * Show dialog to choose signature method (Signature or Fingerprint)
  */
 function show_signature_method_dialog(frm) {
+  // Repeated saves must not stack dialogs on top of each other
+  if (frm.sign_folio_in_progress) return;
+  frm.sign_folio_in_progress = true;
+
+  let method = null;
   const dialog = new frappe.ui.Dialog({
     title: __("Sign Folio:"),
     fields: [
@@ -175,21 +206,23 @@ function show_signature_method_dialog(frm) {
         fieldtype: "HTML",
         fieldname: "info_html",
         options: `
+          <style>
+            .signature-option { cursor: pointer; padding: 20px; border: 2px solid #ccc; border-radius: 10px; width: 150px; text-align: center; }
+            .signature-option:hover { border-color: #5e64ff; background-color: #f0f4ff; }
+          </style>
           <div style="text-align: center; padding: 20px;">
             <p style="font-size: 14px; margin-bottom: 20px;">
               ${__("Please select the signature method")}
             </p>
             <div style="display: flex; justify-content: center; gap: 30px; flex-wrap: wrap;">
-              <div class="signature-option" data-method="signature"
-                   style="cursor: pointer; padding: 20px; border: 2px solid #ccc; border-radius: 10px; width: 150px; text-align: center; transition: all 0.3s;">
+              <div class="signature-option" data-method="signature">
                 <i class="fa fa-pencil" style="font-size: 48px; color: #5e64ff;"></i>
                 <p style="margin-top: 10px; font-weight: bold;">${__(
                   "Signature"
                 )}</p>
                 <small>${__("Draw signature with pen")}</small>
               </div>
-              <div class="signature-option" data-method="fingerprint"
-                   style="cursor: pointer; padding: 20px; border: 2px solid #ccc; border-radius: 10px; width: 150px; text-align: center; transition: all 0.3s;">
+              <div class="signature-option" data-method="fingerprint">
                 <i class="fa fa-hand-paper-o" style="font-size: 48px; color: #28a745;"></i>
                 <p style="margin-top: 10px; font-weight: bold;">${__(
                   "Fingerprint"
@@ -206,77 +239,91 @@ function show_signature_method_dialog(frm) {
     secondary_action: () => dialog.hide(),
   });
 
-  dialog.show();
-
-  // Add hover effects and click handlers
-  dialog.$wrapper.find(".signature-option").hover(
-    function () {
-      $(this).css({
-        "border-color": "#5e64ff",
-        "background-color": "#f0f4ff",
-      });
-    },
-    function () {
-      $(this).css({
-        "border-color": "#ccc",
-        "background-color": "transparent",
-      });
-    }
-  );
-
   dialog.$wrapper.find(".signature-option").on("click", function () {
-    const method = $(this).data("method");
+    method = $(this).data("method");
     dialog.hide();
+  });
 
-    if (method === "signature") {
-      capture_signature_and_sign(frm);
-    } else if (method === "fingerprint") {
-      capture_fingerprint_and_sign(frm);
+  // Open the next modal only after this one is gone, otherwise the backdrop can stay stuck
+  dialog.$wrapper.one("hidden.bs.modal", async () => {
+    dialog.$wrapper.remove();
+    try {
+      if (method === "signature") {
+        await capture_signature_and_sign(frm);
+      } else if (method === "fingerprint") {
+        await capture_fingerprint_and_sign(frm);
+      }
+    } finally {
+      frm.sign_folio_in_progress = false;
     }
   });
+
+  dialog.show();
 }
 
 /**
  * Capture handwritten signature using the Signature class and sign folio
  */
 async function capture_signature_and_sign(frm) {
-  try {
-    const signature = await new Signature({
-      label: __("Sign Folio"),
-      title: __("Sign Folio - Draw Signature"),
-    });
-
-    if (!signature) {
-      frappe.msgprint(__("Signature failed, please try again."));
-      return;
-    }
-
-    frappe.call({
-      method: "hms_tz.nhif.nhif_api.patient_claim.sign_folio",
-      args: {
-        ref_doctype: frm.doc.doctype,
-        ref_docname: frm.doc.name,
-        signature_method: "signature",
-        signature: signature.Data,
+  const signature = await new Signature({
+    label: __("Sign Folio"),
+    title: __("Sign Folio - Draw Signature"),
+    fields: [
+      {
+        fieldtype: "Data",
+        fieldname: "signed_by_name",
+        label: __("Signer Name"),
+        reqd: 1,
+        default: [frm.doc.first_name, frm.doc.last_name]
+          .filter(Boolean)
+          .join(" "),
       },
-      freeze: true,
-      freeze_message: __('<i class="fa fa-spinner fa-spin fa-4x"></i>'),
-      callback: function (r) {
-        if (r.message && r.message !== "Error") {
-          frappe.utils.play_sound("submit");
-          // frappe.show_alert({
-          //   message: __("Folio signed successfully!"),
-          //   indicator: "green",
-          // });
-          frm.reload_doc();
-        } else {
-          frappe.utils.play_sound("error");
-        }
+      { fieldtype: "Column Break" },
+      {
+        fieldtype: "Select",
+        fieldname: "signed_by",
+        label: __("Relationship to Patient"),
+        options: [
+          "PATIENT",
+          "PARENT",
+          "CHILD",
+          "SPOUSE",
+          "SISTER",
+          "BROTHER",
+          "RELATIVE",
+          "FRIEND",
+          "OTHER",
+        ].map((value) => ({
+          value,
+          label: __(frappe.utils.to_title_case(value)),
+        })),
+        default: "PATIENT",
+        reqd: 1,
       },
-    });
-  } catch (error) {
-    console.error("Signature capture error:", error);
-    frappe.msgprint(__("Signature capture failed. Please try again."));
+      { fieldtype: "Section Break" },
+    ],
+  });
+  // Closed without signing: the dialog shows again on the next save
+  if (!signature) return;
+
+  const r = await frappe.call({
+    method: "hms_tz.nhif.nhif_api.patient_claim.sign_folio",
+    args: {
+      ref_doctype: frm.doc.doctype,
+      ref_docname: frm.doc.name,
+      signature_method: "signature",
+      signature: signature.Data,
+      ...signature.values,
+    },
+    freeze: true,
+    freeze_message: __("Signing folio with NHIF..."),
+  });
+
+  if (r.message && r.message !== "Error") {
+    frappe.utils.play_sound("submit");
+    frm.reload_doc();
+  } else {
+    frappe.utils.play_sound("error");
   }
 }
 
