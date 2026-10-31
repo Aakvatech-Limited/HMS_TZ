@@ -54,13 +54,13 @@ def nhif_response(body):
 	return MagicMock(status_code=200, text=json.dumps(body))
 
 
-def bed_service(effective_date, end_date, unit_price):
+def bed_service(effective_date, end_date, unit_price, quantity=1):
 	return {
 		"itemCode": BED_CODE,
 		"usage": "",
 		"effectiveDate": effective_date,
 		"endDate": end_date,
-		"quantityRequested": 1,
+		"quantityRequested": quantity,
 		"unitPrice": unit_price,
 		"remarks": "",
 	}
@@ -107,6 +107,7 @@ class TestNHIFPreApprovalBeds(FrappeTestCase):
 		insert_occupancy("_Test PA Today Bed", idx=4, check_in=f"{today} 10:00:00", amount=OPEN_BED_AMOUNT)
 
 	def setUp(self):
+		getattr(frappe.local, "request_cache", {}).clear()
 		frappe.db.savepoint("pre_approval_test")
 		self.addCleanup(frappe.db.rollback, save_point="pre_approval_test")
 		for mocked in [
@@ -138,18 +139,76 @@ class TestNHIFPreApprovalBeds(FrappeTestCase):
 	def test_only_todays_beds_without_preapproval_no_are_requested(self):
 		services, requested_rows, diseases = pre_approval.get_services(self.make_encounter())
 
+		self.assertEqual(services, [bed_service(nowdate(), nowdate(), BED_RATE, quantity=2)])
 		self.assertEqual(
-			services,
-			[
-				bed_service(nowdate(), nowdate(), BED_RATE),
-				bed_service(nowdate(), nowdate(), OPEN_BED_AMOUNT),
-			],
-		)
-		self.assertEqual(
-			[(row.name, template_name) for row, template_name, _ref_code in requested_rows],
+			[(row.name, template_name) for row, template_name in requested_rows[BED_CODE]],
 			[("_Test PA Transfer Bed", SERVICE_UNIT_TYPE), ("_Test PA Today Bed", SERVICE_UNIT_TYPE)],
 		)
 		self.assertEqual(diseases, [])
+
+	def test_repeated_item_codes_make_one_line_with_summed_quantity(self):
+		codes = {"_Test PA Denture": "6424", "_Test PA Xray": "7001"}
+		encounter = self.make_encounter(inpatient_record=None)
+		for _ in range(3):
+			encounter.append(
+				"procedure_prescription", {"procedure": "_Test PA Denture", "medical_code": "ICD-10 K08.9"}
+			)
+		encounter.append(
+			"radiology_procedure_prescription",
+			{"radiology_examination_template": "_Test PA Xray", "medical_code": "ICD-10 K08.9"},
+		)
+
+		with patch.object(
+			pre_approval, "get_item_refcode", side_effect=lambda doctype, name, *args: codes[name]
+		):
+			services, requested_rows, diseases = pre_approval.get_services(encounter)
+
+		self.assertEqual(
+			[(service["itemCode"], service["quantityRequested"]) for service in services],
+			[("7001", 1), ("6424", 3)],
+		)
+		self.assertEqual(len(requested_rows["6424"]), 3)
+		self.assertEqual(
+			diseases,
+			[{"diseaseCode": "K08.9", "status": "Preliminary"}, {"diseaseCode": "K08.9", "status": "Final"}],
+		)
+
+	def test_rows_pending_at_nhif_are_not_sent_again(self):
+		encounter = self.make_encounter(inpatient_record=None)
+		encounter.append(
+			"procedure_prescription",
+			{
+				"procedure": "_Test PA Denture",
+				"medical_code": "ICD-10 K08.9",
+				"preapproval_status": "WAIT_APPROVAL",
+			},
+		)
+
+		services, _requested_rows, _diseases = pre_approval.get_services(encounter)
+
+		self.assertEqual(services, [])
+
+	@patch.object(pre_approval.requests, "request")
+	def test_rejected_line_is_set_on_every_repeated_row(self, request):
+		request.return_value = nhif_response(
+			{
+				"requestNo": "PA-4",
+				"requestID": "R4",
+				"services": [
+					{"itemCode": BED_CODE, "status": "REJECTED", "rejectionDetails": "Pending request"}
+				],
+			}
+		)
+
+		pre_approval.get_service_preapproval(
+			"Patient Encounter", ENCOUNTER, authorization_no="AUTH1", settings_doc=make_settings()
+		)
+
+		payload = json.loads(request.call_args.kwargs["data"])
+		self.assertEqual(len(payload["requestedServices"]), 1)
+		for name in ["_Test PA Transfer Bed", "_Test PA Today Bed"]:
+			bed = get_occupancy(name)
+			self.assertEqual((bed.preapproval_status, bed.rejection_details), ("REJECTED", "Pending request"))
 
 	def test_disease_code_has_no_standard_prefix_or_space(self):
 		row = frappe._dict(medical_code="ICD-10 Z22.0", parentfield="lab_test_prescription")
@@ -181,7 +240,7 @@ class TestNHIFPreApprovalBeds(FrappeTestCase):
 
 		self.assertTrue(result)
 		payload = json.loads(request.call_args.kwargs["data"])
-		self.assertEqual(len(payload["requestedServices"]), 2)
+		self.assertEqual(len(payload["requestedServices"]), 1)
 		for name in ["_Test PA Transfer Bed", "_Test PA Today Bed"]:
 			bed = get_occupancy(name)
 			self.assertEqual((bed.preapproval_no, bed.preapproval_status), ("PA-1", "ACCEPTED"))
