@@ -7,6 +7,9 @@
  *   if (signature) {
  *     console.log(signature.Data); // Base64 PNG image data
  *   }
+ *
+ * Extra dialog fields passed as `fields` come back in `signature.values`.
+ * Resolves with null when the dialog is closed without signing.
  */
 
 export class Signature {
@@ -18,30 +21,24 @@ export class Signature {
     this.lineColor = opts.lineColor || "#000";
     this.lineWidth = opts.lineWidth || 3;
     this.backgroundColor = opts.backgroundColor || "#fff";
+    this.extraFields = opts.fields || [];
 
-    // Canvas state
-    this.canvas = null;
-    this.ctx = null;
     this.isDrawing = false;
-    this.lastX = 0;
-    this.lastY = 0;
     this.hasDrawn = false;
+    this.result = null;
 
-    return new Promise((resolve, reject) => {
-      this.signaturePromiseResolve = resolve;
-      this.signaturePromiseReject = reject;
-      this.init();
+    return new Promise((resolve) => {
+      this.resolve = resolve;
+      this.showDialog();
     });
-  }
-
-  init() {
-    this.showDialog();
   }
 
   showDialog() {
     this.dialog = new frappe.ui.Dialog({
       title: this.title,
+      static: true,
       fields: [
+        ...this.extraFields,
         {
           fieldtype: "HTML",
           fieldname: "signature_container",
@@ -50,24 +47,19 @@ export class Signature {
       ],
       size: "large",
       primary_action_label: __(this.label),
-      primary_action: () => this.submitSignature(),
+      primary_action: (values) => this.submitSignature(values),
       secondary_action_label: __("Cancel"),
-      secondary_action: () => this.cancel(),
+      secondary_action: () => this.dialog.hide(),
     });
 
+    // Resolving before the modal is gone lets callers open the next one too early and leave the backdrop stuck
+    this.dialog.$wrapper.one("hidden.bs.modal", () => {
+      this.dialog.$wrapper.remove();
+      this.resolve(this.result);
+    });
+
+    this.initCanvas();
     this.dialog.show();
-
-    // Initialize canvas after dialog is rendered
-    this.dialog.$wrapper.on("shown.bs.modal", () => {
-      this.initCanvas();
-    });
-
-    // Fallback initialization with setTimeout
-    setTimeout(() => {
-      if (!this.canvas) {
-        this.initCanvas();
-      }
-    }, 200);
   }
 
   getSignatureHTML() {
@@ -84,22 +76,25 @@ export class Signature {
           background-color: ${this.backgroundColor};
           margin: 0 auto;
           display: inline-block;
+          max-width: 100%;
           box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         ">
           <canvas
-            id="hms-signature-canvas"
+            class="hms-signature-canvas"
             width="${this.canvasWidth}"
             height="${this.canvasHeight}"
             style="
               cursor: crosshair;
               touch-action: none;
+              user-select: none;
               display: block;
+              max-width: 100%;
               border-radius: 8px;
             "
           ></canvas>
         </div>
         <div style="margin-top: 15px;">
-          <button type="button" class="btn btn-default btn-sm" id="hms-clear-signature">
+          <button type="button" class="btn btn-default btn-sm hms-clear-signature">
             <i class="fa fa-eraser"></i> ${__("Clear")}
           </button>
         </div>
@@ -113,192 +108,94 @@ export class Signature {
   }
 
   initCanvas() {
-    this.canvas = document.getElementById("hms-signature-canvas");
-    if (!this.canvas) {
-      console.error("Signature canvas not found");
-      return;
-    }
-
+    const $body = this.dialog.$wrapper;
+    this.canvas = $body.find(".hms-signature-canvas").get(0);
     this.ctx = this.canvas.getContext("2d");
-
-    // Set up canvas styles
-    this.ctx.strokeStyle = this.lineColor;
-    this.ctx.lineWidth = this.lineWidth;
     this.ctx.lineCap = "round";
     this.ctx.lineJoin = "round";
+    this.ctx.strokeStyle = this.lineColor;
+    this.ctx.lineWidth = this.lineWidth;
+    this.clearCanvas();
 
-    // Fill with background color
-    this.ctx.fillStyle = this.backgroundColor;
-    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
-    // Bind event handlers
-    this.bindEvents();
-
-    // Set up clear button
-    const clearBtn = document.getElementById("hms-clear-signature");
-    if (clearBtn) {
-      clearBtn.addEventListener("click", () => this.clearCanvas());
-    }
-  }
-
-  bindEvents() {
-    // Mouse events
-    this.canvas.addEventListener("mousedown", (e) => this.startDrawing(e));
-    this.canvas.addEventListener("mousemove", (e) => this.draw(e));
-    this.canvas.addEventListener("mouseup", (e) => this.stopDrawing(e));
-    this.canvas.addEventListener("mouseleave", (e) => this.stopDrawing(e));
-
-    // Touch events for tablet/mobile
-    this.canvas.addEventListener("touchstart", (e) => this.startDrawing(e), {
-      passive: false,
-    });
-    this.canvas.addEventListener("touchmove", (e) => this.draw(e), {
-      passive: false,
-    });
-    this.canvas.addEventListener("touchend", (e) => this.stopDrawing(e), {
-      passive: false,
-    });
-    this.canvas.addEventListener("touchcancel", (e) => this.stopDrawing(e), {
-      passive: false,
-    });
-
-    // Pointer events (for stylus support)
+    // Pointer events cover mouse, touch and USB pen pads with one code path
     this.canvas.addEventListener("pointerdown", (e) => this.startDrawing(e));
     this.canvas.addEventListener("pointermove", (e) => this.draw(e));
-    this.canvas.addEventListener("pointerup", (e) => this.stopDrawing(e));
-    this.canvas.addEventListener("pointerleave", (e) => this.stopDrawing(e));
+    this.canvas.addEventListener("pointerup", () => this.stopDrawing());
+    this.canvas.addEventListener("pointercancel", () => this.stopDrawing());
+    // Pen barrel buttons and long presses open the context menu mid-stroke
+    this.canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+
+    $body.find(".hms-clear-signature").on("click", () => this.clearCanvas());
   }
 
   getCoordinates(e) {
-    const rect = this.canvas.getBoundingClientRect();
-    let clientX, clientY;
-
-    if (e.touches && e.touches.length > 0) {
-      clientX = e.touches[0].clientX;
-      clientY = e.touches[0].clientY;
-    } else if (e.clientX !== undefined) {
-      clientX = e.clientX;
-      clientY = e.clientY;
-    } else {
-      return null;
-    }
-
-    // Calculate the scaling factor
-    const scaleX = this.canvas.width / rect.width;
-    const scaleY = this.canvas.height / rect.height;
-
     return {
-      x: (clientX - rect.left) * scaleX,
-      y: (clientY - rect.top) * scaleY,
+      x: (e.clientX - this.rect.left) * this.scaleX,
+      y: (e.clientY - this.rect.top) * this.scaleY,
     };
   }
 
   startDrawing(e) {
     e.preventDefault();
-
-    const coords = this.getCoordinates(e);
-    if (!coords) return;
-
+    this.canvas.setPointerCapture(e.pointerId);
+    this.rect = this.canvas.getBoundingClientRect();
+    this.scaleX = this.canvas.width / this.rect.width;
+    this.scaleY = this.canvas.height / this.rect.height;
     this.isDrawing = true;
-    this.lastX = coords.x;
-    this.lastY = coords.y;
+    this.hasDrawn = true;
 
-    // Draw a dot for single click
-    this.ctx.beginPath();
-    this.ctx.arc(coords.x, coords.y, this.lineWidth / 2, 0, Math.PI * 2);
+    const { x, y } = this.getCoordinates(e);
     this.ctx.fillStyle = this.lineColor;
+    this.ctx.beginPath();
+    this.ctx.arc(x, y, this.lineWidth / 2, 0, Math.PI * 2);
     this.ctx.fill();
+    this.ctx.beginPath();
+    this.ctx.moveTo(x, y);
   }
 
   draw(e) {
     if (!this.isDrawing) return;
     e.preventDefault();
 
-    const coords = this.getCoordinates(e);
-    if (!coords) return;
-
-    this.ctx.beginPath();
-    this.ctx.moveTo(this.lastX, this.lastY);
-    this.ctx.lineTo(coords.x, coords.y);
+    // Pens report more points than the frame rate; coalesced events keep fast strokes smooth
+    const coalesced = e.getCoalescedEvents?.() || [];
+    let point;
+    for (const event of coalesced.length ? coalesced : [e]) {
+      point = this.getCoordinates(event);
+      this.ctx.lineTo(point.x, point.y);
+    }
     this.ctx.stroke();
-
-    this.lastX = coords.x;
-    this.lastY = coords.y;
-    this.hasDrawn = true;
+    // Restart the path so each stroke() redraws only the new segments
+    this.ctx.beginPath();
+    this.ctx.moveTo(point.x, point.y);
   }
 
-  stopDrawing(e) {
-    if (e) e.preventDefault();
+  stopDrawing() {
     this.isDrawing = false;
   }
 
   clearCanvas() {
-    if (!this.ctx) return;
-
     this.ctx.fillStyle = this.backgroundColor;
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     this.hasDrawn = false;
   }
 
-  isCanvasBlank() {
-    if (!this.hasDrawn) return true;
-
-    const pixelData = this.ctx.getImageData(
-      0,
-      0,
-      this.canvas.width,
-      this.canvas.height
-    ).data;
-
-    // Check if all pixels match the background color
-    // For white background (255, 255, 255)
-    for (let i = 0; i < pixelData.length; i += 4) {
-      if (
-        pixelData[i] !== 255 ||
-        pixelData[i + 1] !== 255 ||
-        pixelData[i + 2] !== 255
-      ) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  submitSignature() {
-    if (this.isCanvasBlank()) {
-      frappe.msgprint({
-        title: __("Signature Required"),
+  submitSignature(values) {
+    if (!this.hasDrawn) {
+      frappe.show_alert({
         message: __("Please draw your signature before proceeding."),
         indicator: "orange",
       });
       return;
     }
 
-    const signatureData = this.canvas.toDataURL("image/png");
-
+    this.result = {
+      Data: this.canvas.toDataURL("image/png"),
+      values,
+      format: "png",
+      timestamp: new Date().toISOString(),
+    };
     this.dialog.hide();
-
-    if (this.signaturePromiseResolve) {
-      this.signaturePromiseResolve({
-        Data: signatureData,
-        format: "png",
-        timestamp: new Date().toISOString(),
-      });
-    }
-  }
-
-  cancel() {
-    this.dialog.hide();
-
-    if (this.signaturePromiseResolve) {
-      this.signaturePromiseResolve(null);
-    }
-  }
-
-  destroy() {
-    if (this.dialog) {
-      this.dialog.hide();
-    }
   }
 }
 
