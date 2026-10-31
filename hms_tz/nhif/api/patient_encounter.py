@@ -168,7 +168,6 @@ def set_price_list(doc):
 
 
 def on_submit_validation(doc, method):
-	validate_clinical_notes_length(doc)
 	if doc.appointment:
 		validate_appointment_not_cancelled(doc.appointment)
 
