@@ -92,7 +92,8 @@
         "hide_border": 0,
         "permlevel": 0,
         "columns": 0,
-        "doctype": "Custom Field"
+        "doctype": "Custom Field",
+        "depends_on": "eval: doc.customer && doc.customer.includes(\"NHIF\") && doc.docstatus == 0 && doc.items.some((row) => row.is_restricted && !row.service_reference_no)"
     },
     {
         "name": "Delivery Note-custom_get_poc_reference_no",
@@ -139,7 +140,8 @@
         "hide_border": 0,
         "permlevel": 0,
         "columns": 0,
-        "doctype": "Custom Field"
+        "doctype": "Custom Field",
+        "depends_on": "eval: doc.customer && doc.customer.includes(\"NHIF\") && doc.docstatus == 0 && !doc.poc_reference_no"
     },
     {
         "name": "Delivery Note-custom_column_break_7jbma",
