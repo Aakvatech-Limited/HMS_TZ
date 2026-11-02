@@ -2,6 +2,7 @@ import frappe
 from frappe.utils import get_url_to_form
 
 from hms_tz.nhif.nhif_api.approval import issue_approved_service
+from hms_tz.nhif.nhif_api.approval_status import validate_approved_qty
 from hms_tz.nhif.nhif_api.verification import get_poc_reference_no
 
 
@@ -100,6 +101,7 @@ def issue_nhif_service(
 		for row in doc.items:
 			if row.is_restricted == 1 and not row.service_reference_no:
 				if row.approval_number:
+					validate_approved_qty(row, f"{row.item_code} (line {row.idx})")
 					approval_items.append(row)
 				else:
 					frappe.throw(f"Item: {row.item_code} require Approval Number to issue this Item")
