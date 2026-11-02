@@ -98,19 +98,24 @@ class TestIssueServicePocReference(FrappeTestCase):
 
 		self.calls.get_poc_reference_no.assert_not_called()
 
-	def test_delivery_note_uses_pharmacy_point_of_care(self):
-		insert("Delivery Note", "_Test POC DN 1", company=COMPANY, customer="NHIF")
+	def insert_delivery_note(self, name, qty=1, approved_qty=0):
+		insert("Delivery Note", name, company=COMPANY, customer="NHIF")
 		insert(
 			"Delivery Note Item",
-			"_Test POC DN Item 1",
-			parent="_Test POC DN 1",
+			f"{name} Item",
+			parent=name,
 			parenttype="Delivery Note",
 			parentfield="items",
+			idx=1,
 			item_code="_Test POC Drug",
 			is_restricted=1,
 			approval_number="APR-2",
-			qty=1,
+			qty=qty,
+			approved_qty=approved_qty,
 		)
+
+	def test_delivery_note_uses_pharmacy_point_of_care(self):
+		self.insert_delivery_note("_Test POC DN 1")
 
 		issue("Delivery Note", "_Test POC DN 1", "Medication", "")
 
@@ -164,3 +169,19 @@ class TestIssueServicePocReference(FrappeTestCase):
 		issue("Delivery Note", "_Test POC DN 3", "Medication", "")
 
 		self.calls.issue_approved_service.assert_called_once()
+
+	def test_delivery_note_quantity_not_matching_approval_is_not_issued(self):
+		for name, qty in (("_Test POC DN 5", 7), ("_Test POC DN 6", 14)):
+			self.insert_delivery_note(name, qty=qty, approved_qty=10)
+
+			with self.assertRaises(frappe.ValidationError):
+				issue("Delivery Note", name, "Medication", "")
+
+		self.calls.issue_approved_service.assert_not_called()
+
+	def test_delivery_note_quantity_matching_approval_is_issued(self):
+		self.insert_delivery_note("_Test POC DN 7", qty=10, approved_qty=10)
+
+		issue("Delivery Note", "_Test POC DN 7", "Medication", "")
+
+		self.assertEqual(self.calls.issue_approved_service.call_args.kwargs["qty"], 10)
