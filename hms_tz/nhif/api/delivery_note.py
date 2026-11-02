@@ -11,7 +11,7 @@ from hms_tz.hms_tz.doctype.hospital_revenue_entry.hospital_revenue_entry import 
 )
 from hms_tz.nhif.api.healthcare_utils import update_dimensions
 from hms_tz.nhif.api.medical_record import create_medical_record, update_medical_record
-from hms_tz.nhif.nhif_api.approval_status import get_short_approval_message
+from hms_tz.nhif.nhif_api.approval_status import validate_approved_qty
 from hms_tz.nhif.utils import validate_issued_services, validate_point_of_care
 
 
@@ -264,13 +264,8 @@ def before_submit(doc, method):
 				)
 			)
 
-		if item.is_restricted and item.approved_qty and item.qty > item.approved_qty:
-			frappe.throw(
-				get_short_approval_message(
-					f"{item.item_name} (line {item.idx})", item.approved_qty, item.qty
-				),
-				title=_("Quantity Above Approval"),
-			)
+		if item.is_restricted:
+			validate_approved_qty(item, f"{item.item_name} (line {item.idx})")
 
 		validate_issued_services(
 			item.doctype, item.name, is_restricted=item.is_restricted, company=doc.company
