@@ -259,6 +259,8 @@ frappe.ui.form.on("Radiology Examination", {
       });
   },
   get_poc_reference_no: async (frm) => {
+    if (frm.doc.poc_reference_no) return;
+
     if (!frm.doc.insurance_company.includes("NHIF")) {
       frappe.show_alert(
         {
@@ -337,6 +339,8 @@ frappe.ui.form.on("Radiology Examination", {
     });
   },
   issue_service: async (frm) => {
+    if (frm.doc.service_reference_no) return;
+
     if (!frm.doc.insurance_company.includes("NHIF")) {
       frappe.show_alert(
         {

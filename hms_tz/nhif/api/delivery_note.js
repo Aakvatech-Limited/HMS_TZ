@@ -71,6 +71,8 @@ frappe.ui.form.on("Delivery Note", {
     });
   },
   get_poc_reference_no: async (frm) => {
+    if (frm.doc.poc_reference_no) return;
+
     if (!frm.doc.customer.includes("NHIF")) {
       frappe.show_alert(
         {
@@ -149,6 +151,11 @@ frappe.ui.form.on("Delivery Note", {
     });
   },
   issue_service: async (frm) => {
+    const has_unissued_item = frm.doc.items.some(
+      (row) => row.is_restricted && !row.service_reference_no
+    );
+    if (!has_unissued_item) return;
+
     if (!frm.doc.customer.includes("NHIF")) {
       frappe.show_alert(
         {
