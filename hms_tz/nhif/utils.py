@@ -20,6 +20,9 @@ def get_poc_reference_no_for_lrpmt(
 	"""
 
 	doc = frappe.get_cached_doc(ref_doctype, ref_docname)
+	if doc.get("poc_reference_no"):
+		frappe.msgprint(f"POC Reference No: {doc.poc_reference_no} already exists for this document")
+		return
 
 	point_of_care = get_patient_care_name(service_type, service_name)
 
@@ -76,7 +79,13 @@ def get_poc_reference_no_for_lrpmt(
 def issue_nhif_service(
 	ref_doctype, ref_docname, service_type, service_name, fingerprint, fpcode, qty=1, biometric_method="NONE"
 ):
-	doc = frappe.get_cached_doc(ref_doctype, ref_docname)
+	# not cached: the Delivery Note Item set_value below leaves a cached Delivery Note stale
+	doc = frappe.get_doc(ref_doctype, ref_docname)
+	if doc.get("service_reference_no"):
+		frappe.msgprint(
+			f"Service Reference No: {doc.service_reference_no} is already issued for this document"
+		)
+		return {}
 
 	settings_doc = frappe.get_cached_doc("HMS TZ Setting", doc.company)
 

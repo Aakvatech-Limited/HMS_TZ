@@ -124,3 +124,43 @@ class TestIssueServicePocReference(FrappeTestCase):
 		issue("Delivery Note", "_Test POC DN 2", "Medication", "")
 
 		self.calls.get_poc_reference_no.assert_not_called()
+
+	def test_issued_service_is_not_issued_again(self):
+		self.insert_radiology("_Test POC RE 5", poc_reference_no="POC-OLD")
+
+		issue_radiology("_Test POC RE 5")
+		data = issue_radiology("_Test POC RE 5")
+
+		self.assertEqual(data, {})
+		self.calls.issue_approved_service.assert_called_once()
+
+	def test_existing_poc_is_not_requested_again(self):
+		self.insert_radiology("_Test POC RE 6", poc_reference_no="POC-OLD")
+
+		result = utils.get_poc_reference_no_for_lrpmt(
+			"Radiology Examination", "_Test POC RE 6", "Radiology Examination Template", TEMPLATE
+		)
+
+		self.assertIsNone(result)
+		self.calls.get_poc_reference_no.assert_not_called()
+
+	def test_delivery_note_issued_item_is_not_issued_again(self):
+		insert(
+			"Delivery Note", "_Test POC DN 3", company=COMPANY, customer="NHIF", poc_reference_no="POC-OLD"
+		)
+		insert(
+			"Delivery Note Item",
+			"_Test POC DN Item 3",
+			parent="_Test POC DN 3",
+			parenttype="Delivery Note",
+			parentfield="items",
+			item_code="_Test POC Drug",
+			is_restricted=1,
+			approval_number="APR-3",
+			qty=1,
+		)
+
+		issue("Delivery Note", "_Test POC DN 3", "Medication", "")
+		issue("Delivery Note", "_Test POC DN 3", "Medication", "")
+
+		self.calls.issue_approved_service.assert_called_once()
