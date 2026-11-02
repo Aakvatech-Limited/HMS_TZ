@@ -12,6 +12,7 @@ frappe.ui.form.on("Therapy Session", {
       });
     }
     render_ts_consumables_section(frm);
+    RequestApproval.show_restricted_banner(frm);
   },
   onload: function (frm) {
     $('[data-label="Not%20Serviced"]').parent().hide();
@@ -25,6 +26,12 @@ frappe.ui.form.on("Therapy Session", {
         frappe.set_route("tz-patient-history");
       });
     }
+  },
+  approval_number: (frm) => {
+    RequestApproval.show_restricted_banner(frm);
+  },
+  is_restricted: (frm) => {
+    RequestApproval.show_restricted_banner(frm);
   },
   request_approval_no: (frm) => {
     if (
@@ -90,10 +97,6 @@ frappe.ui.form.on("Therapy Session", {
         if (r.message) {
           frm.refresh();
           if (r.message.status == "success") {
-            frm.save().then(() => {
-              frm.reload_doc();
-            });
-
             frappe.show_alert(
               {
                 message: __(
@@ -106,7 +109,11 @@ frappe.ui.form.on("Therapy Session", {
               },
               15
             );
+            if (frm.is_dirty()) {
+              frm.save();
+            }
             frappe.utils.play_sound("submit");
+            frm.reload_doc();
           } else {
             frappe.show_alert(
               {
@@ -153,10 +160,6 @@ frappe.ui.form.on("Therapy Session", {
         if (r.message) {
           frm.refresh();
           if (r.message.status == "success") {
-            frm.save().then(() => {
-              frm.reload_doc();
-            });
-
             frappe.show_alert(
               {
                 message: __(
@@ -169,7 +172,11 @@ frappe.ui.form.on("Therapy Session", {
               },
               15
             );
+            if (frm.is_dirty()) {
+              frm.save();
+            }
             frappe.utils.play_sound("submit");
+            frm.reload_doc();
           } else {
             frappe.show_alert(
               {
@@ -227,11 +234,11 @@ frappe.ui.form.on("Therapy Session", {
           frappe.utils.play_sound("error");
           return;
         } else if (r.message) {
+          if (frm.is_dirty()) {
+            frm.save();
+          }
           frappe.utils.play_sound("submit");
-          frm.save().then(() => {
-            frm.reload_doc();
-          });
-
+          frm.reload_doc();
           frappe.show_alert(
             {
               message: __(
@@ -322,11 +329,11 @@ frappe.ui.form.on("Therapy Session", {
       callback: function (r) {
         if (r.message) {
           if (r.message) {
-            frm.save().then(() => {
-              frm.reload_doc();
-            });
-
+            if (frm.is_dirty()) {
+              frm.save();
+            }
             frappe.utils.play_sound("submit");
+            frm.reload_doc();
           } else {
             frappe.utils.play_sound("error");
           }
@@ -402,11 +409,11 @@ frappe.ui.form.on("Therapy Session", {
       freeze_message: __('<i class="fa fa-spinner fa-spin fa-4x"></i>'),
       callback: function (r) {
         if (r.message) {
+          if (frm.is_dirty()) {
+            frm.save();
+          }
           frappe.utils.play_sound("submit");
-          let data = r.message;
-          frm.save().then(() => {
-            frm.reload_doc();
-          });
+          frm.reload_doc();
         } else {
           frappe.utils.play_sound("error");
         }
