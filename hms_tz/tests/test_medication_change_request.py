@@ -127,6 +127,74 @@ class TestMedicationChangeRequestSalesOrder(FrappeTestCase):
 		self.assertEqual(order.set_warehouse, STORE_A)
 
 
+NHIF_VALUES = {
+	"approval_number": "_Test APPROVAL-1",
+	"approval_date": "2026-11-01",
+	"approval_status": "APPROVED",
+	"approved_qty": 2,
+	"service_authorization_id": "_Test AUTH-1",
+	"authorized_item_id": "_Test ITEM-1",
+	"service_reference_no": "_Test SRN-1",
+}
+
+
+def get_medication_or_item_value(doctype, name, fieldnames):
+	return (f"{name} Item", "Nos") if doctype == "Medication" else (1, name)
+
+
+@patch.object(mcr, "get_warehouse_from_service_unit", get_warehouse_from_service_unit)
+@patch.object(mcr.frappe, "get_cached_value", get_medication_or_item_value)
+class TestMedicationChangeRequestDeliveryNote(FrappeTestCase):
+	def update_delivery_note(self, *drug_codes):
+		dn_doc = frappe.get_doc(
+			{
+				"doctype": "Delivery Note",
+				"name": "_Test MCR DN-1",
+				"set_warehouse": STORE_A,
+				"items": [{"item_code": "_Test MCR Drug A Item", "is_restricted": 1, **NHIF_VALUES}],
+			}
+		)
+		dn_doc.save = MagicMock()
+		dn_doc.reload = MagicMock()
+		rows = [
+			make_row(drug_code=code, name=code, prescribe=0, delivered_quantity=2, amount=10, is_restricted=1)
+			for code in drug_codes
+		]
+		encounter = frappe._dict(drug_prescription=rows, insurance_subscription="_Test MCR Subscription")
+
+		request = frappe.new_doc("Medication Change Request")
+		request.delivery_note = dn_doc.name
+		request.update_delivery_note_workflow = MagicMock()
+		request.update_drug_prescription = MagicMock()
+		get_doc = frappe.get_doc
+		with patch.object(
+			mcr.frappe,
+			"get_doc",
+			side_effect=lambda *args: dn_doc if args == ("Delivery Note", dn_doc.name) else get_doc(*args),
+		):
+			request.update_delivery_note(encounter)
+		return dn_doc
+
+	def test_kept_item_keeps_nhif_values(self):
+		dn_doc = self.update_delivery_note("_Test MCR Drug A")
+
+		item = dn_doc.items[0]
+		self.assertEqual({fieldname: item.get(fieldname) for fieldname in NHIF_VALUES}, NHIF_VALUES)
+		self.assertEqual(dn_doc.hms_tz_original_items[0].approval_number, NHIF_VALUES["approval_number"])
+
+	def test_added_item_has_no_nhif_values(self):
+		dn_doc = self.update_delivery_note("_Test MCR Drug A", "_Test MCR Drug B")
+
+		self.assertEqual(dn_doc.items[0].service_reference_no, NHIF_VALUES["service_reference_no"])
+		self.assertFalse(any(dn_doc.items[1].get(fieldname) for fieldname in NHIF_VALUES))
+
+	def test_removed_item_values_are_not_moved(self):
+		dn_doc = self.update_delivery_note("_Test MCR Drug B")
+
+		self.assertEqual(len(dn_doc.items), 1)
+		self.assertFalse(any(dn_doc.items[0].get(fieldname) for fieldname in NHIF_VALUES))
+
+
 class TestDeliveryNotePendingMedicationChange(FrappeTestCase):
 	def setUp(self):
 		# private queue name, so a running worker cannot take the test jobs
