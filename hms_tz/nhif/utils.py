@@ -142,6 +142,13 @@ def issue_nhif_service(
 
 			data.update(service_data)
 
+	if data and not doc.get("poc_reference_no"):
+		# keep the issued service reference if the POC request fails
+		frappe.db.commit()  # nosemgrep
+		get_poc_reference_no_for_lrpmt(
+			doc.doctype, doc.name, service_type, service_name, fingerprint, fpcode, biometric_method
+		)
+
 	return data
 
 
