@@ -156,6 +156,31 @@ frappe.ui.form.on("Delivery Note", {
     );
     if (!has_unissued_item) return;
 
+    // checked before biometric capture; the server enforces it again
+    const unapproved_qty_row = frm.doc.items.find(
+      (row) =>
+        row.is_restricted &&
+        !row.service_reference_no &&
+        row.approved_qty &&
+        row.qty != row.approved_qty
+    );
+    if (unapproved_qty_row) {
+      frappe.msgprint({
+        title: __("Quantity Does Not Match Approval"),
+        message: __(
+          "Approved quantity for <b>{0} (line {1})</b> is <b>{2}</b> but the quantity is <b>{3}</b>. Change the quantity through a Medication Change Request before issuing.",
+          [
+            unapproved_qty_row.item_code,
+            unapproved_qty_row.idx,
+            unapproved_qty_row.approved_qty,
+            unapproved_qty_row.qty,
+          ]
+        ),
+        indicator: "orange",
+      });
+      return;
+    }
+
     if (!frm.doc.customer.includes("NHIF")) {
       frappe.show_alert(
         {
