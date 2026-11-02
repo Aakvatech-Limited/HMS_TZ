@@ -271,11 +271,6 @@ class RequestApproval {
             // Hide the dialog first
             dialog.hide();
 
-            // Save and reload the form
-            me.frm.save().then(() => {
-              me.frm.reload_doc();
-            });
-
             // Show success alert
             frappe.show_alert(
               {
@@ -290,7 +285,11 @@ class RequestApproval {
               15
             );
 
+            if (me.frm.is_dirty()) {
+              me.frm.save();
+            }
             frappe.utils.play_sound("submit");
+            me.frm.reload_doc();
           } else {
             // Show error alert with message from API if available
             const error_message =
@@ -334,6 +333,40 @@ class RequestApproval {
         });
       },
     });
+  }
+
+  /** Show or clear the orange banner asking for the NHIF approval number. */
+  static show_restricted_banner(frm) {
+    frm.layout.message
+      .find(".nhif-approval-banner")
+      .closest(".form-message")
+      .remove();
+
+    const needs_approval =
+      frm.doc.doctype === "Delivery Note"
+        ? (frm.doc.items || []).some(
+            (row) => row.is_restricted == 1 && !row.approval_number
+          )
+        : frm.doc.is_restricted == 1 && !frm.doc.approval_number;
+
+    if (!needs_approval) {
+      if (!frm.layout.message.children().length) {
+        frm.layout.show_message();
+      }
+      return;
+    }
+    frm.layout.show_message(
+      `<div class="nhif-approval-banner" style="text-align: left; font-size: var(--text-base); font-weight: var(--weight-semibold);">
+        <span style="display: inline-block; vertical-align: middle; margin-right: var(--margin-xs);">${frappe.utils.icon(
+          "es-solid-alert-triangle",
+          "sm"
+        )}</span><span style="vertical-align: middle;">${__(
+        "Get Approval Number from NHIF before doing anything, click the button of 'Get Approval Status'"
+      )}</span>
+      </div>`,
+      "orange",
+      true
+    );
   }
 }
 
