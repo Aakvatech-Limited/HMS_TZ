@@ -34,6 +34,15 @@ from hms_tz.hms_tz.doctype.hospital_revenue_entry.hospital_revenue_entry import 
 from hms_tz.nhif.api.delivery_note import update_drug_prescription
 
 HSR_UPDATE_QUEUE = "short"
+NHIF_ITEM_FIELDS = (
+	"approval_number",
+	"approval_date",
+	"approval_status",
+	"approved_qty",
+	"service_authorization_id",
+	"authorized_item_id",
+	"service_reference_no",
+)
 
 
 class MedicationChangeRequest(Document):
@@ -576,7 +585,9 @@ class MedicationChangeRequest(Document):
 		so_doc.reload()
 
 	def update_delivery_note(self, encounter_doc):
-		dn_doc = frappe.get_cached_doc("Delivery Note", self.delivery_note)
+		# not cached: NHIF values are written to the items with frappe.db.set_value
+		dn_doc = frappe.get_doc("Delivery Note", self.delivery_note)
+		nhif_values = get_nhif_values_by_item(dn_doc)
 		dn_doc.items = []
 		dn_doc.hms_tz_original_items = []
 
@@ -612,6 +623,8 @@ class MedicationChangeRequest(Document):
 			item.is_restricted = row.is_restricted
 			item.discount_percentage = row.hms_tz_is_discount_percent
 			item.hms_tz_is_discount_applied = row.hms_tz_is_discount_applied
+			# keep NHIF values: issuing the service again uses another monthly session
+			item.update(nhif_values.get(item_code, {}))
 			item.description = ", <br>".join(
 				[
 					"frequency: " + str(row.get("dosage") or "No Prescription Dosage"),
@@ -853,6 +866,14 @@ def get_fields_to_clear():
 		"modified_by",
 		"docstatus",
 	]
+
+
+def get_nhif_values_by_item(dn_doc):
+	return {
+		item.item_code: {fieldname: item.get(fieldname) for fieldname in NHIF_ITEM_FIELDS}
+		for item in dn_doc.items
+		if item.approval_number or item.service_reference_no
+	}
 
 
 def set_original_items(name, item):
