@@ -385,6 +385,8 @@ class TestNHIFApprovalStatus(FrappeTestCase):
 		self.assertFalse(get_approval("Radiology Examination", "_Test AS Xray").approval_number)
 
 
+@patch.object(delivery_note, "validate_point_of_care", new=lambda *args: None)
+@patch.object(delivery_note, "validate_issued_services", new=lambda *args, **kwargs: None)
 class TestDeliveryNoteApprovedQty(FrappeTestCase):
 	def make_delivery_note(self, qty, approved_qty):
 		doc = frappe.new_doc("Delivery Note")
@@ -401,17 +403,23 @@ class TestDeliveryNoteApprovedQty(FrappeTestCase):
 		)
 		return doc
 
-	@patch.object(delivery_note, "validate_point_of_care")
-	@patch.object(delivery_note, "validate_issued_services")
-	def test_quantity_above_approved_qty_blocks_submit(self, *mocks):
+	def test_quantity_above_approved_qty_blocks_submit(self):
 		with self.assertRaises(frappe.ValidationError) as error:
 			delivery_note.before_submit(self.make_delivery_note(14, 10), "before_submit")
 
 		self.assertIn("Medication Change Request", str(error.exception))
 		self.assertIn("paid by cash", str(error.exception))
 
-	@patch.object(delivery_note, "validate_point_of_care")
-	@patch.object(delivery_note, "validate_issued_services")
-	def test_quantity_within_approved_qty_submits(self, *mocks):
+	def test_quantity_below_approved_qty_blocks_submit(self):
+		with self.assertRaises(frappe.ValidationError) as error:
+			delivery_note.before_submit(self.make_delivery_note(7, 10), "before_submit")
+
+		self.assertIn(
+			"Change the quantity to <b>10</b> through a Medication Change Request", str(error.exception)
+		)
+
+	def test_quantity_equal_to_approved_qty_submits(self):
 		delivery_note.before_submit(self.make_delivery_note(10, 10), "before_submit")
+
+	def test_quantity_without_approved_qty_submits(self):
 		delivery_note.before_submit(self.make_delivery_note(14, 0), "before_submit")
