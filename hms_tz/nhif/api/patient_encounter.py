@@ -38,6 +38,7 @@ from hms_tz.nhif.api.patient_appointment import (
 	get_cancelled_appointment_message,
 	validate_appointment_not_cancelled,
 )
+from hms_tz.nhif.doctype.nhif_stg.nhif_stg import validate_moh_stg
 from hms_tz.nhif.utils import validate_main_diagnosis_code, validate_point_of_care
 
 
@@ -952,6 +953,7 @@ def before_submit(doc, method):
 
 	validate_preapproval_services(doc)
 	validate_point_of_care(doc, "validate_poc_at_encounter")
+	validate_moh_stg(doc)
 
 	if not doc.healthcare_package_order:
 		# before_save hooks don't run on submit, so the medical code check must be repeated here to block

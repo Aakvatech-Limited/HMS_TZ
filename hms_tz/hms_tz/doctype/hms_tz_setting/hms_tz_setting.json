@@ -28,6 +28,8 @@
   "auto_prescribe_items_on_patient_encounter",
   "validate_medication_class",
   "auto_create_sales_order_from_encounter",
+  "show_stg_on_patient_encounter",
+  "enforce_stg_on_patient_encounter",
   "lab_test_conf_section",
   "allow_send_sms_for_multiple_labs",
   "column_break_zsbe",
@@ -403,6 +405,21 @@
   },
   {
    "default": "1",
+   "description": "Show the MOH STG services of the encounter diagnoses on draft Patient Encounters",
+   "fieldname": "show_stg_on_patient_encounter",
+   "fieldtype": "Check",
+   "label": "Show STG on Patient Encounter"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval: doc.show_stg_on_patient_encounter",
+   "description": "Do not allow submit of a Patient Encounter that has services not in the MOH STG of its diagnoses",
+   "fieldname": "enforce_stg_on_patient_encounter",
+   "fieldtype": "Check",
+   "label": "Enforce STG on Patient Encounter"
+  },
+  {
+   "default": "1",
    "description": "If ticked, Uncovered items will be marked as prescribed and required to be paid in cash on patient encounter",
    "fieldname": "auto_prescribe_items_on_patient_encounter",
    "fieldtype": "Check",
@@ -702,7 +719,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-29 16:28:03.068635",
+ "modified": "2026-11-03 21:00:00.000000",
  "modified_by": "Administrator",
  "module": "Hms Tz",
  "name": "HMS TZ Setting",
