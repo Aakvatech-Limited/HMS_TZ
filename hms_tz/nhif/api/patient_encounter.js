@@ -818,6 +818,7 @@ const medical_code_mapping = {
 };
 
 function set_medical_code(frm, reset_columns) {
+  show_moh_stg(frm);
   function set_options_for_fields(fields, from_table) {
     const options = get_diagnosis_list(frm, from_table);
 
@@ -2753,4 +2754,139 @@ var freeze_encounter_form = (frm) => {
     ],
     false
   );
+};
+
+const STG_SERVICE_LABELS = {
+  "Lab Test Template": __("Lab"),
+  "Radiology Examination Template": __("Radiology"),
+  "Clinical Procedure Template": __("Procedure"),
+  Medication: __("Medication"),
+  "Therapy Type": __("Therapy"),
+};
+
+var show_moh_stg = (frm) => {
+  if (!frm.fields_dict.moh_stg_html) {
+    return;
+  }
+  if (frm.doc.docstatus !== 0) {
+    frm.toggle_display("moh_stg_section", false);
+    return;
+  }
+  frappe.call({
+    method: "hms_tz.nhif.doctype.nhif_stg.nhif_stg.get_moh_stg",
+    args: { encounter: frm.doc },
+    callback: (r) => {
+      if (r.message) {
+        frm.set_df_property(
+          "moh_stg_html",
+          "options",
+          get_moh_stg_html(r.message)
+        );
+      }
+      frm.toggle_display("moh_stg_section", Boolean(r.message));
+    },
+  });
+  frm.fields_dict.moh_stg_html.$wrapper
+    .off("click.moh_stg")
+    .on("click.moh_stg", ".moh-stg-toggle", (e) => {
+      const toggle = $(e.currentTarget);
+      const more = toggle.closest("td").find(".moh-stg-more");
+      more.toggleClass("hidden");
+      toggle.text(
+        more.hasClass("hidden") ? toggle.data("label") : __("..less")
+      );
+    });
+};
+
+var get_moh_stg_html = (data) => {
+  const escape = frappe.utils.escape_html;
+  let html = "";
+  if (data.stg.length) {
+    html += get_moh_stg_codes_html(data.stg);
+  } else if (!data.codes_not_in_stg.length) {
+    html += `<p class="text-muted">${__(
+      "Add a preliminary or final diagnosis to see the investigations and treatments the STG suggests."
+    )}</p>`;
+  }
+  html += get_moh_stg_missing_html(data.codes_not_in_stg, data.not_in_stg);
+  return html;
+};
+
+var get_moh_stg_missing_html = (codes, services) => {
+  if (!codes.length && !services.length) {
+    return "";
+  }
+  const list = (names) =>
+    names.length
+      ? `<ul style="margin: 0; padding-left: 1rem;">${names
+          .map((name) => `<li>${frappe.utils.escape_html(name)}</li>`)
+          .join("")}</ul>`
+      : "";
+  return `<table class="table table-bordered table-sm text-danger" style="table-layout: fixed; font-size: var(--text-tiny); margin-top: 12px;">
+    <thead><tr><th>${__("Medical Code(s) not in STG")}</th><th>${__(
+    "Service(s) not in STG"
+  )}</th></tr></thead>
+    <tbody><tr>
+      <td style="font-size: 10px;">${list(codes)}</td>
+      <td style="font-size: 10px;">${list(services)}</td>
+    </tr></tbody>
+  </table>`;
+};
+
+const STG_VISIBLE_SERVICES = 5;
+
+var get_moh_stg_codes_html = (stg_rows) => {
+  const escape = frappe.utils.escape_html;
+  const by_code = {};
+  stg_rows.forEach((row) => {
+    const code = (by_code[row.code_value] ||= {
+      definition: row.definition,
+      services: {},
+    });
+    (code.services[row.service_type] ||= new Set()).add(row.service_name);
+  });
+
+  const columns = Object.keys(STG_SERVICE_LABELS);
+  const th = (label) =>
+    `<th style="position: sticky; top: 0; background: var(--fg-color); z-index: 1;">${label}</th>`;
+  let html = `<div style="max-height: 360px; overflow-y: auto;">
+    <table class="table table-bordered table-sm" style="table-layout: fixed; font-size: var(--text-tiny);">
+      <thead><tr>${th(__("Diagnosis"))}${columns
+    .map((column) => th(STG_SERVICE_LABELS[column]))
+    .join("")}</tr></thead><tbody>`;
+  for (const [code_value, code] of Object.entries(by_code)) {
+    html += `<tr>
+      <td><b>${escape(code_value)}</b><br>${escape(code.definition || "")}</td>
+      ${columns
+        .map(
+          (column) =>
+            `<td style="font-size: 10px;">${get_moh_stg_list_html(
+              code.services[column] || new Set()
+            )}</td>`
+        )
+        .join("")}
+    </tr>`;
+  }
+  return html + "</tbody></table></div>";
+};
+
+var get_moh_stg_list_html = (services) => {
+  const escape = frappe.utils.escape_html;
+  const items = [...services].map((name, index) => {
+    const hidden =
+      index < STG_VISIBLE_SERVICES ? "" : ` class="moh-stg-more hidden"`;
+    return `<li${hidden}>${escape(name)}</li>`;
+  });
+  if (!items.length) {
+    return "";
+  }
+
+  let html = `<ul style="margin: 0; padding-left: 1rem;">${items.join(
+    ""
+  )}</ul>`;
+  if (items.length > STG_VISIBLE_SERVICES) {
+    const label = __("..more ({0})", [items.length - STG_VISIBLE_SERVICES]);
+    html += `<a class="moh-stg-toggle" style="color: var(--blue-600);" data-label="${label}">${label}</a>`;
+  }
+  return html;
 };
