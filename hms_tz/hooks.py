@@ -278,6 +278,8 @@ scheduler_events = {
 		"*/10 * * * *": ["hms_tz.nhif.api.healthcare_utils.create_invoiced_items_if_not_created"],
 		# Routine for every day every after 30min from 03:00am to 05:00am
 		"*/30 3-4 * * *": ["hms_tz.nhif.api.healthcare_utils.auto_finalize_patient_encounters"],
+		# Routine for the 1st of every month 02:00am at night
+		"0 2 1 * *": ["hms_tz.nhif.nhif_api.reference.get_stg_records"],
 		# Routine for every Saturday 01:00 am at night
 		"0 1 * * 6": [
 			"hms_tz.nhif.nhif_api.verification.get_visit_types",
