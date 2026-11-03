@@ -342,6 +342,17 @@ var add_nhif_actions_btn = function (frm) {
     },
     __("NHIF Actions")
   );
+
+  frm.add_custom_button(
+    __("Get STG Records"),
+    function () {
+      frappe.call({
+        method: "hms_tz.nhif.nhif_api.reference.enqueue_get_stg_records",
+        args: { company: frm.doc.company },
+      });
+    },
+    __("NHIF Actions")
+  );
 };
 
 var add_jubilee_actions_btn = (frm) => {
