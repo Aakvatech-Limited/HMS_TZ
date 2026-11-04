@@ -2,6 +2,7 @@ import json
 
 import frappe
 import requests
+from frappe import _
 from frappe.utils import add_to_date, escape_html, flt, get_datetime, get_fullname
 
 from hms_tz.nhif.doctype.nhif_response_log.nhif_response_log import add_log
@@ -586,12 +587,13 @@ def send_confirmation_code(ref_doctype, ref_docname):
 
 
 @frappe.whitelist(methods=["POST"])
-def get_receipt(ref_doctype, ref_docname):
+def get_receipt(ref_doctype=None, ref_docname=None, doc=None, validate_only=False):
 	"""
-	Get receipt from NHIF
+	Get receipt from NHIF. With validate_only, only check that the claim has reached NHIF.
 	"""
 
-	doc = frappe.get_cached_doc(ref_doctype, ref_docname)
+	if not doc:
+		doc = frappe.get_cached_doc(ref_doctype, ref_docname)
 
 	settings_doc = frappe.get_cached_doc("HMS TZ Setting", doc.company)
 
@@ -615,16 +617,17 @@ def get_receipt(ref_doctype, ref_docname):
 			ref_doctype=doc.doctype,
 			ref_docname=doc.name,
 		)
-		doc.add_comment(
-			comment_type="Comment",
-			text=f"Failed to retrieve receipt!<br><br><b>Message from NHIF:</b><br>{r.text}",
-		)
-		frappe.db.commit()
+		if not validate_only:
+			doc.add_comment(
+				comment_type="Comment",
+				text=f"Failed to retrieve receipt!<br><br><b>Message from NHIF:</b><br>{r.text}",
+			)
+			frappe.db.commit()
 
-		frappe.throw(
-			f"NHIF responded with HTTP status code: {str(r.status_code if r.status_code else 'NO STATUS CODE')}\
+			frappe.throw(
+				f"NHIF responded with HTTP status code: {str(r.status_code if r.status_code else 'NO STATUS CODE')}\
                 <br><br><b>Message from NHIF:</b><br>{r.text}"
-		)
+			)
 	else:
 		data = json.loads(r.text)
 		add_log(
@@ -639,15 +642,25 @@ def get_receipt(ref_doctype, ref_docname):
 			ref_docname=doc.name,
 		)
 
-		doc.receipt_no = data.get("ReceiptNo")
-		doc.save(ignore_permissions=True)
-		doc.reload()
+		if not validate_only:
+			doc.receipt_no = data.get("ReceiptNo")
+			doc.save(ignore_permissions=True)
+			doc.reload()
 
-		doc.add_comment(
-			comment_type="Comment",
-			text=f"Receipt retrieved successfully!<br><br><b>Receipt No:</b> {escape_html(data.get('ReceiptNo'))}",
+			doc.add_comment(
+				comment_type="Comment",
+				text=f"Receipt retrieved successfully!<br><br><b>Receipt No:</b> {escape_html(data.get('ReceiptNo'))}",
+			)
+			return True
+
+	if r.status_code != 200 or not data.get("ReceiptNo"):
+		frappe.throw(
+			_(
+				"Do not bypass sending to NHIF. Claim {0} has not yet reached NHIF.<br><br><b>Message from NHIF:</b><br>{1}"
+			).format(doc.name, escape_html(r.text)),
+			title=_("Claim Not Received by NHIF"),
 		)
-		return True
+	return True
 
 
 def to_iso8601_utc(dt):
