@@ -2528,13 +2528,6 @@ def execute():
 		},
 		{
 			"doctype": "NHIF Patient Claim",
-			"fieldname": "authorization_no",
-			"property": "permlevel",
-			"property_type": "Int",
-			"value": 0,
-		},
-		{
-			"doctype": "NHIF Patient Claim",
 			"fieldname": "allow_changes",
 			"property": "permlevel",
 			"property_type": "Int",
@@ -2553,13 +2546,6 @@ def execute():
 			"property": "fetch_if_empty",
 			"property_type": "Check",
 			"value": 0,
-		},
-		{
-			"doctype": "NHIF Patient Claim",
-			"fieldname": "authorization_no",
-			"property": "read_only_depends_on",
-			"property_type": "Data",
-			"value": "eval: !doc.allow_changes",
 		},
 		{
 			"doctype": "Inpatient Consultancy",
