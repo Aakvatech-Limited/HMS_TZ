@@ -260,7 +260,6 @@ def get_payload(doc):
 	date_created = get_datetime(f"{doc.attendance_date} {doc.attendance_time}").isoformat(
 		timespec="milliseconds"
 	)
-	# date_created = to_iso8601_utc(f"{doc.attendance_date} {doc.attendance_time}")
 
 	for disease in doc.nhif_patient_claim_disease:
 		# disease_date = to_iso8601_utc(disease.date_created)
@@ -277,7 +276,6 @@ def get_payload(doc):
 		diseases.append(disease_dict)
 
 	for item in doc.nhif_patient_claim_item:
-		# item_date = to_iso8601_utc(item.date_created)
 		item_date = get_datetime(item.date_created).isoformat(timespec="milliseconds")
 
 		item_dict = {
@@ -296,17 +294,20 @@ def get_payload(doc):
 		}
 		items.append(item_dict)
 
-	Signatures = [
-		{
-			"Signatory": "PATIENT",
-			"SignatoryID": doc.cardno.strip(),
-			"SignatureData": doc.patient_signature,  # str(doc.patient_signature).replace("data:image/png;base64,", ""),
-			"DateCreated": date_created,
-			"CreatedBy": doc.item_crt_by,
-			"LastModified": date_modified,
-			"LastModifiedBy": f"{doc.first_name} {doc.last_name}",
-		}
-	]
+	Signatures = []
+
+	if not doc.folio_signed:
+		Signatures.append(
+			{
+				"Signatory": "PATIENT",
+				"SignatoryID": doc.cardno.strip(),
+				"SignatureData": doc.patient_signature,
+				"DateCreated": date_created,
+				"CreatedBy": doc.item_crt_by,
+				"LastModified": date_modified,
+				"LastModifiedBy": f"{doc.first_name} {doc.last_name}",
+			}
+		)
 
 	for d in doc.practitioners:
 		if d.mct_code:
@@ -317,7 +318,7 @@ def get_payload(doc):
 				{
 					"Signatory": "MCT",
 					"SignatoryID": d.mct_code,
-					"SignatureData": signature,  # str(signature).replace("data:image/png;base64,", ""),
+					"SignatureData": signature,
 					"DateCreated": date_created,
 					"CreatedBy": doc.item_crt_by,
 					"LastModified": date_modified,
@@ -357,9 +358,6 @@ def get_payload(doc):
 		"LastModifiedBy": get_fullname(doc.modified_by),
 	}
 	if doc.patient_type_code == "IN":
-		# payload["DateAdmitted"] = to_iso8601_utc(f"{doc.date_admitted} {doc.admitted_time}")
-		# payload["DateDischarged"] = to_iso8601_utc(f"{doc.date_discharge} {doc.discharge_time}")
-
 		admission_datetime = get_datetime(f"{doc.date_admitted} {doc.admitted_time}")
 		discharge_datetime = get_datetime(f"{doc.date_discharge} {doc.discharge_time}")
 
