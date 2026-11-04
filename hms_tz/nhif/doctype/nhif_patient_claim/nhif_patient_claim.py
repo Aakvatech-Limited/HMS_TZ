@@ -1321,15 +1321,15 @@ def reconcile_repeated_items(claim_no):
 def update_original_patient_claim(doc):
 	"""Update original patient claim incase merging if done for this claim"""
 
-	ref_docnames = []
+	ref_docnames = set()
 	for item in doc.original_nhif_patient_claim_item:
-		if item.ref_docname:
-			d = item.ref_docname.split(",")
-			ref_docnames.extend(d)
+		ref_docnames.update((item.ref_docname or "").split(","))
 
 	for row in doc.nhif_patient_claim_item:
-		if row.ref_docname not in ref_docnames:
-			ref_docnames.append(row.ref_docname)
+		# Reconciled rows join their ref_docnames with commas
+		row_ref_docnames = set((row.ref_docname or "").split(","))
+		if not row_ref_docnames.issubset(ref_docnames):
+			ref_docnames.update(row_ref_docnames)
 
 			new_row = row.as_dict()
 			for fieldname in [
