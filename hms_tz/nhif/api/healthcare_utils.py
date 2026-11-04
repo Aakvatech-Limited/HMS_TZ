@@ -2664,103 +2664,91 @@ def enqueue_auto_create_nhif_patient_claims():
 
 
 def auto_create_nhif_patient_claims():
-	"""Auto create NHIF patient claims after a number of days set in company settings
+	"""Create NHIF Patient Claims for each company with auto create of claims enabled; runs daily at 01:30."""
+	from_date = get_first_day(nowdate())
+	to_date = add_days(nowdate(), -1)
+	companies = frappe.get_all(
+		"HMS TZ Setting",
+		filters={"enable_nhif_api": 1, "enable_auto_create_of_claims": 1},
+		pluck="company",
+	)
+	for company in companies:
+		closed_appointments = set(get_unclaimed_nhif_appointments(company, from_date, to_date))
+		ongoing_inpatients = set(get_ongoing_nhif_inpatient_appointments(company))
+		discharged_inpatients = set(get_discharged_nhif_inpatient_appointments(company, from_date, to_date))
+		create_nhif_patient_claims((closed_appointments - ongoing_inpatients) | discharged_inpatients)
 
-	This routine runs every day at 01: 30am at night
-	"""
 
-	pa = DocType("Patient Appointment")
-	pe = DocType("Patient Encounter")
-	ip = DocType("Inpatient Record")
-
-	def get_appointments(from_date, to_date):
-		appointments = (
-			frappe.qb.from_(pa)
-			.inner_join(pe)
-			.on(pa.name == pe.appointment)
-			.select(
-				pa.name.as_("appointment"),
-			)
-			.where(
-				(pa.status == "Closed")
-				# (pa.insurance_company.like("NHIF"))
-				& (pa.insurance_company == "NHIF")
-				& (pa.company == "Shree Hindu Mandal Hospital - Dar es Salaam")
-				& (pa.appointment_date.between(from_date, to_date))
-				& (pa.nhif_patient_claim.isnull() | (pa.nhif_patient_claim == ""))
-				& (pe.docstatus == 1)
-				& (pe.duplicated == 0)
-			)
-		).run(as_dict=True)
-
-		appointment_ids = [i.appointment for i in appointments]
-		return appointment_ids
-
-	def get_ongoiong_inpatients():
-		inpatient_appointments = (
-			frappe.qb.from_(ip)
-			.select(ip.patient_appointment)
-			.where(
-				# (ip.insurance_company.like("NHIF"))
-				(ip.insurance_company == "NHIF")
-				& (ip.company == "Shree Hindu Mandal Hospital - Dar es Salaam")
-				& (ip.patient_appointment.isnotnull())
-				& (ip.status != "Discharged")
-			)
-		).run(as_dict=True)
-
-		ongoing_inpatients = [i.patient_appointment for i in inpatient_appointments]
-
-		return ongoing_inpatients
-
-	def get_discharged_inpatients(from_date, to_date):
-		inpatient_appointments = (
-			frappe.qb.from_(ip)
-			.inner_join(pa)
-			.on(ip.patient_appointment == pa.name)
-			.inner_join(pe)
-			.on(ip.patient_appointment == pe.appointment)
-			.select(ip.patient_appointment)
-			.where(
-				# (ip.insurance_company.like("NHIF"))
-				(ip.insurance_company == "NHIF")
-				& (ip.company == "Shree Hindu Mandal Hospital - Dar es Salaam")
-				& (ip.patient_appointment.isnotnull())
-				& (ip.status == "Discharged")
-				& (ip.discharge_date.between(from_date, to_date))
-				& (pa.status == "Closed")
-				& (pa.nhif_patient_claim.isnull() | (pa.nhif_patient_claim == ""))
-				& (pe.docstatus == 1)
-				& (pe.duplicated == 0)
-			)
-		).run(as_dict=True)
-
-		discharged_appointments = [i.patient_appointment for i in inpatient_appointments]
-
-		return discharged_appointments
-
-	def create_claims(appointment_ids):
-		for appointment in appointment_ids:
-			try:
-				doc = frappe.new_doc("NHIF Patient Claim")
-				doc.patient_appointment = appointment
-				doc.save(ignore_permissions=True)
-				doc.reload()
-
-			except Exception:
-				frappe.log_error(
-					frappe.get_traceback(),
-					f"Error in creating NHIF Patient Claim for appointment: {appointment}",
-				)
-				continue
-
-	before_1_day = add_days(nowdate(), -1)
-	first_of_month = get_first_day(nowdate())
-	appointment_names = get_appointments(first_of_month, before_1_day)
-	ongoing_inpatients = get_ongoiong_inpatients()
-	discharged_appointments = get_discharged_inpatients(first_of_month, before_1_day)
-	appointment_ids = list(
-		set(list(set(appointment_names) - set(ongoing_inpatients)) + list(set(discharged_appointments)))
+def get_unclaimed_appointment_condition(pa, pe):
+	return (
+		(pa.status == "Closed")
+		& (pa.nhif_patient_claim.isnull() | (pa.nhif_patient_claim == ""))
+		& (pe.docstatus == 1)
+		& (pe.duplicated == 0)
 	)
 
-	create_claims(appointment_ids)
+
+def get_nhif_inpatient_condition(ip, company):
+	return (
+		(ip.insurance_company.like("NHIF%")) & (ip.company == company) & (ip.patient_appointment.isnotnull())
+	)
+
+
+def get_unclaimed_nhif_appointments(company, from_date, to_date):
+	pa = DocType("Patient Appointment")
+	pe = DocType("Patient Encounter")
+	return (
+		frappe.qb.from_(pa)
+		.inner_join(pe)
+		.on(pa.name == pe.appointment)
+		.select(pa.name)
+		.where(
+			get_unclaimed_appointment_condition(pa, pe)
+			& (pa.insurance_company.like("NHIF%"))
+			& (pa.company == company)
+			& (pa.appointment_date.between(from_date, to_date))
+		)
+	).run(pluck=True)
+
+
+def get_ongoing_nhif_inpatient_appointments(company):
+	ip = DocType("Inpatient Record")
+	return (
+		frappe.qb.from_(ip)
+		.select(ip.patient_appointment)
+		.where(get_nhif_inpatient_condition(ip, company) & (ip.status != "Discharged"))
+	).run(pluck=True)
+
+
+def get_discharged_nhif_inpatient_appointments(company, from_date, to_date):
+	ip = DocType("Inpatient Record")
+	pa = DocType("Patient Appointment")
+	pe = DocType("Patient Encounter")
+	return (
+		frappe.qb.from_(ip)
+		.inner_join(pa)
+		.on(ip.patient_appointment == pa.name)
+		.inner_join(pe)
+		.on(ip.patient_appointment == pe.appointment)
+		.select(ip.patient_appointment)
+		.where(
+			get_nhif_inpatient_condition(ip, company)
+			& get_unclaimed_appointment_condition(pa, pe)
+			& (ip.status == "Discharged")
+			& (ip.discharge_date.between(from_date, to_date))
+		)
+	).run(pluck=True)
+
+
+def create_nhif_patient_claims(appointments):
+	for appointment in appointments:
+		try:
+			doc = frappe.new_doc("NHIF Patient Claim")
+			doc.patient_appointment = appointment
+			doc.save(ignore_permissions=True)
+		except Exception:
+			frappe.log_error(
+				title=f"Error in creating NHIF Patient Claim for appointment: {appointment}",
+				reference_doctype="Patient Appointment",
+				reference_name=appointment,
+			)
