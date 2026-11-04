@@ -645,7 +645,7 @@ def get_receipt(ref_doctype, ref_docname):
 
 		doc.add_comment(
 			comment_type="Comment",
-			text=f"Receipt retrieved successfully!<br><br><b>Message from NHIF:</b><br>{data.get('Message')}",
+			text=f"Receipt retrieved successfully!<br><br><b>Receipt No:</b> {escape_html(data.get('ReceiptNo'))}",
 		)
 		return True
 
