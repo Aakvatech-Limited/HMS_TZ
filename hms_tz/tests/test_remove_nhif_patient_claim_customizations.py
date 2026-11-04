@@ -16,6 +16,7 @@ MOVED_FIELDS = (
 	"unsubmittable_claim",
 )
 COLUMN_BREAKS = ("7hfoo", "f0pzn", "psqsj", "cffd2", "zz999")
+FIELD_ORDER_SETTERS = (f"{DOCTYPE}-main-field_order", "field-order-with-another-name")
 
 
 def insert_live_site_rows():
@@ -38,6 +39,16 @@ def insert_live_site_rows():
 			doctype="Custom Field", name=name, dt=DOCTYPE, fieldname=fieldname, fieldtype="Data"
 		).db_insert()
 
+	for name in FIELD_ORDER_SETTERS:
+		frappe.get_doc(
+			doctype="Property Setter",
+			name=name,
+			doc_type=DOCTYPE,
+			doctype_or_field="DocType",
+			property="field_order",
+			value="[]",
+		).db_insert()
+
 	for suffix in COLUMN_BREAKS:
 		frappe.get_doc(
 			doctype="Custom Field",
@@ -54,7 +65,7 @@ class TestRemoveNhifPatientClaimCustomizations(FrappeTestCase):
 
 		execute()
 
-		for name in PROPERTY_SETTERS:
+		for name in [*PROPERTY_SETTERS, *FIELD_ORDER_SETTERS]:
 			self.assertFalse(frappe.db.exists("Property Setter", name), name)
 		for name in CUSTOM_FIELDS:
 			self.assertFalse(frappe.db.exists("Custom Field", name), name)
