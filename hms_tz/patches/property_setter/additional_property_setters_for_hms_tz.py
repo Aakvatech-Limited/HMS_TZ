@@ -170,12 +170,6 @@ def execute():
 			"value": 1,
 		},
 		{
-			"doctype": "NHIF Patient Claim",
-			"property": "make_attachments_public",
-			"property_type": "Check",
-			"value": 1,
-		},
-		{
 			"doctype": "Patient",
 			"fieldname": "dob",
 			"property": "reqd",
