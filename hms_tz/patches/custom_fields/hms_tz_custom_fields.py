@@ -1297,33 +1297,6 @@ def execute():
 				"insert_after": "disabled",
 			},
 		],
-		"NHIF Patient Claim": [
-			{
-				"fieldtype": "Data",
-				"label": "hms_tz_appointment_string",
-				"fieldname": "hms_tz_appointment_string",
-				"insert_after": "naming_series",
-			},
-			{
-				"fieldtype": "Rating",
-				"label": "How Likely Would You Recommend Our Services To Others",
-				"fieldname": "how_likely_would_you_recommend_our_services_to_others",
-				"insert_after": "total_amount",
-			},
-			{
-				"fieldtype": "Data",
-				"label": "Internal Form Number",
-				"fieldname": "internal_form_number",
-				"insert_after": "allow_changes",
-			},
-			{
-				"fieldtype": "Select",
-				"label": "Unsubmittable Claim",
-				"fieldname": "unsubmittable_claim",
-				"insert_after": "internal_form_number",
-				"options": "\nUnclaimable - Only Consultation\nUnclaimable - Zero Amount\nUnclaimable - Same Auth Number Submitted On The Same Day\nChecked and Ready to Send\nAuthorization Number Checked\nTo Delete (Same Auth No. Claim Already Merged)",
-			},
-		],
 		"Normal Test Result": [
 			{
 				"fieldtype": "Data",
