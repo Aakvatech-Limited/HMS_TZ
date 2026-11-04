@@ -99,7 +99,6 @@ frappe.ui.form.on("NHIF Patient Claim", {
     if (needs_folio_signature(frm)) {
       show_signature_method_dialog(frm);
     }
-    alert_signed_amount_mismatch(frm);
   },
 
   is_ready_for_auto_submission: (frm) => {
@@ -160,27 +159,6 @@ frappe.ui.form.on("NHIF Patient Claim", {
     }
   },
 });
-
-function alert_signed_amount_mismatch(frm) {
-  const { signed_amount, total_amount } = frm.doc;
-  if (
-    !signed_amount ||
-    !total_amount ||
-    flt(signed_amount, 0) === flt(total_amount, 0)
-  )
-    return;
-
-  frappe.show_alert(
-    {
-      message: __("Signed Amount {0} is different from Total Amount {1}", [
-        format_number(signed_amount, null, 0),
-        format_number(total_amount, null, 0),
-      ]),
-      indicator: "orange",
-    },
-    10
-  );
-}
 
 function needs_folio_signature(frm) {
   return (
