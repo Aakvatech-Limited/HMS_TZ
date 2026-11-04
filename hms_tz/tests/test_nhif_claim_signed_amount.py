@@ -38,6 +38,7 @@ def insert_claim(name, **values):
 
 
 @patch.object(nhif_patient_claim, "validate_submit_date", new=lambda doc: None)
+@patch.object(nhif_patient_claim, "get_receipt", new=lambda *args, **kwargs: None)
 @patch.object(NHIFPatientClaim, "validate_multiple_appointments_per_authorization_no", new=lambda self: None)
 class TestNHIFClaimSignedAmount(FrappeTestCase):
 	@patch.object(nhif_patient_claim, "get_missing_patient_signature")
