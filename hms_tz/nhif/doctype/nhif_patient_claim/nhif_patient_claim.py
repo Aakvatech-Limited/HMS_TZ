@@ -11,6 +11,8 @@ from frappe.model.document import Document
 from frappe.query_builder import DocType
 from frappe.utils import (
 	cint,
+	flt,
+	fmt_money,
 	get_datetime,
 	get_fullname,
 	get_time,
@@ -128,13 +130,11 @@ class NHIFPatientClaim(Document):
 
 		validate_item_status(self)
 
-		if not self.patient_signature:
+		# A fingerprint-signed folio keeps no image, so do not fill it from the Patient
+		if not self.patient_signature and not self.folio_signed:
 			get_missing_patient_signature(self)
 
-		# if self.folio_signed == 0:
-		#     frappe.throw(
-		#         _("Please sign the folio to NHIF before submitting the claim.")
-		#     )
+		self.validate_signed_amount()
 
 		validate_submit_date(self)
 
@@ -646,7 +646,16 @@ class NHIFPatientClaim(Document):
 				"authorization_no": self.authorization_no,
 				"cardno": self.cardno,
 			},
-			fields=["patient_appointment", "hms_tz_claim_appointment_list"],
+			fields=[
+				"name",
+				"patient_appointment",
+				"hms_tz_claim_appointment_list",
+				"docstatus",
+				"folio_signed",
+				"signed_amount",
+				"total_amount",
+				"patient_signature",
+			],
 		)
 		if len(appointment_list) == 1:
 			frappe.throw(
@@ -656,6 +665,8 @@ class NHIFPatientClaim(Document):
                     </p>"
 				)
 			)
+		self.set_merged_signed_amount(appointment_list)
+
 		app_list = []
 		for app_name in appointment_list:
 			if app_name["hms_tz_claim_appointment_list"]:
@@ -683,6 +694,28 @@ class NHIFPatientClaim(Document):
 		self.hms_tz_claim_appointment_list = json.dumps(app_list)
 
 		self.save(ignore_permissions=True)
+
+	def set_merged_signed_amount(self, claims):
+		"""Count each appointment's signed amount once; a merged claim's amount covers its whole list."""
+		signed_claims = [self] + [
+			claim for claim in claims if claim.name != self.name and claim.docstatus == 0
+		]
+		# Merged claims first, so the claims inside them are skipped; stable sort keeps self first on ties
+		signed_claims.sort(key=lambda claim: len(get_claim_appointments(claim)), reverse=True)
+
+		counted_appointments = set()
+		signed_amount = 0
+		for claim in signed_claims:
+			appointments = get_claim_appointments(claim)
+			if appointments <= counted_appointments:
+				continue
+
+			amount = get_claim_signed_amount(claim)
+			if amount > 0:
+				counted_appointments |= appointments
+				signed_amount += amount
+
+		self.signed_amount = signed_amount
 
 	def validate_appointment_info(self):
 		appointment_doc = frappe.get_cached_doc("Patient Appointment", self.patient_appointment)
@@ -859,6 +892,36 @@ class NHIFPatientClaim(Document):
 	def validate_reqd_fields(self):
 		if not self.main_diagnosis_code:
 			frappe.throw(_("Main Diagnosis Code is required"))
+
+	def validate_signed_amount(self):
+		if not self.folio_signed or flt(self.signed_amount) <= 0:
+			return
+
+		if flt(self.total_amount, 0) > flt(self.signed_amount, 0):
+			frappe.throw(
+				_("Total Amount {0} cannot be greater than Signed Amount {1}").format(
+					fmt_money(self.total_amount, precision=0), fmt_money(self.signed_amount, precision=0)
+				)
+			)
+
+
+def get_claim_appointments(claim):
+	return set(json.loads(claim.hms_tz_claim_appointment_list or "[]")) or {claim.patient_appointment}
+
+
+def get_claim_signed_amount(claim):
+	"""A claim signed without a recorded signed amount counts its total amount."""
+	if flt(claim.signed_amount) > 0:
+		return flt(claim.signed_amount)
+
+	if not claim.folio_signed and not claim.patient_signature:
+		frappe.throw(
+			_(
+				"NHIF Patient Claim {0} has no Patient Signature and its folio is not signed. Sign the folio or add the Patient Signature, then merge again."
+			).format(claim.name)
+		)
+
+	return flt(claim.total_amount)
 
 
 def get_missing_patient_signature(self):
