@@ -111,7 +111,7 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Patient Appointment",
+   "label": "Appointment",
    "options": "Patient Appointment",
    "reqd": 1,
    "search_index": 1
@@ -785,7 +785,7 @@
  "is_submittable": 1,
  "links": [],
  "make_attachments_public": 1,
- "modified": "2026-11-04 17:41:18.934194",
+ "modified": "2026-11-04 17:47:11.168592",
  "modified_by": "Administrator",
  "module": "NHIF",
  "name": "NHIF Patient Claim",
