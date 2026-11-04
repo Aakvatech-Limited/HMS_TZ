@@ -31,7 +31,7 @@ from hms_tz.nhif.api.patient_encounter import finalized_encounter
 from hms_tz.nhif.doctype.nhif_tracking_claim_change.nhif_tracking_claim_change import (
 	track_changes_of_claim_items,
 )
-from hms_tz.nhif.nhif_api.patient_claim import submit_folio
+from hms_tz.nhif.nhif_api.patient_claim import get_receipt, submit_folio
 
 pa = DocType("Patient Appointment")
 pe = DocType("Patient Encounter")
@@ -140,6 +140,8 @@ class NHIFPatientClaim(Document):
 
 		if self.bypass_sending_to_nhif == 0:
 			submit_folio(self)
+		else:
+			get_receipt(doc=self, validate_only=True)
 
 		end_datetime = get_datetime()
 		time_in_seconds = time_diff_in_seconds(str(end_datetime), str(start_datetime))
