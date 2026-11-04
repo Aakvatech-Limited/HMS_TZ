@@ -27,8 +27,11 @@
   "coverage_plan_name",
   "inpatient_record",
   "allow_changes",
+  "internal_form_number",
+  "unsubmittable_claim",
   "column_break_o9pbn",
   "total_amount",
+  "how_likely_would_you_recommend_our_services_to_others",
   "patient_signature",
   "section_break_auto_send",
   "is_ready_for_auto_submission",
@@ -49,10 +52,10 @@
   "claim_year",
   "claim_month",
   "folio_no",
-  "practitioner_name",
-  "practitioner_no",
   "serial_no",
   "main_diagnosis_code",
+  "practitioner_name",
+  "practitioner_no",
   "column_break_znuxw",
   "patient_type_code",
   "attendance_date",
@@ -67,26 +70,12 @@
   "date_discharge",
   "discharge_time",
   "delayreason",
-  "patient_file_section",
-  "patient_file",
-  "claim_file_section",
-  "claim_file",
-  "clinical_notes_section",
-  "clinical_notes",
   "attending_practitioner_section",
   "practitioners",
-  "section_break_28",
-  "nhif_patient_claim_disease",
-  "section_break_30",
-  "nhif_patient_claim_item",
-  "original_section_break",
-  "original_nhif_patient_claim_item",
   "section_break_zffby",
   "submission_id",
   "hashcode",
   "bypass_sending_to_nhif",
-  "naming_series",
-  "amended_from",
   "column_break_u4tk9",
   "submission_no",
   "submission_channel",
@@ -94,8 +83,27 @@
   "column_break_q7pz8",
   "date_submitted",
   "submission_remarks",
-  "hms_tz_claim_appointment_list",
-  "bypass_reason"
+  "bypass_reason",
+  "items_tab",
+  "section_break_28",
+  "nhif_patient_claim_disease",
+  "section_break_30",
+  "nhif_patient_claim_item",
+  "clinical_notes_tab",
+  "clinical_notes_section",
+  "clinical_notes",
+  "patient_file_section",
+  "patient_file",
+  "claim_file_section",
+  "claim_file",
+  "original_items_tab",
+  "original_section_break",
+  "original_nhif_patient_claim_item",
+  "section_break_hrlg",
+  "naming_series",
+  "column_break_rasw",
+  "amended_from",
+  "hms_tz_claim_appointment_list"
  ],
  "fields": [
   {
@@ -238,6 +246,7 @@
    "in_standard_filter": 1,
    "label": "Authorization No",
    "permlevel": 1,
+   "read_only": 1,
    "reqd": 1,
    "search_index": 1
   },
@@ -482,7 +491,6 @@
    "read_only": 1
   },
   {
-   "collapsible": 1,
    "depends_on": "eval: !doc.__islocal",
    "fieldname": "original_section_break",
    "fieldtype": "Section Break",
@@ -511,7 +519,6 @@
    "search_index": 1
   },
   {
-   "collapsible": 1,
    "depends_on": "eval: !doc.__islocal",
    "fieldname": "clinical_notes_section",
    "fieldtype": "Section Break",
@@ -731,13 +738,54 @@
    "no_copy": 1,
    "precision": "0",
    "read_only": 1
+  },
+  {
+   "bold": 1,
+   "fieldname": "items_tab",
+   "fieldtype": "Tab Break",
+   "label": "Items"
+  },
+  {
+   "fieldname": "clinical_notes_tab",
+   "fieldtype": "Tab Break",
+   "label": "Clinical Notes"
+  },
+  {
+   "fieldname": "original_items_tab",
+   "fieldtype": "Tab Break",
+   "label": "Original Items"
+  },
+  {
+   "fieldname": "section_break_hrlg",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_rasw",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "internal_form_number",
+   "fieldtype": "Data",
+   "label": "Internal Form Number"
+  },
+  {
+   "fieldname": "unsubmittable_claim",
+   "fieldtype": "Select",
+   "label": "Unsubmittable Claim",
+   "options": "\nUnclaimable - Only Consultation\nUnclaimable - Zero Amount\nUnclaimable - Same Auth Number Submitted On The Same Day\nChecked and Ready to Send\nAuthorization Number Checked\nTo Delete (Same Auth No. Claim Already Merged)"
+  },
+  {
+   "fieldname": "how_likely_would_you_recommend_our_services_to_others",
+   "fieldtype": "Rating",
+   "label": "How Likely Would You Recommend Our Services To Others"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-11-04 11:03:32.936227",
+ "make_attachments_public": 1,
+ "modified": "2026-11-04 17:41:18.934194",
  "modified_by": "Administrator",
  "module": "NHIF",
  "name": "NHIF Patient Claim",
