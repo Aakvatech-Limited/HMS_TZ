@@ -1063,15 +1063,15 @@ class JubileePatientClaim(Document):
 	def update_original_patient_claim(self):
 		"""Update original patient claim incase merging if done for this claim"""
 
-		ref_docnames = []
+		ref_docnames = set()
 		for item in self.original_jubilee_patient_claim_item:
-			if item.ref_docname:
-				d = item.ref_docname.split(",")
-				ref_docnames.extend(d)
+			ref_docnames.update((item.ref_docname or "").split(","))
 
-		# appends to original_jubilee_patient_claim_item
 		for row in self.jubilee_patient_claim_item:  # nosemgrep
-			if row.ref_docname not in ref_docnames:
+			# Reconciled rows join their ref_docnames with commas
+			row_ref_docnames = set((row.ref_docname or "").split(","))
+			if not row_ref_docnames.issubset(ref_docnames):
+				ref_docnames.update(row_ref_docnames)
 				new_row = row.as_dict()
 				for fieldname in [
 					"name",
