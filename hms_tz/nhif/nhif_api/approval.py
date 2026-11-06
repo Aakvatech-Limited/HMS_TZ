@@ -3,6 +3,7 @@ import json
 
 import frappe
 import requests
+from frappe import _
 from frappe.core.utils import html2text
 from frappe.utils import cint, get_datetime, get_fullname
 
@@ -184,6 +185,64 @@ def get_approval_status(ref_doctype, ref_docname, dni_id=None):
 		)
 
 		return update_approval_status(doc, appointment, data, dni_id=dni_id)
+
+
+@frappe.whitelist()
+def get_unissued_services(ref_doctype, ref_docname):
+	"""Return the NHIF approvals of the visit's card with unissued qty, with our service name and the rows it can fill."""
+	# nhif.utils imports this module
+	from hms_tz.nhif.utils import SERVICE_FIELDS, get_approval_targets, get_nhif_visit, get_service_names
+
+	if ref_doctype not in (*SERVICE_FIELDS, "Delivery Note") or not isinstance(ref_docname, str):
+		frappe.throw(_("Unissued services are not available for {0}").format(ref_doctype))
+
+	doc = frappe.get_doc(ref_doctype, ref_docname)
+	doc.check_permission("read")
+	visit = get_nhif_visit(doc)
+	if not visit:
+		frappe.throw(_("Unissued services are only available for an NHIF visit with a card number"))
+
+	settings_doc = frappe.get_cached_doc("HMS TZ Setting", doc.company)
+	if not settings_doc.enable_nhif_api:
+		frappe.throw(_("NHIF API is disabled"))
+
+	card_no = visit.coverage_plan_card_number
+	url = f"{settings_doc.nhifservice_url}/api/Approvals/GetUnIssuedServices?cardNo={card_no}"
+	headers = {"Content-Type": "application/json", "Authorization": f"Bearer {settings_doc.get_nhif_token()}"}
+	r = requests.request("GET", url, headers=headers, timeout=60)
+	data = r.json() if r.status_code == 200 else r.text
+	add_log(
+		request_type="GetUnIssuedServices",
+		request_url=url,
+		request_header=headers,
+		request_body="",
+		response_data=data,
+		status_code=r.status_code,
+		company=settings_doc.name,
+		ref_doctype=ref_doctype,
+		ref_docname=ref_docname,
+		card_no=card_no,
+	)
+	if r.status_code != 200:
+		frappe.throw(
+			_("Status Code: {0}<br>NHIF Response: {1}").format(
+				r.status_code, frappe.bold(frappe.utils.escape_html(r.text))
+			),
+			title=_("NHIF API Error"),
+		)
+
+	targets = get_approval_targets(doc, visit)
+	service_names = get_service_names(
+		{line.get("ItemCode") for line in data}, settings_doc.nhif_customer_name
+	)
+	return [
+		{
+			**line,
+			"service_name": ", ".join(service_names.get(line.get("ItemCode"), [])) or line.get("ItemName"),
+			"targets": targets.get(line.get("ItemCode"), []),
+		}
+		for line in data
+	]
 
 
 @frappe.whitelist()
