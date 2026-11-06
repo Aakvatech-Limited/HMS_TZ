@@ -116,9 +116,13 @@ class TestNHIFApprovalStatus(FrappeTestCase):
 			approval_status, "get_service_item", side_effect=lambda doctype, name, *args: (CODES[name], None)
 		)
 		msgprint = patch.object(approval_status.frappe, "msgprint")
+		# Insurance Approval Log is covered by test_insurance_approval_log
+		upsert = patch.object(approval_status, "upsert_approval_lines")
 		refcode.start()
+		upsert.start()
 		self.msgprint = msgprint.start()
 		self.addCleanup(refcode.stop)
+		self.addCleanup(upsert.stop)
 		self.addCleanup(msgprint.stop)
 
 	def update(self, lines, doctype="Clinical Procedure", name="_Test AS Procedure 1", dni_id=None):
