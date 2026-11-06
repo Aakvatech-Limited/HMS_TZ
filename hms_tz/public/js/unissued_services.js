@@ -1,0 +1,132 @@
+/**
+ * NHIF Unissued Services: list the approvals of the patient's card that still have unissued qty
+ * and let the user put one on a restricted service of this form.
+ *
+ * Usage, in the form's refresh: NHIFUnissuedServices.add_button(frm);
+ */
+class NHIFUnissuedServices {
+  static add_button(frm) {
+    if (frm.is_new() || !NHIFUnissuedServices.is_nhif_restricted(frm)) {
+      return;
+    }
+    frm.add_custom_button(
+      __("Unissued Services"),
+      () => NHIFUnissuedServices.show(frm),
+      __("NHIF")
+    );
+  }
+
+  static is_nhif_restricted(frm) {
+    if (frm.doc.doctype === "Delivery Note") {
+      return (
+        (frm.doc.customer || "").includes("NHIF") &&
+        (frm.doc.items || []).some((row) => row.is_restricted == 1)
+      );
+    }
+    return (
+      (frm.doc.insurance_company || "").includes("NHIF") &&
+      frm.doc.is_restricted == 1
+    );
+  }
+
+  static show(frm) {
+    frappe.call({
+      method: "hms_tz.nhif.nhif_api.approval.get_unissued_services",
+      args: { ref_doctype: frm.doc.doctype, ref_docname: frm.doc.name },
+      freeze: true,
+      freeze_message: __("Fetching unissued services from NHIF..."),
+      callback: (r) => {
+        if (r.message) {
+          NHIFUnissuedServices.show_dialog(frm, r.message);
+        }
+      },
+    });
+  }
+
+  static show_dialog(frm, lines) {
+    const dialog = new frappe.ui.Dialog({
+      title: __("NHIF Unissued Services"),
+      size: "extra-large",
+      fields: [{ fieldname: "services_html", fieldtype: "HTML" }],
+    });
+    dialog.onhide = () => dialog.$wrapper.remove();
+    const wrapper = dialog.fields_dict.services_html.$wrapper;
+    wrapper.html(NHIFUnissuedServices.get_table_html(lines));
+
+    wrapper.on("click", ".use-approval", function () {
+      const line = lines[$(this).data("line")];
+      const target = line.targets[$(this).data("target")];
+      NHIFUnissuedServices.use_approval(frm, target, line.ApprovalReferenceNo);
+      dialog.hide();
+    });
+    dialog.show();
+  }
+
+  static get_table_html(lines) {
+    if (!lines.length) {
+      return `<p class="text-muted">${__(
+        "NHIF has no unissued services for this card."
+      )}</p>`;
+    }
+
+    const escape = (value) => frappe.utils.escape_html(String(value ?? ""));
+    const rows = lines
+      .map((line, line_index) => {
+        const buttons = line.targets
+          .map(
+            (target, target_index) =>
+              `<button class="btn btn-xs btn-primary use-approval" data-line="${line_index}" data-target="${target_index}"
+                title="${escape(target.label)}">${
+                line.targets.length > 1
+                  ? __("Use for {0}", [escape(target.label)])
+                  : __("Use this approval")
+              }</button>`
+          )
+          .join(" ");
+        return `<tr>
+          <td>${escape(line.ItemCode)}</td>
+          <td>${escape(line.service_name)}</td>
+          <td class="text-right">${escape(line.QuantityRequested)}</td>
+          <td class="text-right">${escape(line.QuantityIssued)}</td>
+          <td class="text-right">${escape(line.QuantityRemains)}</td>
+          <td><span class="indicator-pill green">${escape(
+            line.ApprovalReferenceNo
+          )}</span></td>
+          <td>${escape(frappe.datetime.str_to_user(line.ApprovalDate))}</td>
+          <td>${escape(line.Remarks)}</td>
+          <td>${buttons}</td>
+        </tr>`;
+      })
+      .join("");
+
+    return `<table class="table table-bordered table-condensed">
+      <thead><tr>
+        <th>${__("Item Code")}</th><th>${__("Service Name")}</th>
+        <th>${__("Requested")}</th><th>${__("Issued")}</th><th>${__(
+      "Remains"
+    )}</th>
+        <th>${__("Approval No")}</th><th>${__("Approval Date")}</th>
+        <th>${__("Remarks")}</th><th></th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  }
+
+  static use_approval(frm, target, approval_number) {
+    frappe.model.set_value(
+      target.doctype,
+      target.name,
+      "approval_number",
+      approval_number
+    );
+    frappe.show_alert({
+      message: __("Approval No {0} is set on {1}. Save to keep it.", [
+        frappe.utils.escape_html(approval_number),
+        frappe.utils.escape_html(target.label),
+      ]),
+      indicator: "green",
+    });
+  }
+}
+
+window.NHIFUnissuedServices = NHIFUnissuedServices;
