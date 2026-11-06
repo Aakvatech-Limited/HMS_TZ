@@ -91,6 +91,13 @@ class TestLogUnissuedServices(FrappeTestCase):
 		frappe.db.savepoint("log_unissued_test")
 		self.addCleanup(frappe.db.rollback, save_point="log_unissued_test")
 		for patcher in (
+			patch.object(utils.frappe, "enqueue"),
+			patch.dict(frappe.flags, {"queued_approval_status": set()}),
+		):
+			patcher.start()
+			self.addCleanup(patcher.stop)
+		self.enqueue = utils.frappe.enqueue
+		for patcher in (
 			patch.object(utils, "get_item_refcode", return_value="6234"),
 			patch.object(job, "get_item_refcode", return_value="6234"),
 			patch.object(insurance_approval_log, "get_item_refcode", return_value="6234"),
@@ -286,3 +293,24 @@ class TestLogUnissuedServices(FrappeTestCase):
 		self.assertEqual(
 			frappe.db.get_value("Delivery Note Item", "_Test LU DN Item 1", "approval_number"), "APR-2"
 		)
+
+	@patch.object(job.frappe.db, "commit")
+	def test_drafts_left_without_number_ask_nhif_for_status(self, commit):
+		insert_procedure("_Test LU Open 1")
+		insert_procedure("_Test LU Open 2")
+		open_1, open_2 = ("Clinical Procedure", "_Test LU Open 1"), ("Clinical Procedure", "_Test LU Open 2")
+		cached_value = frappe.get_cached_value
+
+		def get_cached_value(doctype, *args, **kwargs):
+			return 1 if doctype == "HMS TZ Setting" else cached_value(doctype, *args, **kwargs)
+
+		with (
+			patch.object(job, "get_open_restricted_drafts", side_effect=[[open_1, open_2], [open_2]]),
+			patch.object(utils.frappe, "get_cached_value", side_effect=get_cached_value),
+			patch_settings(),
+			patch.object(job, "request_unissued_services", return_value=[UNISSUED_DIALYSIS]),
+		):
+			job.log_unissued_services_of_open_drafts()
+
+		self.enqueue.assert_called_once()
+		self.assertEqual(self.enqueue.call_args.kwargs["ref_docname"], "_Test LU Open 2")

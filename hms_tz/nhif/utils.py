@@ -267,6 +267,25 @@ def get_nhif_visit(doc):
 	return visit
 
 
+def queue_approval_status(doc):
+	"""Ask NHIF in the background for the approvals of the visit of `doc`; one job per visit at a time."""
+	appointment = doc.get("appointment") or doc.get("hms_tz_appointment_no")
+	# deduplicate checks the queue when called, but after_commit jobs are pushed later
+	queued = frappe.flags.setdefault("queued_approval_status", set())
+	if appointment in queued or not frappe.get_cached_value("HMS TZ Setting", doc.company, "enable_nhif_api"):
+		return
+
+	queued.add(appointment)
+	frappe.enqueue(
+		"hms_tz.nhif.nhif_api.approval.get_approval_status",
+		job_id=f"nhif_approval_status::{appointment}",
+		deduplicate=True,
+		enqueue_after_commit=True,
+		ref_doctype=doc.doctype,
+		ref_docname=doc.name,
+	)
+
+
 def get_services_needing_approval(doc):
 	"""Yield (row, service type, service name) of each restricted service without an approval number."""
 	if doc.doctype == "Delivery Note":
