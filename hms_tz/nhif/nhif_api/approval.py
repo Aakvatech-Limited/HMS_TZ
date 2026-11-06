@@ -8,6 +8,7 @@ from frappe.core.utils import html2text
 from frappe.utils import cint, get_datetime, get_fullname
 
 from hms_tz.hms_tz.doctype.healthcare_service_request.healthcare_service_request import (
+	get_appointment,
 	get_item_rate,
 	get_item_refcode,
 )
@@ -137,7 +138,7 @@ def get_approval_status(ref_doctype, ref_docname, dni_id=None):
 			"status": "error",
 		}
 
-	appointment = doc.get("appointment") or doc.get("hms_tz_appointment_no")
+	appointment = get_appointment(doc)
 
 	authorization_no = ""
 	if doc.doctype == "Delivery Note":
@@ -276,7 +277,7 @@ def update_service_approval(
 		frappe.msgprint("NHIF API is disabled")
 		return False
 
-	appointment = doc.get("appointment") or doc.get("hms_tz_appointment_no")
+	appointment = get_appointment(doc)
 
 	payload = get_update_approval_payload(
 		doc,
@@ -378,7 +379,7 @@ def issue_approved_service(
 
 		insurance_subscription = doc.get("insurance_subscription")
 		if not insurance_subscription:
-			appointment = doc.get("appointment") or doc.get("hms_tz_appointment_no")
+			appointment = get_appointment(doc)
 			insurance_subscription = frappe.get_cached_value(
 				"Patient Appointment", appointment, "insurance_subscription"
 			)
@@ -476,7 +477,7 @@ def get_request_approval_payload(
 	clinical_notes = html2text(clinical_notes).lstrip("\n")
 	patient_doc = frappe.get_cached_doc("Patient", doc.patient)
 
-	appointment = doc.get("appointment") or doc.get("hms_tz_appointment_no")
+	appointment = get_appointment(doc)
 	appointment_info = get_appointment_details(appointment)
 
 	encounter_id = doc.get("ref_docname") or doc.get("reference_name")
