@@ -1,6 +1,7 @@
 import frappe
 from frappe.utils import get_url_to_form
 
+from hms_tz.nhif.doctype.insurance_approval_log.insurance_approval_log import add_approval_usage
 from hms_tz.nhif.nhif_api.approval import issue_approved_service
 from hms_tz.nhif.nhif_api.approval_status import validate_approved_qty
 from hms_tz.nhif.nhif_api.verification import get_poc_reference_no
@@ -127,6 +128,7 @@ def issue_nhif_service(
 					"service_reference_no",
 					service_data.get("ServiceReferenceNo"),
 				)
+				add_approval_usage(doc, d.approval_number, d.qty, service_data.get("ServiceReferenceNo"))
 
 				data.update(service_data)
 
@@ -150,6 +152,7 @@ def issue_nhif_service(
 
 		if service_data:
 			doc.db_set("service_reference_no", service_data.get("ServiceReferenceNo"))
+			add_approval_usage(doc, doc.approval_number, 1, service_data.get("ServiceReferenceNo"))
 
 			data.update(service_data)
 
