@@ -18,14 +18,14 @@ def insert(doctype, name, **values):
 	doc.db_insert()
 
 
-def issue(doctype, name, service_type, service_name):
+def issue(doctype, name, service_type, service_name, qty=1):
 	return utils.issue_nhif_service(
-		doctype, name, service_type, service_name, "image", "fp", biometric_method="NONE"
+		doctype, name, service_type, service_name, "image", "fp", qty=qty, biometric_method="NONE"
 	)
 
 
-def issue_radiology(name):
-	return issue("Radiology Examination", name, "Radiology Examination Template", TEMPLATE)
+def issue_radiology(name, qty=1):
+	return issue("Radiology Examination", name, "Radiology Examination Template", TEMPLATE, qty)
 
 
 class TestIssueServicePocReference(FrappeTestCase):
@@ -47,7 +47,7 @@ class TestIssueServicePocReference(FrappeTestCase):
 		patcher.start()
 		self.addCleanup(patcher.stop)
 
-	def insert_radiology(self, name, poc_reference_no=None, approval_number="APR-1"):
+	def insert_radiology(self, name, poc_reference_no=None, approval_number="APR-1", **values):
 		insert(
 			"Radiology Examination",
 			name,
@@ -57,6 +57,7 @@ class TestIssueServicePocReference(FrappeTestCase):
 			approval_number=approval_number,
 			is_restricted=1,
 			poc_reference_no=poc_reference_no,
+			**values,
 		)
 
 	def test_missing_poc_is_generated_after_issue(self):
@@ -201,3 +202,63 @@ class TestIssueServicePocReference(FrappeTestCase):
 				("_Test POC DN 8", "APR-2", 10, "SRV-1"),
 			],
 		)
+
+	def get_service_reference_nos(self, *names):
+		return [frappe.db.get_value("Radiology Examination", name, "service_reference_no") for name in names]
+
+	def test_issued_qty_sets_reference_on_similar_services_of_the_visit(self):
+		visit = {"appointment": "_Test POC APT 1", "poc_reference_no": "POC-OLD"}
+		for name in ("_Test POC RE 9", "_Test POC RE 10", "_Test POC RE 11"):
+			self.insert_radiology(name, **visit)
+		self.insert_radiology("_Test POC RE 12", appointment="_Test POC APT 2", poc_reference_no="POC-OLD")
+		self.insert_radiology("_Test POC RE 13", approval_number="APR-OTHER", **visit)
+
+		with patch.object(utils, "add_approval_usage") as add_approval_usage:
+			issue_radiology("_Test POC RE 9", qty=3)
+
+		self.assertEqual(self.calls.issue_approved_service.call_args.kwargs["qty"], 3)
+		self.assertEqual(
+			self.get_service_reference_nos(
+				"_Test POC RE 9", "_Test POC RE 10", "_Test POC RE 11", "_Test POC RE 12", "_Test POC RE 13"
+			),
+			["SRV-1", "SRV-1", "SRV-1", None, None],
+		)
+		self.assertEqual(add_approval_usage.call_args.args[2], 3)
+		self.assertTrue(
+			frappe.db.exists(
+				"Comment",
+				{"reference_name": "_Test POC RE 10", "content": ["like", "%SRV-1%_Test POC RE 9%"]},
+			)
+		)
+
+	def test_qty_above_similar_services_of_the_visit_is_not_issued(self):
+		visit = {"appointment": "_Test POC APT 3", "poc_reference_no": "POC-OLD"}
+		self.insert_radiology("_Test POC RE 14", **visit)
+		self.insert_radiology("_Test POC RE 15", **visit)
+
+		for qty in (0, 3):
+			with self.assertRaises(frappe.ValidationError):
+				issue_radiology("_Test POC RE 14", qty=qty)
+
+		self.calls.issue_approved_service.assert_not_called()
+		self.assertEqual(self.get_service_reference_nos("_Test POC RE 14", "_Test POC RE 15"), [None, None])
+
+	def test_qty_above_one_without_visit_is_not_issued(self):
+		self.insert_radiology("_Test POC RE 16", poc_reference_no="POC-OLD")
+		self.insert_radiology("_Test POC RE 17", poc_reference_no="POC-OLD")
+
+		with self.assertRaises(frappe.ValidationError):
+			issue_radiology("_Test POC RE 16", qty=2)
+
+		self.calls.issue_approved_service.assert_not_called()
+
+	def test_submitted_and_not_serviced_records_are_not_covered(self):
+		visit = {"appointment": "_Test POC APT 4", "poc_reference_no": "POC-OLD"}
+		self.insert_radiology("_Test POC RE 18", **visit)
+		self.insert_radiology("_Test POC RE 19", docstatus=1, **visit)
+		self.insert_radiology("_Test POC RE 20", workflow_state="Not Serviced", **visit)
+
+		with self.assertRaises(frappe.ValidationError):
+			issue_radiology("_Test POC RE 18", qty=2)
+
+		self.calls.issue_approved_service.assert_not_called()
