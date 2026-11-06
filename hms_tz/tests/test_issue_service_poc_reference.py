@@ -185,3 +185,19 @@ class TestIssueServicePocReference(FrappeTestCase):
 		issue("Delivery Note", "_Test POC DN 7", "Medication", "")
 
 		self.assertEqual(self.calls.issue_approved_service.call_args.kwargs["qty"], 10)
+
+	def test_issued_service_is_counted_on_its_approval(self):
+		self.insert_radiology("_Test POC RE 8", poc_reference_no="POC-OLD")
+		self.insert_delivery_note("_Test POC DN 8", qty=10, approved_qty=10)
+
+		with patch.object(utils, "add_approval_usage") as add_approval_usage:
+			issue_radiology("_Test POC RE 8")
+			issue("Delivery Note", "_Test POC DN 8", "Medication", "")
+
+		self.assertEqual(
+			[(call.args[0].name, *call.args[1:]) for call in add_approval_usage.call_args_list],
+			[
+				("_Test POC RE 8", "APR-1", 1, "SRV-1"),
+				("_Test POC DN 8", "APR-2", 10, "SRV-1"),
+			],
+		)
