@@ -35,6 +35,7 @@ frappe.ui.form.on("Lab Test", {
     $('[data-label="Not%20Serviced"]').parent().hide();
     render_lt_consumables_section(frm);
     RequestApproval.show_restricted_banner(frm);
+    NHIFUnissuedServices.add_button(frm);
   },
   onload: (frm) => {
     $('[data-label="Not%20Serviced"]').parent().hide();
