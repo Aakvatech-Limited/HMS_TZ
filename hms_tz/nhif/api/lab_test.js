@@ -389,6 +389,9 @@ frappe.ui.form.on("Lab Test", {
       return;
     }
 
+    const qty = await prompt_nhif_issue_qty(frm, frm.doc.template);
+    if (!qty) return;
+
     let biometricData;
 
     if (frm.doc.biometric_method === "FACIAL") {
@@ -434,6 +437,7 @@ frappe.ui.form.on("Lab Test", {
         fingerprint: biometricData.Data,
         fpcode: biometricData.fpCode,
         biometric_method: frm.doc.biometric_method,
+        qty: qty,
       },
       freeze: true,
       freeze_message: __('<i class="fa fa-spinner fa-spin fa-4x"></i>'),
