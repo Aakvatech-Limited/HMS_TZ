@@ -8,6 +8,7 @@ from frappe.query_builder import DocType
 from frappe.utils import cint, flt, get_datetime, get_fullname, getdate
 
 from hms_tz.hms_tz.doctype.healthcare_service_request.healthcare_service_request import get_childs_map
+from hms_tz.nhif.doctype.insurance_approval_log.insurance_approval_log import upsert_approval_lines
 from hms_tz.nhif.nhif_api.pre_approval import get_service_item
 
 DELIVERY_NOTE_ITEM = "Delivery Note Item"
@@ -29,6 +30,11 @@ def update_approval_status(doc, appointment, data, dni_id=None):
 		document for document in restricted if document.docstatus == 0 and not document.approval_number
 	]
 	documents = get_requested_documents(open_documents, doc.company, insurance_company)
+	upsert_approval_lines(
+		data,
+		appointment,
+		{document.ref_code: (document.template_doctype, document.template_name) for document in documents},
+	)
 	documents.sort(key=lambda document: (document.requested_at, document.creation))
 
 	lines = sorted(data, key=lambda line: get_datetime(line.get("ApprovalDate") or "9999-12-31"))
@@ -152,6 +158,7 @@ def get_requested_documents(documents, company, insurance_company):
 
 		document.update(
 			ref_code=ref_code,
+			template_name=row.get(document.template_field),
 			preapproval_no=row.preapproval_no,
 			requested_at=request.timestamp,
 			requested_qty=request.quantities.get(ref_code),
