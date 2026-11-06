@@ -1,0 +1,308 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-05 15:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "patient",
+  "patient_name",
+  "column_break_patient",
+  "company",
+  "card_no",
+  "column_break_mddp",
+  "insurance_company",
+  "insurance_subscription",
+  "coverage_plan",
+  "section_approval",
+  "reference_no",
+  "approval_status",
+  "authorized_item_id",
+  "column_break_approval",
+  "approved_by",
+  "prescribed_by",
+  "service_authorization_id",
+  "column_break_vwwg",
+  "remarks",
+  "section_service",
+  "service_type",
+  "service_name",
+  "item_code",
+  "column_break_service",
+  "date_requested",
+  "date_approved",
+  "expiry_date",
+  "column_break_sggv",
+  "qty_requested",
+  "qty_approved",
+  "qty_issued",
+  "qty_remaining",
+  "references_tab",
+  "section_usages",
+  "usages"
+ ],
+ "fields": [
+  {
+   "fieldname": "patient",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Patient",
+   "options": "Patient",
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fetch_from": "patient.patient_name",
+   "fieldname": "patient_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Patient Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "card_no",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Card No",
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "column_break_patient",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "insurance_company",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Insurance Company",
+   "options": "Healthcare Insurance Company",
+   "read_only": 1
+  },
+  {
+   "fieldname": "insurance_subscription",
+   "fieldtype": "Link",
+   "label": "Insurance Subscription",
+   "options": "Healthcare Insurance Subscription",
+   "read_only": 1
+  },
+  {
+   "fieldname": "coverage_plan",
+   "fieldtype": "Link",
+   "label": "Coverage Plan",
+   "options": "Healthcare Insurance Coverage Plan",
+   "read_only": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_approval",
+   "fieldtype": "Section Break",
+   "label": "Approval"
+  },
+  {
+   "fieldname": "reference_no",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Approval No",
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "approval_status",
+   "fieldtype": "Data",
+   "in_standard_filter": 1,
+   "label": "Approval Status",
+   "read_only": 1
+  },
+  {
+   "fieldname": "authorized_item_id",
+   "fieldtype": "Data",
+   "label": "Authorized Item ID",
+   "read_only": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "service_authorization_id",
+   "fieldtype": "Data",
+   "label": "Service Authorization ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_approval",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "approved_by",
+   "fieldtype": "Data",
+   "label": "Approved By",
+   "read_only": 1
+  },
+  {
+   "fieldname": "prescribed_by",
+   "fieldtype": "Data",
+   "label": "Prescribed By",
+   "read_only": 1
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_service",
+   "fieldtype": "Section Break",
+   "label": "Service"
+  },
+  {
+   "fieldname": "service_type",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "Service Type",
+   "options": "\nLab Test Template\nRadiology Examination Template\nClinical Procedure Template\nMedication\nTherapy Type",
+   "read_only": 1
+  },
+  {
+   "fieldname": "service_name",
+   "fieldtype": "Dynamic Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Service Name",
+   "options": "service_type",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_service",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Data",
+   "in_standard_filter": 1,
+   "label": "Item Code",
+   "read_only": 1,
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "date_requested",
+   "fieldtype": "Date",
+   "label": "Date Requested",
+   "read_only": 1
+  },
+  {
+   "fieldname": "date_approved",
+   "fieldtype": "Datetime",
+   "label": "Date Approved",
+   "read_only": 1
+  },
+  {
+   "description": "Date Requested + 30 days",
+   "fieldname": "expiry_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Expiry Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "qty_requested",
+   "fieldtype": "Float",
+   "label": "Qty Requested",
+   "read_only": 1
+  },
+  {
+   "fieldname": "qty_approved",
+   "fieldtype": "Float",
+   "label": "Qty Approved",
+   "read_only": 1
+  },
+  {
+   "fieldname": "qty_issued",
+   "fieldtype": "Float",
+   "label": "Qty Issued",
+   "read_only": 1
+  },
+  {
+   "fieldname": "qty_remaining",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Qty Remaining",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_usages",
+   "fieldtype": "Section Break",
+   "label": "Issued To"
+  },
+  {
+   "fieldname": "usages",
+   "fieldtype": "Table",
+   "label": "Usages",
+   "options": "Insurance Approval Log Usage",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_mddp",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_sggv",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "references_tab",
+   "fieldtype": "Tab Break",
+   "label": "References"
+  },
+  {
+   "fieldname": "column_break_vwwg",
+   "fieldtype": "Column Break"
+  }
+ ],
+ "in_create": 1,
+ "links": [],
+ "modified": "2026-11-05 18:07:59.600943",
+ "modified_by": "Administrator",
+ "module": "NHIF",
+ "name": "Insurance Approval Log",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Healthcare Administrator",
+   "share": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "search_fields": "patient_name,reference_no,item_code",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "reference_no",
+ "track_changes": 1
+}
