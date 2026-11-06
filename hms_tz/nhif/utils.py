@@ -4,6 +4,7 @@ import frappe
 from frappe.utils import get_url_to_form
 
 from hms_tz.hms_tz.doctype.healthcare_service_request.healthcare_service_request import get_item_refcode
+from hms_tz.nhif.api.healthcare_utils import get_appointment
 from hms_tz.nhif.doctype.insurance_approval_log.insurance_approval_log import add_approval_usage
 from hms_tz.nhif.nhif_api.approval import issue_approved_service
 from hms_tz.nhif.nhif_api.approval_status import validate_approved_qty
@@ -47,7 +48,7 @@ def get_poc_reference_no_for_lrpmt(
 		fpcode=fpcode,
 		biometric_method=biometric_method.upper(),
 		company=doc.company,
-		appointment_id=doc.get("appointment") or doc.get("hms_tz_appointment_no"),
+		appointment_id=get_appointment(doc),
 		authorization_no=doc.get("authorization_number") or "",
 		ref_doctype=ref_doctype,
 		ref_docname=ref_docname,
@@ -254,7 +255,7 @@ def needs_approval_number(target):
 
 def get_nhif_visit(doc):
 	"""Return the card no and insurance company of an NHIF visit; other insurers have no approval API yet."""
-	appointment = doc.get("appointment") or doc.get("hms_tz_appointment_no")
+	appointment = get_appointment(doc)
 	if not appointment:
 		return None
 
@@ -269,7 +270,7 @@ def get_nhif_visit(doc):
 
 def queue_approval_status(doc):
 	"""Ask NHIF in the background for the approvals of the visit of `doc`; one job per visit at a time."""
-	appointment = doc.get("appointment") or doc.get("hms_tz_appointment_no")
+	appointment = get_appointment(doc)
 	# deduplicate checks the queue when called, but after_commit jobs are pushed later
 	queued = frappe.flags.setdefault("queued_approval_status", set())
 	if appointment in queued or not frappe.get_cached_value("HMS TZ Setting", doc.company, "enable_nhif_api"):
