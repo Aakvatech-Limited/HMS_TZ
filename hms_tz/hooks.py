@@ -192,7 +192,10 @@ doc_events = {
 		"after_insert": "hms_tz.nhif.api.lab_test.after_insert",
 		"on_trash": "hms_tz.nhif.api.lab_test.on_trash",
 		"on_cancel": "hms_tz.nhif.api.lab_test.on_cancel",
-		"validate": "hms_tz.nhif.api.lab_test.validate",
+		"validate": [
+			"hms_tz.nhif.api.lab_test.validate",
+			"hms_tz.nhif.doctype.insurance_approval_log.insurance_approval_log.set_approval_number_from_log",
+		],
 	},
 	"Radiology Examination": {
 		"after_insert": "hms_tz.nhif.api.radiology_examination.after_insert",
@@ -200,6 +203,7 @@ doc_events = {
 		"before_submit": "hms_tz.nhif.api.radiology_examination.before_submit",
 		"on_submit": "hms_tz.nhif.api.radiology_examination.on_submit",
 		"on_cancel": "hms_tz.nhif.api.radiology_examination.on_cancel",
+		"validate": "hms_tz.nhif.doctype.insurance_approval_log.insurance_approval_log.set_approval_number_from_log",
 	},
 	"Clinical Procedure": {
 		"after_insert": "hms_tz.nhif.api.clinical_procedure.after_insert",
@@ -208,9 +212,13 @@ doc_events = {
 		"before_submit": "hms_tz.nhif.api.clinical_procedure.before_submit",
 		"on_submit": "hms_tz.nhif.api.clinical_procedure.on_submit",
 		"on_update_after_submit": "hms_tz.nhif.api.clinical_procedure.on_update_after_submit",
+		"validate": "hms_tz.nhif.doctype.insurance_approval_log.insurance_approval_log.set_approval_number_from_log",
 	},
 	"Delivery Note": {
-		"validate": "hms_tz.nhif.api.delivery_note.validate",
+		"validate": [
+			"hms_tz.nhif.api.delivery_note.validate",
+			"hms_tz.nhif.doctype.insurance_approval_log.insurance_approval_log.set_approval_number_from_log",
+		],
 		"onload": "hms_tz.nhif.api.delivery_note.onload",
 		"after_insert": "hms_tz.nhif.api.delivery_note.after_insert",
 		"before_submit": "hms_tz.nhif.api.delivery_note.before_submit",
@@ -244,6 +252,7 @@ doc_events = {
 		"after_insert": "hms_tz.nhif.api.therapy_session.after_insert",
 		"before_submit": "hms_tz.nhif.api.therapy_session.before_submit",
 		"on_submit": "hms_tz.nhif.api.therapy_session.on_submit",
+		"validate": "hms_tz.nhif.doctype.insurance_approval_log.insurance_approval_log.set_approval_number_from_log",
 	},
 	"Patient Medical Record": {
 		"before_insert": "hms_tz.nhif.api.medical_record.before_insert",
