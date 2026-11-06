@@ -7,6 +7,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 from frappe.utils import add_days, today
 
+from hms_tz.nhif import utils
 from hms_tz.nhif.doctype.insurance_approval_log import insurance_approval_log
 from hms_tz.nhif.doctype.insurance_approval_log.insurance_approval_log import (
 	INSURANCE_APPROVAL_LOG,
@@ -101,6 +102,21 @@ class TestInsuranceApprovalLog(FrappeTestCase):
 		)
 		refcode.start()
 		self.addCleanup(refcode.stop)
+		get_cached_value = frappe.get_cached_value
+		for patcher in (
+			patch.object(utils.frappe, "enqueue"),
+			patch.object(
+				utils.frappe,
+				"get_cached_value",
+				side_effect=lambda doctype, *args, **kwargs: 1
+				if doctype == "HMS TZ Setting"
+				else get_cached_value(doctype, *args, **kwargs),
+			),
+			patch.dict(frappe.flags, {"queued_approval_status": set()}),
+		):
+			patcher.start()
+			self.addCleanup(patcher.stop)
+		self.enqueue = utils.frappe.enqueue
 
 	def log_dialysis(self, approved=12, service_date=None):
 		upsert_approval_lines(
@@ -279,3 +295,61 @@ class TestInsuranceApprovalLog(FrappeTestCase):
 
 		self.assertEqual((item.approval_number, item.approved_qty), ("611626102638", 90))
 		self.assertRaises(frappe.ValidationError, validate_approved_qty, item, "Sitagliptin")
+
+	def test_new_service_not_in_log_asks_nhif_in_background(self):
+		doc = new_procedure("_Test IAL Visit 1")
+		doc.name = "_Test IAL New"
+
+		set_approval_number_from_log(doc)
+
+		self.enqueue.assert_called_once_with(
+			"hms_tz.nhif.nhif_api.approval.get_approval_status",
+			job_id="nhif_approval_status::_Test IAL Visit 1",
+			deduplicate=True,
+			enqueue_after_commit=True,
+			ref_doctype="Clinical Procedure",
+			ref_docname="_Test IAL New",
+		)
+
+	def test_service_covered_by_log_does_not_ask_nhif(self):
+		self.log_dialysis()
+
+		set_approval_number_from_log(new_procedure("_Test IAL Visit 1"))
+
+		self.enqueue.assert_not_called()
+
+	def test_saved_service_asks_nhif_only_when_it_becomes_restricted(self):
+		for was_restricted, is_queued in ((0, True), (1, False)):
+			self.enqueue.reset_mock()
+			name = f"_Test IAL Saved {was_restricted}"
+			insert(
+				"Clinical Procedure",
+				name,
+				patient=PATIENT,
+				company=COMPANY,
+				appointment="_Test IAL Visit 1",
+				procedure_template=DIALYSIS,
+				is_restricted=was_restricted,
+			)
+			doc = frappe.get_doc("Clinical Procedure", name)
+			doc.load_doc_before_save()
+			doc.is_restricted = 1
+
+			set_approval_number_from_log(doc)
+
+			self.assertEqual(self.enqueue.called, is_queued)
+
+	def test_service_of_another_insurer_does_not_ask_nhif(self):
+		insert_appointment("_Test IAL Jubilee", insurance_company="Jubilee")
+
+		set_approval_number_from_log(new_procedure("_Test IAL Jubilee"))
+
+		self.enqueue.assert_not_called()
+
+	def test_visit_is_queued_once_per_transaction(self):
+		for name in ("_Test IAL First", "_Test IAL Second"):
+			doc = new_procedure("_Test IAL Visit 1")
+			doc.name = name
+			set_approval_number_from_log(doc)
+
+		self.enqueue.assert_called_once()
