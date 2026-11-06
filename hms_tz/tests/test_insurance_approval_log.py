@@ -1,5 +1,6 @@
 # Copyright (c) 2026, Aakvatech and Contributors
 # See license.txt
+from unittest import skip
 from unittest.mock import patch
 
 import frappe
@@ -109,14 +110,15 @@ class TestInsuranceApprovalLog(FrappeTestCase):
 		)
 		return get_log("AI-DIALYSIS")
 
-	def test_line_is_logged_once_with_patient_service_and_expiry(self):
+	def test_line_is_logged_once_with_patient_and_service(self):
 		self.log_dialysis()
 		log = self.log_dialysis()
 
 		self.assertEqual(frappe.db.count(INSURANCE_APPROVAL_LOG, {"authorized_item_id": "AI-DIALYSIS"}), 1)
 		self.assertEqual((log.patient, log.patient_name, log.card_no), (PATIENT, "Halima Mhando", CARD_NO))
 		self.assertEqual((log.service_type, log.service_name), ("Clinical Procedure Template", DIALYSIS))
-		self.assertEqual(str(log.expiry_date), add_days(today(), 30))
+		# expiry_date is not set until NHIF returns one
+		self.assertIsNone(log.expiry_date)
 		self.assertEqual((log.qty_approved, log.qty_issued, log.qty_remaining), (12, 0, 12))
 
 	def test_pending_line_is_approved_in_place(self):
@@ -202,6 +204,7 @@ class TestInsuranceApprovalLog(FrappeTestCase):
 
 		self.assertEqual(second.approval_number, "211626100436")
 
+	@skip("Expiry filter is off until NHIF returns an expiry date")
 	def test_expired_approval_is_not_given(self):
 		self.log_dialysis(service_date=add_days(today(), -31))
 		doc = new_procedure("_Test IAL Visit 1")

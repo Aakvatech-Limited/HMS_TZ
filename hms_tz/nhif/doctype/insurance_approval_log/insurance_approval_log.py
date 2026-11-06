@@ -4,7 +4,7 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import add_days, flt, get_datetime, getdate, now_datetime, today
+from frappe.utils import flt, get_datetime, getdate, now_datetime
 
 from hms_tz.hms_tz.doctype.healthcare_service_request.healthcare_service_request import get_item_refcode
 
@@ -19,8 +19,9 @@ class InsuranceApprovalLog(Document):
 	def validate(self):
 		self.qty_issued = sum(flt(row.qty) for row in self.usages)
 		self.qty_remaining = flt(self.qty_approved) - self.qty_issued
-		if self.date_requested:
-			self.expiry_date = add_days(self.date_requested, APPROVAL_VALIDITY_DAYS)
+		# NHIF does not return an expiry date, so it is not set until it does
+		# if self.date_requested:
+		# 	self.expiry_date = add_days(self.date_requested, APPROVAL_VALIDITY_DAYS)
 
 	def update_from_line(self, line):
 		self.update(
@@ -55,12 +56,8 @@ class InsuranceApprovalLog(Document):
 		self.save(ignore_permissions=True)
 
 
-def upsert_approval_lines(lines, appointment, services):
-	"""Keep one log per approval line, so a pending line becomes approved in place.
-
-	`services` maps the insurer item code to its (service type, service name).
-	"""
-	visit = frappe.db.get_value(
+def get_visit_values(appointment):
+	return frappe.db.get_value(
 		"Patient Appointment",
 		appointment,
 		[
@@ -72,24 +69,84 @@ def upsert_approval_lines(lines, appointment, services):
 		],
 		as_dict=True,
 	)
+
+
+def upsert_approval_lines(lines, appointment, services):
+	"""Keep one log per approval line, so a pending line becomes approved in place.
+
+	A log seeded from unissued services has no AuthorizedItemID; the approval line with the
+	same reference no, card no and item code takes it over.
+	`services` maps the insurer item code to its (service type, service name).
+	"""
+	visit = get_visit_values(appointment)
 	for line in lines:
 		authorized_item_id = line.get("AuthorizedItemID")
 		if not authorized_item_id:
 			continue
 
 		name = frappe.db.get_value(INSURANCE_APPROVAL_LOG, {"authorized_item_id": authorized_item_id})
+		if not name and line.get("ReferenceNo"):
+			name = frappe.db.get_value(
+				INSURANCE_APPROVAL_LOG,
+				{
+					"reference_no": line.get("ReferenceNo"),
+					"card_no": line.get("CardNo"),
+					"item_code": line.get("ItemCode"),
+					"authorized_item_id": ["is", "not set"],
+				},
+			)
+
 		if name:
 			log = frappe.get_doc(INSURANCE_APPROVAL_LOG, name)
 		else:
 			log = frappe.new_doc(INSURANCE_APPROVAL_LOG)
-			log.update({"authorized_item_id": authorized_item_id, **visit})
+			log.update(visit)
 
+		log.authorized_item_id = authorized_item_id
 		log.update_from_line(line)
 		service = services.get(line.get("ItemCode"))
 		if service:
 			log.service_type, log.service_name = service
 
 		log.save(ignore_permissions=True)
+
+
+def insert_unissued_lines(lines, appointment, services):
+	"""Log the unissued approvals NHIF holds for a card, once per reference no, card no and item code.
+
+	NHIF counts units issued before the log existed; they are kept as one usage row without a document.
+	"""
+	visit = get_visit_values(appointment)
+	for line in lines:
+		key = {
+			"reference_no": line.get("ApprovalReferenceNo"),
+			"card_no": line.get("CardNo"),
+			"item_code": line.get("ItemCode"),
+		}
+		if not key["reference_no"] or frappe.db.exists(INSURANCE_APPROVAL_LOG, key):
+			continue
+
+		log = frappe.new_doc(INSURANCE_APPROVAL_LOG)
+		log.update(visit)
+		log.update_from_line(
+			{
+				"ReferenceNo": line.get("ApprovalReferenceNo"),
+				"ApprovalStatus": line.get("ApprovalStatus"),
+				"CardNo": line.get("CardNo"),
+				"ItemCode": line.get("ItemCode"),
+				"ServiceDate": line.get("DateRequested"),
+				"ApprovalDate": line.get("ApprovalDate"),
+				"QuantityRequested": line.get("QuantityRequested"),
+				"QuantityApproved": flt(line.get("QuantityIssued")) + flt(line.get("QuantityRemains")),
+				"Remarks": line.get("Remarks"),
+			}
+		)
+		if service := services.get(line.get("ItemCode")):
+			log.service_type, log.service_name = service
+		if flt(line.get("QuantityIssued")):
+			log.append("usages", {"qty": flt(line.get("QuantityIssued"))})
+
+		log.insert(ignore_permissions=True)
 
 
 def get_open_approval(patient, card_no, item_code):
@@ -102,7 +159,8 @@ def get_open_approval(patient, card_no, item_code):
 			"item_code": item_code,
 			"approval_status": "Approved",
 			"reference_no": ["is", "set"],
-			"expiry_date": [">=", today()],
+			# NHIF does not return an expiry date, so the 30 days are not enforced until it does
+			# "expiry_date": [">=", today()],
 			"qty_remaining": [">", 0],
 		},
 		[
@@ -139,27 +197,35 @@ def set_approval_number_from_log(doc, method=None):
 		set_approval_number(doc, visit, target, service_type, service_name)
 
 
-def set_approval_number(doc, visit, target, service_type, service_name):
+def get_open_approval_of_service(doc, visit, service_type, service_name):
 	if not service_name:
-		return
+		return None
 
 	item_code = get_item_refcode(service_type, service_name, doc.company, visit.insurance_company)
-	approval = get_open_approval(doc.patient, visit.coverage_plan_card_number, item_code)
+	return get_open_approval(doc.patient, visit.coverage_plan_card_number, item_code)
+
+
+def get_approval_values(approval, target):
+	"""Return the approval fields to set on `target` from an open log."""
+	values = {
+		"approval_number": approval.reference_no,
+		"approval_status": approval.approval_status,
+		"approval_date": getdate(approval.date_approved) if approval.date_approved else None,
+		"service_authorization_id": approval.service_authorization_id,
+		"authorized_item_id": approval.authorized_item_id,
+	}
+	if target.doctype == "Delivery Note Item":
+		values["approved_qty"] = approval.qty_remaining
+
+	return values
+
+
+def set_approval_number(doc, visit, target, service_type, service_name):
+	approval = get_open_approval_of_service(doc, visit, service_type, service_name)
 	if not approval:
 		return
 
-	target.update(
-		{
-			"approval_number": approval.reference_no,
-			"approval_status": approval.approval_status,
-			"approval_date": getdate(approval.date_approved) if approval.date_approved else None,
-			"service_authorization_id": approval.service_authorization_id,
-			"authorized_item_id": approval.authorized_item_id,
-		}
-	)
-	if target.doctype == "Delivery Note Item":
-		target.approved_qty = approval.qty_remaining
-
+	target.update(get_approval_values(approval, target))
 	frappe.msgprint(
 		_("Approval No {0} for {1} is set from Insurance Approval Log, {2} remaining").format(
 			frappe.bold(approval.reference_no), service_name, approval.qty_remaining
