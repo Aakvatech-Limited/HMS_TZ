@@ -7,6 +7,7 @@ from frappe.model.document import Document
 from frappe.utils import flt, get_datetime, getdate, now_datetime
 
 from hms_tz.hms_tz.doctype.healthcare_service_request.healthcare_service_request import get_item_refcode
+from hms_tz.nhif.api.healthcare_utils import get_appointment
 
 INSURANCE_APPROVAL_LOG = "Insurance Approval Log"
 # The insurer does not return an expiry date
@@ -47,7 +48,7 @@ class InsuranceApprovalLog(Document):
 			{
 				"ref_doctype": document.doctype,
 				"ref_docname": document.name,
-				"appointment": document.get("appointment") or document.get("hms_tz_appointment_no"),
+				"appointment": get_appointment(document),
 				"qty": qty,
 				"service_reference_no": service_reference_no,
 				"issued_on": now_datetime(),
