@@ -16,6 +16,7 @@ from hms_tz.nhif.utils import (
 	SERVICE_FIELDS,
 	get_nhif_visit,
 	get_services_needing_approval,
+	queue_approval_status,
 )
 
 
@@ -34,6 +35,7 @@ def log_unissued_services_of_open_drafts():
 	"""Log the NHIF unissued approvals of the cards on open restricted drafts, then set their approval numbers.
 
 	Run once from a patch: approvals given before Insurance Approval Log existed are not in the log.
+	Drafts still without an approval number then ask NHIF for the approval status of their visit.
 	"""
 
 	drafts_of_card = defaultdict(list)
@@ -44,6 +46,7 @@ def log_unissued_services_of_open_drafts():
 			drafts_of_card[visit.coverage_plan_card_number].append(doc)
 
 	# one commit per card and per draft, so a failure does not undo the work before it
+	logged_drafts = []
 	for card_no, drafts in drafts_of_card.items():
 		if run_and_commit(
 			log_unissued_services_of_card, card_no, drafts, title=f"unissued services of card {card_no}"
@@ -52,6 +55,12 @@ def log_unissued_services_of_open_drafts():
 				run_and_commit(
 					set_approval_numbers_of_draft, draft, title=f"approval number of {draft.name}", doc=draft
 				)
+			logged_drafts += drafts
+
+	still_open = set(get_open_restricted_drafts())
+	for draft in logged_drafts:
+		if (draft.doctype, draft.name) in still_open:
+			queue_approval_status(draft)
 
 
 def log_unissued_services_of_card(card_no, drafts):
