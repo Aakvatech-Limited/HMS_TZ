@@ -1,7 +1,8 @@
 from collections import defaultdict
 
 import frappe
-from frappe.utils import get_url_to_form
+from frappe import _
+from frappe.utils import cint, get_url_to_form
 
 from hms_tz.hms_tz.doctype.healthcare_service_request.healthcare_service_request import get_item_refcode
 from hms_tz.nhif.api.healthcare_utils import get_appointment
@@ -151,6 +152,8 @@ def issue_nhif_service(
 				"Approval Number is not set for this document, Please get Approval Number from NHIF."
 			)
 
+		qty = cint(qty)
+		similar_services = get_similar_services_to_issue(doc, qty)
 		service_data = issue_approved_service(
 			doc,
 			doc.approval_number,
@@ -158,14 +161,22 @@ def issue_nhif_service(
 			service_name,
 			fingerprint,
 			fpcode,
-			qty=1,
+			qty=qty,
 			settings_doc=settings_doc,
 			biometric_method=biometric_method,
 		)
 
 		if service_data:
-			doc.db_set("service_reference_no", service_data.get("ServiceReferenceNo"))
-			add_approval_usage(doc, doc.approval_number, 1, service_data.get("ServiceReferenceNo"))
+			service_reference_no = service_data.get("ServiceReferenceNo")
+			doc.db_set("service_reference_no", service_reference_no)
+			for name in similar_services:
+				similar_doc = frappe.get_doc(doc.doctype, name)
+				similar_doc.db_set("service_reference_no", service_reference_no)
+				similar_doc.add_comment(
+					"Comment",
+					text=f"Service Reference No: <strong>{service_reference_no}</strong> issued with qty {qty} from {doc.name}.",
+				)
+			add_approval_usage(doc, doc.approval_number, qty, service_reference_no)
 
 			data.update(service_data)
 
@@ -177,6 +188,44 @@ def issue_nhif_service(
 		)
 
 	return data
+
+
+def get_similar_services_to_issue(doc, qty):
+	"""Return the other unissued, serviceable drafts of the same service, visit and approval that one issue of `qty` covers."""
+	if qty < 1:
+		frappe.throw(_("Qty to be Issued must be at least 1"))
+	if qty == 1:
+		return []
+
+	appointment = get_appointment(doc)
+	service_field = SERVICE_FIELDS[doc.doctype][1]
+	names = (
+		frappe.get_all(
+			doc.doctype,
+			filters={
+				"name": ["!=", doc.name],
+				"appointment": appointment,
+				service_field: doc.get(service_field),
+				"approval_number": doc.approval_number,
+				"service_reference_no": ["is", "not set"],
+				"docstatus": 0,
+				"workflow_state": ["not in", NOT_SERVICED_STATES],
+			},
+			order_by="creation",
+			limit=qty - 1,
+			pluck="name",
+		)
+		if appointment
+		else []
+	)
+	if len(names) < qty - 1:
+		frappe.throw(
+			_(
+				"Qty to be Issued is {0}, but this visit has only {1} unissued {2} of {3} with Approval Number {4}."
+			).format(qty, len(names) + 1, _(doc.doctype), doc.get(service_field), doc.approval_number),
+			title=_("Qty to be Issued Too High"),
+		)
+	return names
 
 
 def get_patient_care_name(service_type, service_name):
