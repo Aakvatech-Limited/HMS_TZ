@@ -8,6 +8,7 @@ from frappe.model.base_document import BaseDocument
 from frappe.tests.utils import FrappeTestCase
 from frappe.utils import add_days, nowdate
 
+from hms_tz.nhif.api.patient_encounter import validate_nhif_pre_approval
 from hms_tz.nhif.nhif_api import pre_approval
 
 COMPANY = "_Test PA Company"
@@ -83,6 +84,8 @@ class TestNHIFPreApprovalBeds(FrappeTestCase):
 		insert("Patient", PATIENT, first_name="Test", last_name="Patient", dob="1990-01-01", sex="Male")
 		insert("Healthcare Practitioner", PRACTITIONER, tz_mct_code="MCT1", mobile_phone="0700000000")
 		insert("Inpatient Record", INPATIENT_RECORD, patient=PATIENT, company=COMPANY)
+		insert("HMS TZ Setting", COMPANY, company=COMPANY, enable_nhif_api=1)
+		cls.addClassCleanup(frappe.clear_document_cache, "HMS TZ Setting", COMPANY)
 		insert(
 			"Patient Encounter",
 			ENCOUNTER,
@@ -305,3 +308,13 @@ class TestNHIFPreApprovalBeds(FrappeTestCase):
 			sorted(name for name in updated if name.startswith("_Test PA") and "Bed" in name),
 			["_Test PA Today Bed", "_Test PA Transfer Bed"],
 		)
+
+	def test_todays_beds_without_preapproval_block_submit(self):
+		with self.assertRaisesRegex(frappe.ValidationError, "<b>2</b> service"):
+			validate_nhif_pre_approval(self.make_encounter())
+
+	def test_todays_beds_with_preapproval_or_rejection_pass(self):
+		frappe.db.set_value("Inpatient Occupancy", "_Test PA Transfer Bed", "preapproval_no", "PA-5")
+		frappe.db.set_value("Inpatient Occupancy", "_Test PA Today Bed", "preapproval_status", "REJECTED")
+
+		validate_nhif_pre_approval(self.make_encounter())
