@@ -181,9 +181,15 @@ def set_approval_number_from_log(doc, method=None):
 
 	A Delivery Note item gets the remaining qty as approved qty, so a short approval is stopped by
 	`validate_approved_qty` like a short approval from Get Approval Status.
+	A service the log cannot cover asks NHIF for the approval status in the background when it is created.
 	"""
 	# nhif.utils imports this module
-	from hms_tz.nhif.utils import get_nhif_visit, get_services_needing_approval, needs_approval_number
+	from hms_tz.nhif.utils import (
+		get_nhif_visit,
+		get_services_needing_approval,
+		needs_approval_number,
+		queue_approval_status,
+	)
 
 	rows = doc.items if doc.doctype == "Delivery Note" else [doc]
 	if doc.docstatus != 0 or not any(needs_approval_number(row) for row in rows):
@@ -193,8 +199,13 @@ def set_approval_number_from_log(doc, method=None):
 	if not visit:
 		return
 
-	for target, service_type, service_name in get_services_needing_approval(doc):
+	is_covered = [
 		set_approval_number(doc, visit, target, service_type, service_name)
+		for target, service_type, service_name in get_services_needing_approval(doc)
+	]
+	# Therapy Session becomes restricted in after_insert
+	if not all(is_covered) and (doc.is_new() or doc.has_value_changed("is_restricted")):
+		queue_approval_status(doc)
 
 
 def get_open_approval_of_service(doc, visit, service_type, service_name):
@@ -221,9 +232,10 @@ def get_approval_values(approval, target):
 
 
 def set_approval_number(doc, visit, target, service_type, service_name):
+	"""Set the approval number of an open log on `target`; return False when the log has none."""
 	approval = get_open_approval_of_service(doc, visit, service_type, service_name)
 	if not approval:
-		return
+		return False
 
 	target.update(get_approval_values(approval, target))
 	frappe.msgprint(
@@ -232,6 +244,7 @@ def set_approval_number(doc, visit, target, service_type, service_name):
 		),
 		alert=True,
 	)
+	return True
 
 
 def add_approval_usage(document, reference_no, qty, service_reference_no):
