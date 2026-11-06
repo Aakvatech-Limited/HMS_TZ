@@ -39,6 +39,7 @@ from hms_tz.nhif.api.patient_appointment import (
 	validate_appointment_not_cancelled,
 )
 from hms_tz.nhif.doctype.nhif_stg.nhif_stg import validate_moh_stg
+from hms_tz.nhif.nhif_api.pre_approval import get_service_rows
 from hms_tz.nhif.utils import validate_main_diagnosis_code, validate_point_of_care
 
 
@@ -2018,21 +2019,19 @@ def validate_nhif_pre_approval(doc):
 	if not frappe.get_cached_value("HMS TZ Setting", doc.company, "enable_nhif_api"):
 		return
 
-	# TODO: require bed (Inpatient Occupancy) pre-approval once live usage is reviewed
 	eligible_pre_approval_services = []
-	for child in get_childs_map():
-		for row in doc.get(child.get("table")):
-			if (
-				row.get("prescribe")
-				or row.get("is_not_available_inhouse")
-				or row.get("is_cancelled")
-				# or row.get("is_restricted")
-				or row.get("preapproval_status") in ["Accepted", "REJECTED"]
-				or row.get("preapproval_no")
-			):
-				continue
+	for row, _template_doctype, template_name in get_service_rows(doc):
+		if (
+			row.get("prescribe")
+			or row.get("is_not_available_inhouse")
+			or row.get("is_cancelled")
+			# or row.get("is_restricted")
+			or row.get("preapproval_status") in ["Accepted", "REJECTED"]
+			or row.get("preapproval_no")
+		):
+			continue
 
-			eligible_pre_approval_services.append(row.get(child.get("item")))
+		eligible_pre_approval_services.append(template_name)
 
 	if len(eligible_pre_approval_services) > 0:
 		frappe.throw(
