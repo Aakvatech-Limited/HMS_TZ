@@ -23,6 +23,7 @@ frappe.ui.form.on("Clinical Procedure", {
     render_cp_anesthesia_records(frm);
     render_cp_implant_specimen_buttons(frm);
     RequestApproval.show_restricted_banner(frm);
+    NHIFUnissuedServices.add_button(frm);
   },
 
   onload: function (frm) {
