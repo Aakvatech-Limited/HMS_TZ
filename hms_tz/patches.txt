@@ -61,3 +61,4 @@ hms_tz.patches.set_missing_invoiced_references
 hms_tz.patches.custom_fields.hide_request_approval_no_on_lrpt_docs
 hms_tz.patches.custom_fields.hide_nhif_service_buttons_once_referenced
 hms_tz.patches.remove_nhif_patient_claim_customizations
+hms_tz.patches.log_unissued_services_of_open_drafts

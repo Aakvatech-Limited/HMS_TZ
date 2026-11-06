@@ -206,7 +206,23 @@ def get_unissued_services(ref_doctype, ref_docname):
 	if not settings_doc.enable_nhif_api:
 		frappe.throw(_("NHIF API is disabled"))
 
-	card_no = visit.coverage_plan_card_number
+	data = request_unissued_services(settings_doc, visit.coverage_plan_card_number, ref_doctype, ref_docname)
+	targets = get_approval_targets(doc, visit)
+	service_names = get_service_names(
+		{line.get("ItemCode") for line in data}, settings_doc.nhif_customer_name
+	)
+	return [
+		{
+			**line,
+			"service_name": ", ".join(service_names.get(line.get("ItemCode"), [])) or line.get("ItemName"),
+			"targets": targets.get(line.get("ItemCode"), []),
+		}
+		for line in data
+	]
+
+
+def request_unissued_services(settings_doc, card_no, ref_doctype, ref_docname):
+	"""Return the approvals of the card that NHIF has not fully issued yet."""
 	url = f"{settings_doc.nhifservice_url}/api/Approvals/GetUnIssuedServices?cardNo={card_no}"
 	headers = {"Content-Type": "application/json", "Authorization": f"Bearer {settings_doc.get_nhif_token()}"}
 	r = requests.request("GET", url, headers=headers, timeout=60)
@@ -231,18 +247,7 @@ def get_unissued_services(ref_doctype, ref_docname):
 			title=_("NHIF API Error"),
 		)
 
-	targets = get_approval_targets(doc, visit)
-	service_names = get_service_names(
-		{line.get("ItemCode") for line in data}, settings_doc.nhif_customer_name
-	)
-	return [
-		{
-			**line,
-			"service_name": ", ".join(service_names.get(line.get("ItemCode"), [])) or line.get("ItemName"),
-			"targets": targets.get(line.get("ItemCode"), []),
-		}
-		for line in data
-	]
+	return data
 
 
 @frappe.whitelist()
