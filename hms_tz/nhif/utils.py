@@ -1,10 +1,22 @@
+from collections import defaultdict
+
 import frappe
 from frappe.utils import get_url_to_form
 
+from hms_tz.hms_tz.doctype.healthcare_service_request.healthcare_service_request import get_item_refcode
 from hms_tz.nhif.doctype.insurance_approval_log.insurance_approval_log import add_approval_usage
 from hms_tz.nhif.nhif_api.approval import issue_approved_service
 from hms_tz.nhif.nhif_api.approval_status import validate_approved_qty
 from hms_tz.nhif.nhif_api.verification import get_poc_reference_no
+
+SERVICE_FIELDS = {
+	"Lab Test": ("Lab Test Template", "template"),
+	"Radiology Examination": ("Radiology Examination Template", "radiology_examination_template"),
+	"Clinical Procedure": ("Clinical Procedure Template", "procedure_template"),
+	"Therapy Session": ("Therapy Type", "therapy_type"),
+}
+SERVICE_TYPES = (*(service_type for service_type, _field in SERVICE_FIELDS.values()), "Medication")
+NOT_SERVICED_STATES = ("Not Serviced", "Submitted but Not Serviced")
 
 
 @frappe.whitelist()
@@ -234,3 +246,79 @@ def validate_main_diagnosis_code(doc):
 			title="<b>Main Diagnosis Code Missing</b>",
 			msg="<b>Main Diagnosis Code is required for NHIF insured patients. Please set it first.</b>",
 		)
+
+
+def needs_approval_number(target):
+	return target.is_restricted and not target.approval_number
+
+
+def get_nhif_visit(doc):
+	"""Return the card no and insurance company of an NHIF visit; other insurers have no approval API yet."""
+	appointment = doc.get("appointment") or doc.get("hms_tz_appointment_no")
+	if not appointment:
+		return None
+
+	visit = frappe.get_cached_value(
+		"Patient Appointment", appointment, ["coverage_plan_card_number", "insurance_company"], as_dict=True
+	)
+	if not visit or "NHIF" not in (visit.insurance_company or "") or not visit.coverage_plan_card_number:
+		return None
+
+	return visit
+
+
+def get_services_needing_approval(doc):
+	"""Yield (row, service type, service name) of each restricted service without an approval number."""
+	if doc.doctype == "Delivery Note":
+		for item in doc.items:
+			if needs_approval_number(item) and item.reference_name:
+				drug_code = frappe.db.get_value(item.reference_doctype, item.reference_name, "drug_code")
+				yield item, "Medication", drug_code
+	elif needs_approval_number(doc):
+		service_type, service_field = SERVICE_FIELDS[doc.doctype]
+		yield doc, service_type, doc.get(service_field)
+
+
+def get_approval_targets(doc, visit):
+	"""Map each insurer item code to the rows of a draft, serviceable `doc` that still need an approval number."""
+	targets = defaultdict(list)
+	if doc.docstatus != 0 or doc.get("workflow_state") in NOT_SERVICED_STATES:
+		return targets
+
+	for target, service_type, service_name in get_services_needing_approval(doc):
+		if not service_name:
+			continue
+
+		item_code = get_item_refcode(service_type, service_name, doc.company, visit.insurance_company)
+		label = (
+			f"Row {target.idx}: {target.item_name}"
+			if target.doctype == "Delivery Note Item"
+			else service_name
+		)
+		targets[item_code].append({"doctype": target.doctype, "name": target.name, "label": label})
+
+	return targets
+
+
+def get_service_names(item_codes, insurance_customer):
+	"""Map each insurer item code to the names of our service templates whose item carries that code."""
+	codes_of_item = defaultdict(set)
+	for row in frappe.get_all(
+		"Item Customer Detail",
+		filters={"customer_name": insurance_customer, "ref_code": ["in", list(item_codes)]},
+		fields=["parent", "ref_code"],
+	):
+		codes_of_item[row.parent].add(row.ref_code)
+
+	names = defaultdict(list)
+	if not codes_of_item:
+		return names
+
+	for service_type in SERVICE_TYPES:
+		for template in frappe.get_all(
+			service_type, filters={"item": ["in", list(codes_of_item)]}, fields=["name", "item"]
+		):
+			for item_code in codes_of_item[template.item]:
+				names[item_code].append(template.name)
+
+	return names

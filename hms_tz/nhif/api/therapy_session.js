@@ -13,6 +13,7 @@ frappe.ui.form.on("Therapy Session", {
     }
     render_ts_consumables_section(frm);
     RequestApproval.show_restricted_banner(frm);
+    NHIFUnissuedServices.add_button(frm);
   },
   onload: function (frm) {
     $('[data-label="Not%20Serviced"]').parent().hide();
