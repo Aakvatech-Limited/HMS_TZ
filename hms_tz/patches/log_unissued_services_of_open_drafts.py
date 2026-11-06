@@ -5,6 +5,7 @@ from frappe.query_builder import DocType
 from frappe.query_builder.functions import IfNull
 
 from hms_tz.hms_tz.doctype.healthcare_service_request.healthcare_service_request import get_item_refcode
+from hms_tz.nhif.api.healthcare_utils import get_appointment
 from hms_tz.nhif.doctype.insurance_approval_log.insurance_approval_log import (
 	get_approval_values,
 	get_open_approval_of_service,
@@ -78,7 +79,7 @@ def log_unissued_services_of_card(card_no, drafts):
 				services[item_code] = (service_type, service_name)
 
 	data = request_unissued_services(settings_doc, card_no, doc.doctype, doc.name)
-	insert_unissued_lines(data, doc.get("appointment") or doc.get("hms_tz_appointment_no"), services)
+	insert_unissued_lines(data, get_appointment(doc), services)
 	return True
 
 

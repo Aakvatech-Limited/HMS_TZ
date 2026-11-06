@@ -27,6 +27,11 @@ from hms_tz.hms_tz.doctype.hms_tz_setting.hms_tz_setting import is_cash_inpatien
 from hms_tz.hms_tz.utils import manage_fee_validity
 
 
+def get_appointment(doc):
+	"""Return the Patient Appointment of an LRPMT record or a Delivery Note."""
+	return doc.get("appointment") or doc.get("hms_tz_appointment_no")
+
+
 def get_childs_map():
 	childs_map = {
 		"Lab Prescription": {
