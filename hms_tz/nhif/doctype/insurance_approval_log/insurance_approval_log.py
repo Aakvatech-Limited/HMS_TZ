@@ -11,12 +11,6 @@ from hms_tz.hms_tz.doctype.healthcare_service_request.healthcare_service_request
 INSURANCE_APPROVAL_LOG = "Insurance Approval Log"
 # The insurer does not return an expiry date
 APPROVAL_VALIDITY_DAYS = 30
-SERVICE_FIELDS = {
-	"Lab Test": ("Lab Test Template", "template"),
-	"Radiology Examination": ("Radiology Examination Template", "radiology_examination_template"),
-	"Clinical Procedure": ("Clinical Procedure Template", "procedure_template"),
-	"Therapy Session": ("Therapy Type", "therapy_type"),
-}
 
 
 class InsuranceApprovalLog(Document):
@@ -130,44 +124,19 @@ def set_approval_number_from_log(doc, method=None):
 	A Delivery Note item gets the remaining qty as approved qty, so a short approval is stopped by
 	`validate_approved_qty` like a short approval from Get Approval Status.
 	"""
-	if doc.docstatus != 0:
+	# nhif.utils imports this module
+	from hms_tz.nhif.utils import get_nhif_visit, get_services_needing_approval, needs_approval_number
+
+	rows = doc.items if doc.doctype == "Delivery Note" else [doc]
+	if doc.docstatus != 0 or not any(needs_approval_number(row) for row in rows):
 		return
 
-	if doc.doctype == "Delivery Note":
-		items = [item for item in doc.items if needs_approval_number(item) and item.reference_name]
-		visit = items and get_nhif_visit(doc)
-		if not visit:
-			return
-
-		for item in items:
-			drug_code = frappe.db.get_value(item.reference_doctype, item.reference_name, "drug_code")
-			set_approval_number(doc, visit, item, "Medication", drug_code)
+	visit = get_nhif_visit(doc)
+	if not visit:
 		return
 
-	if needs_approval_number(doc):
-		service_type, service_field = SERVICE_FIELDS[doc.doctype]
-		visit = get_nhif_visit(doc)
-		if visit:
-			set_approval_number(doc, visit, doc, service_type, doc.get(service_field))
-
-
-def needs_approval_number(target):
-	return target.is_restricted and not target.approval_number
-
-
-def get_nhif_visit(doc):
-	"""Return the card no and insurance company of an NHIF visit; other insurers have no approval API yet."""
-	appointment = doc.get("appointment") or doc.get("hms_tz_appointment_no")
-	if not appointment:
-		return None
-
-	visit = frappe.get_cached_value(
-		"Patient Appointment", appointment, ["coverage_plan_card_number", "insurance_company"], as_dict=True
-	)
-	if not visit or "NHIF" not in (visit.insurance_company or "") or not visit.coverage_plan_card_number:
-		return None
-
-	return visit
+	for target, service_type, service_name in get_services_needing_approval(doc):
+		set_approval_number(doc, visit, target, service_type, service_name)
 
 
 def set_approval_number(doc, visit, target, service_type, service_name):
