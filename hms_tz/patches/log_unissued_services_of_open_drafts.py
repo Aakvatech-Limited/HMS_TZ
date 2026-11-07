@@ -4,20 +4,16 @@ import frappe
 from frappe.query_builder import DocType
 from frappe.query_builder.functions import IfNull
 
-from hms_tz.hms_tz.doctype.healthcare_service_request.healthcare_service_request import get_item_refcode
 from hms_tz.nhif.api.healthcare_utils import get_appointment
-from hms_tz.nhif.doctype.insurance_approval_log.insurance_approval_log import (
-	get_approval_values,
-	get_open_approval_of_service,
-	insert_unissued_lines,
-)
+from hms_tz.nhif.doctype.insurance_approval_log.insurance_approval_log import insert_unissued_lines
 from hms_tz.nhif.nhif_api.approval import request_unissued_services
 from hms_tz.nhif.utils import (
 	NOT_SERVICED_STATES,
 	SERVICE_FIELDS,
 	get_nhif_visit,
-	get_services_needing_approval,
+	get_services_of_drafts,
 	queue_approval_status,
+	set_approval_numbers_of_draft,
 )
 
 
@@ -70,27 +66,9 @@ def log_unissued_services_of_card(card_no, drafts):
 	if not settings_doc.enable_nhif_api:
 		return False
 
-	insurance_company = get_nhif_visit(doc).insurance_company
-	services = {}
-	for draft in drafts:
-		for _target, service_type, service_name in get_services_needing_approval(draft):
-			if service_name:
-				item_code = get_item_refcode(service_type, service_name, draft.company, insurance_company)
-				services[item_code] = (service_type, service_name)
-
+	services = get_services_of_drafts(drafts, get_nhif_visit(doc).insurance_company)
 	data = request_unissued_services(settings_doc, card_no, doc.doctype, doc.name)
 	insert_unissued_lines(data, get_appointment(doc), services)
-	return True
-
-
-def set_approval_numbers_of_draft(draft):
-	"""Write approval numbers from the log to the draft's restricted rows with `frappe.db.set_value`."""
-	visit = get_nhif_visit(draft)
-	for target, service_type, service_name in get_services_needing_approval(draft):
-		approval = get_open_approval_of_service(draft, visit, service_type, service_name)
-		if approval:
-			frappe.db.set_value(target.doctype, target.name, get_approval_values(approval, target))
-
 	return True
 
 
