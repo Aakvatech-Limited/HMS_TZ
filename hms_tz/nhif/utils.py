@@ -416,16 +416,25 @@ def set_approval_numbers_of_draft(draft):
 	return is_covered
 
 
-def get_services_needing_approval(doc):
-	"""Yield (row, service type, service name) of each restricted service without an approval number."""
+def get_restricted_services(doc, is_wanted=lambda row: row.is_restricted):
+	"""Yield (row, service type, service name) of each service of `doc` that `is_wanted` accepts."""
 	if doc.doctype == "Delivery Note":
 		for item in doc.items:
-			if needs_approval_number(item) and item.reference_name:
+			if is_wanted(item) and item.reference_name:
 				drug_code = frappe.db.get_value(item.reference_doctype, item.reference_name, "drug_code")
 				yield item, "Medication", drug_code
-	elif needs_approval_number(doc):
+	elif is_wanted(doc):
 		service_type, service_field = SERVICE_FIELDS[doc.doctype]
 		yield doc, service_type, doc.get(service_field)
+
+
+def get_services_needing_approval(doc):
+	"""Yield (row, service type, service name) of each restricted service without an approval number."""
+	return get_restricted_services(doc, needs_approval_number)
+
+
+def get_service_label(row, service_name):
+	return f"Row {row.idx}: {row.item_name}" if row.doctype == "Delivery Note Item" else service_name
 
 
 def get_approval_targets(doc, visit):
@@ -439,12 +448,9 @@ def get_approval_targets(doc, visit):
 			continue
 
 		item_code = get_item_refcode(service_type, service_name, doc.company, visit.insurance_company)
-		label = (
-			f"Row {target.idx}: {target.item_name}"
-			if target.doctype == "Delivery Note Item"
-			else service_name
+		targets[item_code].append(
+			{"doctype": target.doctype, "name": target.name, "label": get_service_label(target, service_name)}
 		)
-		targets[item_code].append({"doctype": target.doctype, "name": target.name, "label": label})
 
 	return targets
 

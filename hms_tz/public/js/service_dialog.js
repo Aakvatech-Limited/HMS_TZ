@@ -16,6 +16,15 @@ class NHIFServiceDialog {
       : [frm.doc];
   }
 
+  static is_nhif_restricted(frm) {
+    return (
+      NHIFServiceDialog.is_nhif(frm) &&
+      NHIFServiceDialog.get_service_rows(frm).some(
+        (row) => row.is_restricted == 1
+      )
+    );
+  }
+
   static escape(value) {
     return frappe.utils.escape_html(String(value ?? ""));
   }

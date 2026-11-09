@@ -6,22 +6,13 @@
  */
 class NHIFUnissuedServices {
   static add_button(frm) {
-    if (frm.is_new() || !NHIFUnissuedServices.is_nhif_restricted(frm)) {
+    if (frm.is_new() || !NHIFServiceDialog.is_nhif_restricted(frm)) {
       return;
     }
     frm.add_custom_button(
       __("Unissued Services"),
       () => NHIFUnissuedServices.show(frm),
       __("NHIF")
-    );
-  }
-
-  static is_nhif_restricted(frm) {
-    return (
-      NHIFServiceDialog.is_nhif(frm) &&
-      NHIFServiceDialog.get_service_rows(frm).some(
-        (row) => row.is_restricted == 1
-      )
     );
   }
 
