@@ -452,21 +452,20 @@ frappe.ui.form.on("Delivery Note Item", {
       );
       return;
     }
-    if (!frm.doc.approval_number) {
-      frappe.msgprint("Approval Number is required to verify");
+    let row = locals[cdt][cdn];
+    if (!row.service_reference_no) {
+      frappe.msgprint("Service Reference No is required to verify");
       return;
     }
 
-    let row = locals[cdt][cdn];
-
     frappe
       .call({
-        method: "hms_tz.nhif.nhif_api.approval.verify_approval_number",
+        method: "hms_tz.nhif.nhif_api.approval.verify_service_reference_no",
         args: {
           company: frm.doc.company,
-          approval_number: row.approval_number,
+          service_reference_no: row.service_reference_no,
           service_type: "Medication",
-          service_name: "",
+          service_name: row.item_code,
           appointment: frm.doc.hms_tz_appointment_no,
           ref_doctype: frm.doc.doctype,
           ref_docname: frm.doc.name,
@@ -491,7 +490,7 @@ frappe.ui.form.on("Delivery Note Item", {
             {
               message: __(
                 "<h4 class='text-center' style='background-color: #D3D3D3; font-weight: bold;'>\
-                        Approval Number is Valid</h4>"
+                        Service Reference No is Valid</h4>"
               ),
               indicator: "green",
             },
@@ -499,12 +498,11 @@ frappe.ui.form.on("Delivery Note Item", {
           );
         } else {
           frappe.utils.play_sound("error");
-          frm.set_value("approval_number", "");
           frappe.show_alert(
             {
               message: __(
                 "<h4 class='text-center' style='background-color: #D3D3D3; font-weight: bold;'>\
-                        Approval Number is not Valid</h4>"
+                        Service Reference No is not Valid</h4>"
               ),
               indicator: "Red",
             },
