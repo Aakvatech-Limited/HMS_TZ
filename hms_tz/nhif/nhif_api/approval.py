@@ -1,5 +1,6 @@
 import base64
 import json
+from urllib.parse import urlencode
 
 import frappe
 import requests
@@ -197,25 +198,16 @@ def get_unissued_services(ref_doctype, ref_docname):
 	"""
 	# nhif.utils imports this module
 	from hms_tz.nhif.utils import (
-		SERVICE_FIELDS,
 		get_approval_targets,
 		get_nhif_visit,
 		get_service_names,
 		get_services_of_drafts,
 	)
 
-	if ref_doctype not in (*SERVICE_FIELDS, "Delivery Note") or not isinstance(ref_docname, str):
-		frappe.throw(_("Unissued services are not available for {0}").format(ref_doctype))
-
-	doc = frappe.get_doc(ref_doctype, ref_docname)
-	doc.check_permission("read")
+	doc, settings_doc = get_nhif_document(ref_doctype, ref_docname, _("Unissued services"))
 	visit = get_nhif_visit(doc)
 	if not visit:
 		frappe.throw(_("Unissued services are only available for an NHIF visit with a card number"))
-
-	settings_doc = frappe.get_cached_doc("HMS TZ Setting", doc.company)
-	if not settings_doc.enable_nhif_api:
-		frappe.throw(_("NHIF API is disabled"))
 
 	data = request_unissued_services(settings_doc, visit.coverage_plan_card_number, ref_doctype, ref_docname)
 	insert_unissued_lines(data, get_appointment(doc), get_services_of_drafts([doc], visit.insurance_company))
@@ -235,12 +227,61 @@ def get_unissued_services(ref_doctype, ref_docname):
 
 def request_unissued_services(settings_doc, card_no, ref_doctype, ref_docname):
 	"""Return the approvals of the card that NHIF has not fully issued yet."""
-	url = f"{settings_doc.nhifservice_url}/api/Approvals/GetUnIssuedServices?cardNo={card_no}"
+	return request_approvals_api(
+		settings_doc, "GetUnIssuedServices", {"cardNo": card_no}, ref_doctype, ref_docname
+	)
+
+
+@frappe.whitelist()
+def get_approved_services(ref_doctype, ref_docname):
+	"""Return the NHIF approved services of each approval number on the document, grouped by that number."""
+	doc, settings_doc = get_nhif_document(ref_doctype, ref_docname, _("Approved services"))
+	rows = doc.items if ref_doctype == "Delivery Note" else [doc]
+	approval_numbers = list(dict.fromkeys(row.approval_number for row in rows if row.get("approval_number")))
+	if not approval_numbers:
+		frappe.throw(_("{0} {1} has no approval number").format(_(ref_doctype), ref_docname))
+
+	return [
+		{
+			"approval_number": approval_number,
+			"services": request_approvals_api(
+				settings_doc,
+				"GetApprovedServices",
+				{"approvalReferenceNo": approval_number},
+				ref_doctype,
+				ref_docname,
+			),
+		}
+		for approval_number in approval_numbers
+	]
+
+
+def get_nhif_document(ref_doctype, ref_docname, feature):
+	"""Return the readable NHIF service document or Delivery Note and its HMS TZ Setting, with the NHIF API enabled."""
+	# nhif.utils imports this module
+	from hms_tz.nhif.utils import SERVICE_FIELDS
+
+	if ref_doctype not in (*SERVICE_FIELDS, "Delivery Note") or not isinstance(ref_docname, str):
+		frappe.throw(_("{0} are not available for {1}").format(feature, ref_doctype))
+
+	doc = frappe.get_doc(ref_doctype, ref_docname)
+	doc.check_permission("read")
+	settings_doc = frappe.get_cached_doc("HMS TZ Setting", doc.company)
+	if not settings_doc.enable_nhif_api:
+		frappe.throw(_("NHIF API is disabled"))
+
+	return doc, settings_doc
+
+
+def request_approvals_api(settings_doc, request_type, query, ref_doctype, ref_docname):
+	"""GET /api/Approvals/<request_type> from NHIF, log it and return the JSON. Throw on a non-200 response."""
+	request = f"{request_type}?{urlencode(query)}"
+	url = f"{settings_doc.nhifservice_url}/api/Approvals/{request}"
 	headers = {"Content-Type": "application/json", "Authorization": f"Bearer {settings_doc.get_nhif_token()}"}
 	r = requests.request("GET", url, headers=headers, timeout=60)
 	data = r.json() if r.status_code == 200 else r.text
 	add_log(
-		request_type="GetUnIssuedServices",
+		request_type=request_type,
 		request_url=url,
 		request_header=headers,
 		request_body="",
@@ -249,12 +290,14 @@ def request_unissued_services(settings_doc, card_no, ref_doctype, ref_docname):
 		company=settings_doc.name,
 		ref_doctype=ref_doctype,
 		ref_docname=ref_docname,
-		card_no=card_no,
+		card_no=query.get("cardNo"),
 	)
 	if r.status_code != 200:
 		frappe.throw(
-			_("Status Code: {0}<br>NHIF Response: {1}").format(
-				r.status_code, frappe.bold(frappe.utils.escape_html(r.text))
+			_("Request: {0}<br>Status Code: {1}<br>NHIF Response: {2}").format(
+				frappe.utils.escape_html(request),
+				r.status_code,
+				frappe.bold(frappe.utils.escape_html(r.text)),
 			),
 			title=_("NHIF API Error"),
 		)
