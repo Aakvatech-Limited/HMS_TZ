@@ -1,5 +1,5 @@
 /**
- * Shared parts of the NHIF service dialogs (Unissued Services, Approved Services, Eligibility, Approval List).
+ * Shared parts of the NHIF service dialogs (Unissued Services, Approved Services, Eligibility, Approval List, Issued Services).
  */
 class NHIFServiceDialog {
   static is_nhif(frm) {
@@ -27,6 +27,16 @@ class NHIFServiceDialog {
 
   static escape(value) {
     return frappe.utils.escape_html(String(value ?? ""));
+  }
+
+  static format_date(value, with_time = false) {
+    if (!value) {
+      return "";
+    }
+    const [date, time = ""] = value.split("T");
+    return frappe.datetime.str_to_user(
+      with_time ? `${date} ${time.split(".")[0]}` : date
+    );
   }
 
   static show(title, html, extra_fields = []) {
