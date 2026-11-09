@@ -293,12 +293,34 @@ def check_eligibility(ref_doctype, ref_docname):
 	return [{**service, **eligibility[service["item_code"]]} for service in services]
 
 
-def get_nhif_document(ref_doctype, ref_docname, feature):
-	"""Return the readable NHIF service document or Delivery Note and its HMS TZ Setting, with the NHIF API enabled."""
+@frappe.whitelist()
+def get_approval_list(ref_doctype, ref_docname):
+	"""Return every approval request NHIF holds for the visit's card, from any facility."""
+	# nhif.utils imports this module
+	from hms_tz.nhif.utils import get_nhif_visit
+
+	doc, settings_doc = get_nhif_document(
+		ref_doctype, ref_docname, _("Approval lists"), extra_doctypes=("Patient Encounter",)
+	)
+	visit = get_nhif_visit(doc)
+	if not visit:
+		frappe.throw(_("Approval list is only available for an NHIF visit with a card number"))
+
+	return request_approvals_api(
+		settings_doc, "GetApprovals", {"cardNo": visit.coverage_plan_card_number}, ref_doctype, ref_docname
+	)
+
+
+def get_nhif_document(ref_doctype, ref_docname, feature, extra_doctypes=()):
+	"""Return the readable NHIF service document, Delivery Note or `extra_doctypes` document and its HMS TZ Setting.
+
+	Throw when the NHIF API is disabled.
+	"""
 	# nhif.utils imports this module
 	from hms_tz.nhif.utils import SERVICE_FIELDS
 
-	if ref_doctype not in (*SERVICE_FIELDS, "Delivery Note") or not isinstance(ref_docname, str):
+	doctypes = (*SERVICE_FIELDS, "Delivery Note", *extra_doctypes)
+	if ref_doctype not in doctypes or not isinstance(ref_docname, str):
 		frappe.throw(_("{0} are not available for {1}").format(feature, ref_doctype))
 
 	doc = frappe.get_doc(ref_doctype, ref_docname)
