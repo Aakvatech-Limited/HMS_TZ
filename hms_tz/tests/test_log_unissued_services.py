@@ -99,7 +99,6 @@ class TestLogUnissuedServices(FrappeTestCase):
 		self.enqueue = utils.frappe.enqueue
 		for patcher in (
 			patch.object(utils, "get_item_refcode", return_value="6234"),
-			patch.object(job, "get_item_refcode", return_value="6234"),
 			patch.object(insurance_approval_log, "get_item_refcode", return_value="6234"),
 		):
 			patcher.start()
