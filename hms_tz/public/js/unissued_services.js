@@ -56,7 +56,7 @@ class NHIFUnissuedServices {
     wrapper.on("click", ".use-approval", function () {
       const line = lines[$(this).data("line")];
       const target = line.targets[$(this).data("target")];
-      NHIFUnissuedServices.use_approval(frm, target, line.ApprovalReferenceNo);
+      NHIFUnissuedServices.use_approval(target, line);
       dialog.hide();
     });
     dialog.show();
@@ -112,16 +112,22 @@ class NHIFUnissuedServices {
     </table>`;
   }
 
-  static use_approval(frm, target, approval_number) {
-    frappe.model.set_value(
-      target.doctype,
-      target.name,
-      "approval_number",
-      approval_number
-    );
+  static use_approval(target, line) {
+    // Same values as get_approval_values on the server; the ids belong to the new request, not this approval
+    const values = {
+      approval_number: line.ApprovalReferenceNo,
+      approval_status: line.ApprovalStatus,
+      approval_date: line.ApprovalDate ? line.ApprovalDate.slice(0, 10) : null,
+      service_authorization_id: null,
+      authorized_item_id: null,
+    };
+    if (target.doctype === "Delivery Note Item") {
+      values.approved_qty = line.QuantityRemains;
+    }
+    frappe.model.set_value(target.doctype, target.name, values);
     frappe.show_alert({
       message: __("Approval No {0} is set on {1}. Save to keep it.", [
-        frappe.utils.escape_html(approval_number),
+        frappe.utils.escape_html(line.ApprovalReferenceNo),
         frappe.utils.escape_html(target.label),
       ]),
       indicator: "green",

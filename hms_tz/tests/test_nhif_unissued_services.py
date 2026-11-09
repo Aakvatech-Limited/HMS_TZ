@@ -63,6 +63,9 @@ class TestNHIFUnissuedServices(FrappeTestCase):
 	@classmethod
 	def setUpClass(cls):
 		super().setUpClass()
+		insert("Company", COMPANY, company_name=COMPANY, abbr="_TUS", default_currency="TZS")
+		if not frappe.db.exists("Healthcare Insurance Company", "NHIF"):
+			insert("Healthcare Insurance Company", "NHIF", insurance_company_name="NHIF")
 		insert(
 			"Patient Appointment",
 			APPOINTMENT,
@@ -72,6 +75,7 @@ class TestNHIFUnissuedServices(FrappeTestCase):
 		)
 		insert("Patient Appointment", "_Test US Cash Visit", company=COMPANY)
 		insert("Clinical Procedure Template", DIALYSIS, template=DIALYSIS, item="_Test US Dialysis Item")
+		insert("Medication", DRUG)
 		insert(
 			"Item Customer Detail",
 			"_Test US Dialysis Code",
@@ -202,3 +206,20 @@ class TestNHIFUnissuedServices(FrappeTestCase):
 			lines = approval.get_unissued_services("Clinical Procedure", name)
 
 			self.assertEqual([line["targets"] for line in lines], [[], []])
+
+	def test_lines_are_logged_once_for_the_issue_to_count(self):
+		insert_procedure("_Test US Procedure")
+
+		for _call in range(2):
+			approval.get_unissued_services("Clinical Procedure", "_Test US Procedure")
+
+		logs = frappe.get_all(
+			"Insurance Approval Log",
+			filters={"card_no": CARD_NO},
+			fields=["reference_no", "service_name", "qty_approved", "qty_issued"],
+			order_by="reference_no",
+		)
+		self.assertEqual(
+			[tuple(log.values()) for log in logs],
+			[("580625628084", None, 4, 3), ("901626062560", DIALYSIS, 12, 2)],
+		)

@@ -303,7 +303,7 @@ class TestInsuranceApprovalLog(FrappeTestCase):
 		set_approval_number_from_log(doc)
 
 		self.enqueue.assert_called_once_with(
-			"hms_tz.nhif.nhif_api.approval.get_approval_status",
+			"hms_tz.nhif.utils.get_visit_approvals",
 			job_id="nhif_approval_status::_Test IAL Visit 1",
 			deduplicate=True,
 			enqueue_after_commit=True,

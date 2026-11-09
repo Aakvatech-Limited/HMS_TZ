@@ -12,6 +12,7 @@ from hms_tz.hms_tz.doctype.healthcare_service_request.healthcare_service_request
 	get_item_rate,
 	get_item_refcode,
 )
+from hms_tz.nhif.doctype.insurance_approval_log.insurance_approval_log import insert_unissued_lines
 from hms_tz.nhif.doctype.nhif_response_log.nhif_response_log import add_log
 from hms_tz.nhif.nhif_api.approval_status import update_approval_status
 from hms_tz.nhif.nhif_api.referral import get_disease_code
@@ -190,9 +191,18 @@ def get_approval_status(ref_doctype, ref_docname, dni_id=None):
 
 @frappe.whitelist()
 def get_unissued_services(ref_doctype, ref_docname):
-	"""Return the NHIF approvals of the visit's card with unissued qty, with our service name and the rows it can fill."""
+	"""Return the NHIF approvals of the visit's card with unissued qty, with our service name and the rows it can fill.
+
+	The approvals are logged, so issuing a service with one of them counts its usage.
+	"""
 	# nhif.utils imports this module
-	from hms_tz.nhif.utils import SERVICE_FIELDS, get_approval_targets, get_nhif_visit, get_service_names
+	from hms_tz.nhif.utils import (
+		SERVICE_FIELDS,
+		get_approval_targets,
+		get_nhif_visit,
+		get_service_names,
+		get_services_of_drafts,
+	)
 
 	if ref_doctype not in (*SERVICE_FIELDS, "Delivery Note") or not isinstance(ref_docname, str):
 		frappe.throw(_("Unissued services are not available for {0}").format(ref_doctype))
@@ -208,6 +218,7 @@ def get_unissued_services(ref_doctype, ref_docname):
 		frappe.throw(_("NHIF API is disabled"))
 
 	data = request_unissued_services(settings_doc, visit.coverage_plan_card_number, ref_doctype, ref_docname)
+	insert_unissued_lines(data, get_appointment(doc), get_services_of_drafts([doc], visit.insurance_company))
 	targets = get_approval_targets(doc, visit)
 	service_names = get_service_names(
 		{line.get("ItemCode") for line in data}, settings_doc.nhif_customer_name
