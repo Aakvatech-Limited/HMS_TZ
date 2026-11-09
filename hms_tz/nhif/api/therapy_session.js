@@ -15,6 +15,7 @@ frappe.ui.form.on("Therapy Session", {
     RequestApproval.show_restricted_banner(frm);
     NHIFUnissuedServices.add_button(frm);
     NHIFApprovedServices.add_button(frm);
+    NHIFEligibility.add_button(frm);
   },
   onload: function (frm) {
     $('[data-label="Not%20Serviced"]').parent().hide();
