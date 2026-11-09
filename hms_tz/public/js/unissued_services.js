@@ -17,15 +17,11 @@ class NHIFUnissuedServices {
   }
 
   static is_nhif_restricted(frm) {
-    if (frm.doc.doctype === "Delivery Note") {
-      return (
-        (frm.doc.customer || "").includes("NHIF") &&
-        (frm.doc.items || []).some((row) => row.is_restricted == 1)
-      );
-    }
     return (
-      (frm.doc.insurance_company || "").includes("NHIF") &&
-      frm.doc.is_restricted == 1
+      NHIFServiceDialog.is_nhif(frm) &&
+      NHIFServiceDialog.get_service_rows(frm).some(
+        (row) => row.is_restricted == 1
+      )
     );
   }
 
@@ -44,22 +40,16 @@ class NHIFUnissuedServices {
   }
 
   static show_dialog(frm, lines) {
-    const dialog = new frappe.ui.Dialog({
-      title: __("NHIF Unissued Services"),
-      size: "extra-large",
-      fields: [{ fieldname: "services_html", fieldtype: "HTML" }],
-    });
-    dialog.onhide = () => dialog.$wrapper.remove();
-    const wrapper = dialog.fields_dict.services_html.$wrapper;
-    wrapper.html(NHIFUnissuedServices.get_table_html(lines));
-
-    wrapper.on("click", ".use-approval", function () {
+    const dialog = NHIFServiceDialog.show(
+      __("NHIF Unissued Services"),
+      NHIFUnissuedServices.get_table_html(lines)
+    );
+    dialog.$wrapper.on("click", ".use-approval", function () {
       const line = lines[$(this).data("line")];
       const target = line.targets[$(this).data("target")];
       NHIFUnissuedServices.use_approval(target, line);
       dialog.hide();
     });
-    dialog.show();
   }
 
   static get_table_html(lines) {
@@ -69,7 +59,7 @@ class NHIFUnissuedServices {
       )}</p>`;
     }
 
-    const escape = (value) => frappe.utils.escape_html(String(value ?? ""));
+    const escape = NHIFServiceDialog.escape;
     const rows = lines
       .map((line, line_index) => {
         const buttons = line.targets
