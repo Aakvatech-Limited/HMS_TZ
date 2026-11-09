@@ -228,16 +228,16 @@ frappe.ui.form.on("Clinical Procedure", {
       );
       return;
     }
-    if (!frm.doc.approval_number) {
-      frappe.msgprint("Approval Number is required to verify");
+    if (!frm.doc.service_reference_no) {
+      frappe.msgprint("Service Reference No is required to verify");
       return;
     }
     frappe
       .call({
-        method: "hms_tz.nhif.nhif_api.approval.verify_approval_number",
+        method: "hms_tz.nhif.nhif_api.approval.verify_service_reference_no",
         args: {
           company: frm.doc.company,
-          approval_number: frm.doc.approval_number,
+          service_reference_no: frm.doc.service_reference_no,
           service_type: "Clinical Procedure Template",
           service_name: frm.doc.procedure_template,
           appointment: frm.doc.appointment,
@@ -264,7 +264,7 @@ frappe.ui.form.on("Clinical Procedure", {
             {
               message: __(
                 "<h4 class='text-center' style='background-color: #D3D3D3; font-weight: bold;'>\
-                        Approval Number is Valid</h4>"
+                        Service Reference No is Valid</h4>"
               ),
               indicator: "green",
             },
@@ -272,12 +272,11 @@ frappe.ui.form.on("Clinical Procedure", {
           );
         } else {
           frappe.utils.play_sound("error");
-          frm.set_value("approval_number", "");
           frappe.show_alert(
             {
               message: __(
                 "<h4 class='text-center' style='background-color: #D3D3D3; font-weight: bold;'>\
-                        Approval Number is not Valid</h4>"
+                        Service Reference No is not Valid</h4>"
               ),
               indicator: "Red",
             },
