@@ -8,6 +8,7 @@ import "./unissued_services.js";
 import "./approved_services.js";
 import "./check_eligibility.js";
 import "./approval_list.js";
+import "./issued_services.js";
 import "./issue_service.js";
 import "../../hms_tz/doctype/consumable_record/consumable_dialog.js";
 import "./awesome_bar_links.js";
