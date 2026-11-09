@@ -6,6 +6,7 @@ frappe.ui.form.on("Radiology Examination", {
     NHIFUnissuedServices.add_button(frm);
     NHIFApprovedServices.add_button(frm);
     NHIFEligibility.add_button(frm);
+    NHIFApprovalList.add_button(frm);
   },
   onload: (frm) => {
     $('[data-label="Not%20Serviced"]').parent().hide();
