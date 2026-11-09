@@ -25,6 +25,7 @@ frappe.ui.form.on("Clinical Procedure", {
     RequestApproval.show_restricted_banner(frm);
     NHIFUnissuedServices.add_button(frm);
     NHIFApprovedServices.add_button(frm);
+    NHIFEligibility.add_button(frm);
   },
 
   onload: function (frm) {
