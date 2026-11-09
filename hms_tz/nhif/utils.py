@@ -6,9 +6,18 @@ from frappe.utils import cint, get_url_to_form
 
 from hms_tz.hms_tz.doctype.healthcare_service_request.healthcare_service_request import get_item_refcode
 from hms_tz.nhif.api.healthcare_utils import get_appointment
-from hms_tz.nhif.doctype.insurance_approval_log.insurance_approval_log import add_approval_usage
-from hms_tz.nhif.nhif_api.approval import issue_approved_service
-from hms_tz.nhif.nhif_api.approval_status import validate_approved_qty
+from hms_tz.nhif.doctype.insurance_approval_log.insurance_approval_log import (
+	add_approval_usage,
+	get_approval_values,
+	get_open_approval_of_service,
+	insert_unissued_lines,
+)
+from hms_tz.nhif.nhif_api.approval import (
+	get_approval_status,
+	issue_approved_service,
+	request_unissued_services,
+)
+from hms_tz.nhif.nhif_api.approval_status import get_restricted_documents, validate_approved_qty
 from hms_tz.nhif.nhif_api.verification import get_poc_reference_no
 
 SERVICE_FIELDS = {
@@ -318,7 +327,7 @@ def get_nhif_visit(doc):
 
 
 def queue_approval_status(doc):
-	"""Ask NHIF in the background for the approvals of the visit of `doc`; one job per visit at a time."""
+	"""Run `get_visit_approvals` in the background for the visit of `doc`; one job per visit at a time."""
 	appointment = get_appointment(doc)
 	# deduplicate checks the queue when called, but after_commit jobs are pushed later
 	queued = frappe.flags.setdefault("queued_approval_status", set())
@@ -327,13 +336,84 @@ def queue_approval_status(doc):
 
 	queued.add(appointment)
 	frappe.enqueue(
-		"hms_tz.nhif.nhif_api.approval.get_approval_status",
+		"hms_tz.nhif.utils.get_visit_approvals",
 		job_id=f"nhif_approval_status::{appointment}",
 		deduplicate=True,
 		enqueue_after_commit=True,
 		ref_doctype=doc.doctype,
 		ref_docname=doc.name,
 	)
+
+
+def get_visit_approvals(ref_doctype, ref_docname):
+	"""Give the open drafts of the visit the unissued approvals of its card; ask NHIF for the approval status of the rest.
+
+	GetApprovalStatus only returns the approvals of this visit's authorization, so an approval of
+	an earlier visit with units left is found only through the card's unissued services.
+	"""
+	doc = frappe.get_doc(ref_doctype, ref_docname)
+	drafts = get_open_drafts_of_visit(get_appointment(doc))
+	if not drafts:
+		return
+
+	try:
+		log_unissued_services(doc, drafts)
+	except frappe.ValidationError:
+		# the status of the new requests is still worth asking for
+		frappe.log_error(
+			title=f"NHIF unissued services of {ref_docname} failed",
+			reference_doctype=ref_doctype,
+			reference_name=ref_docname,
+		)
+
+	if not all([set_approval_numbers_of_draft(draft) for draft in drafts]):
+		get_approval_status(ref_doctype, ref_docname)
+
+
+def get_open_drafts_of_visit(appointment):
+	"""Return the serviceable drafts of the visit with a restricted service that has no approval number."""
+	names = {
+		("Delivery Note", document.parent) if document.parent else (document.doctype, document.name)
+		for document in get_restricted_documents(appointment)
+		if document.docstatus == 0 and not document.approval_number
+	}
+	drafts = [frappe.get_doc(doctype, name) for doctype, name in sorted(names)]
+	return [draft for draft in drafts if draft.get("workflow_state") not in NOT_SERVICED_STATES]
+
+
+def log_unissued_services(doc, drafts):
+	"""Log the unissued NHIF approvals of the card of `doc`, with the services of `drafts` they are for."""
+	visit = get_nhif_visit(doc)
+	settings_doc = frappe.get_cached_doc("HMS TZ Setting", doc.company)
+	data = request_unissued_services(settings_doc, visit.coverage_plan_card_number, doc.doctype, doc.name)
+	insert_unissued_lines(data, get_appointment(doc), get_services_of_drafts(drafts, visit.insurance_company))
+
+
+def get_services_of_drafts(drafts, insurance_company):
+	"""Map the insurer item code of each service needing approval in `drafts` to its (service type, service name)."""
+	services = {}
+	for draft in drafts:
+		for _target, service_type, service_name in get_services_needing_approval(draft):
+			if service_name:
+				item_code = get_item_refcode(service_type, service_name, draft.company, insurance_company)
+				services[item_code] = (service_type, service_name)
+
+	return services
+
+
+def set_approval_numbers_of_draft(draft):
+	"""Write approval numbers from the log to the draft's restricted rows; return False when a row is left without one."""
+	visit = get_nhif_visit(draft)
+	is_covered = True
+	for target, service_type, service_name in get_services_needing_approval(draft):
+		approval = get_open_approval_of_service(draft, visit, service_type, service_name)
+		if approval:
+			frappe.db.set_value(target.doctype, target.name, get_approval_values(approval, target))
+		else:
+			is_covered = False
+
+	draft.notify_update()
+	return is_covered
 
 
 def get_services_needing_approval(doc):
