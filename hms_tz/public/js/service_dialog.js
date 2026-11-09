@@ -1,5 +1,5 @@
 /**
- * Shared parts of the NHIF service dialogs (Unissued Services, Approved Services).
+ * Shared parts of the NHIF service dialogs (Unissued Services, Approved Services, Eligibility, Approval List).
  */
 class NHIFServiceDialog {
   static is_nhif(frm) {
@@ -29,11 +29,14 @@ class NHIFServiceDialog {
     return frappe.utils.escape_html(String(value ?? ""));
   }
 
-  static show(title, html) {
+  static show(title, html, extra_fields = []) {
     const dialog = new frappe.ui.Dialog({
       title: title,
       size: "extra-large",
-      fields: [{ fieldname: "services_html", fieldtype: "HTML" }],
+      fields: [
+        ...extra_fields,
+        { fieldname: "services_html", fieldtype: "HTML" },
+      ],
     });
     dialog.onhide = () => dialog.$wrapper.remove();
     dialog.fields_dict.services_html.$wrapper.html(html);
