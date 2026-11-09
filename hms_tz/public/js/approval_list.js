@@ -94,16 +94,12 @@ class NHIFApprovalList {
     return { approved: "green", rejected: "red" }[status] || "gray";
   }
 
-  static get_date(value) {
-    return value ? frappe.datetime.str_to_user(value.split("T")[0]) : "";
-  }
-
   static get_table_html(approvals) {
     const escape = NHIFServiceDialog.escape;
     const rows = approvals
       .map(
         (line) => `<tr>
-          <td class="text-nowrap">${NHIFApprovalList.get_date(
+          <td class="text-nowrap">${NHIFServiceDialog.format_date(
             line.AttendanceDate
           )}</td>
           <td class="text-nowrap">${escape(line.AuthorizationNo)}</td>
@@ -116,7 +112,7 @@ class NHIFApprovalList {
             line.ApprovalStatus
           )}">${escape(line.ApprovalStatus)}</span></td>
           <td class="text-nowrap">${escape(line.ApprovalReferenceNo)}</td>
-          <td class="text-nowrap">${NHIFApprovalList.get_date(
+          <td class="text-nowrap">${NHIFServiceDialog.format_date(
             line.ApprovalDate
           )}</td>
         </tr>`
