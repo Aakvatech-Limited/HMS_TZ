@@ -6,7 +6,7 @@ import frappe
 import requests
 from frappe import _
 from frappe.core.utils import html2text
-from frappe.utils import cint, get_datetime, get_fullname
+from frappe.utils import add_months, cint, get_datetime, get_fullname, getdate
 
 from hms_tz.hms_tz.doctype.healthcare_service_request.healthcare_service_request import (
 	get_appointment,
@@ -311,6 +311,27 @@ def get_approval_list(ref_doctype, ref_docname):
 	)
 
 
+@frappe.whitelist()
+def get_issued_services(ref_doctype: str, ref_docname: str, from_date: str, to_date: str):
+	"""Return the services the facility issued to NHIF patients from the start of `from_date` to the end of `to_date`."""
+	from_date, to_date = getdate(from_date), getdate(to_date)
+	if from_date > to_date:
+		frappe.throw(_("From Date cannot be after To Date"))
+	if to_date >= add_months(from_date, 1):
+		frappe.throw(_("The date range cannot be longer than one month"))
+
+	_doc, settings_doc = get_nhif_document(ref_doctype, ref_docname, _("Issued services"))
+
+	return request_approvals_api(
+		settings_doc,
+		"GetIssuedServices",
+		{"fromDate": f"{from_date}T00:00:01", "toDate": f"{to_date}T23:59:59"},
+		ref_doctype,
+		ref_docname,
+		method="POST",
+	)
+
+
 def get_nhif_document(ref_doctype, ref_docname, feature, extra_doctypes=()):
 	"""Return the readable NHIF service document, Delivery Note or `extra_doctypes` document and its HMS TZ Setting.
 
@@ -332,12 +353,12 @@ def get_nhif_document(ref_doctype, ref_docname, feature, extra_doctypes=()):
 	return doc, settings_doc
 
 
-def request_approvals_api(settings_doc, request_type, query, ref_doctype, ref_docname):
-	"""GET /api/Approvals/<request_type> from NHIF, log it and return the JSON. Throw on a non-200 response."""
+def request_approvals_api(settings_doc, request_type, query, ref_doctype, ref_docname, method="GET"):
+	"""Call /api/Approvals/<request_type> on NHIF, log it and return the JSON. Throw on a non-200 response."""
 	request = f"{request_type}?{urlencode(query)}"
 	url = f"{settings_doc.nhifservice_url}/api/Approvals/{request}"
 	headers = {"Content-Type": "application/json", "Authorization": f"Bearer {settings_doc.get_nhif_token()}"}
-	r = requests.request("GET", url, headers=headers, timeout=60)
+	r = requests.request(method, url, headers=headers, timeout=60)
 	data = r.json() if r.status_code == 200 else r.text
 	add_log(
 		request_type=request_type,
