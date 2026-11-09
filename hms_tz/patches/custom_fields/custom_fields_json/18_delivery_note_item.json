@@ -410,7 +410,7 @@
         "fetch_if_empty": 0,
         "collapsible": 0,
         "non_negative": 0,
-        "depends_on": "eval: doc.is_restricted == 1 && doc.approval_number",
+        "depends_on": "eval: doc.service_reference_no",
         "reqd": 0,
         "unique": 0,
         "is_virtual": 0,
