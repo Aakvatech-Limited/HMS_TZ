@@ -256,6 +256,43 @@ def get_approved_services(ref_doctype, ref_docname):
 	]
 
 
+@frappe.whitelist()
+def check_eligibility(ref_doctype, ref_docname):
+	"""Return whether the visit's card may get an approval for each restricted service on the document.
+
+	NHIF is called once per distinct item code.
+	"""
+	# nhif.utils imports this module
+	from hms_tz.nhif.utils import get_nhif_visit, get_restricted_services, get_service_label
+
+	doc, settings_doc = get_nhif_document(ref_doctype, ref_docname, _("Eligibility checks"))
+	visit = get_nhif_visit(doc)
+	if not visit:
+		frappe.throw(_("Eligibility check is only available for an NHIF visit with a card number"))
+
+	services = []
+	for row, service_type, service_name in get_restricted_services(doc):
+		label = get_service_label(row, service_name)
+		item_code = get_item_refcode(service_type, service_name, doc.company, visit.insurance_company)
+		if not item_code:
+			frappe.throw(_("{0} has no NHIF item code").format(frappe.bold(label)))
+		services.append({"service": label, "item_code": item_code})
+	if not services:
+		frappe.throw(_("{0} {1} has no restricted service").format(_(ref_doctype), ref_docname))
+
+	eligibility = {
+		item_code: request_approvals_api(
+			settings_doc,
+			"CheckEligibility",
+			{"cardNo": visit.coverage_plan_card_number, "itemCode": item_code},
+			ref_doctype,
+			ref_docname,
+		)
+		for item_code in dict.fromkeys(service["item_code"] for service in services)
+	}
+	return [{**service, **eligibility[service["item_code"]]} for service in services]
+
+
 def get_nhif_document(ref_doctype, ref_docname, feature):
 	"""Return the readable NHIF service document or Delivery Note and its HMS TZ Setting, with the NHIF API enabled."""
 	# nhif.utils imports this module
