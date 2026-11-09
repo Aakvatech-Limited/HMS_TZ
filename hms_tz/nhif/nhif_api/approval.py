@@ -973,9 +973,9 @@ def get_service_type_id(ref_code):
 
 
 @frappe.whitelist()
-def verify_approval_number(
+def verify_service_reference_no(
 	company,
-	approval_number,
+	service_reference_no,
 	service_type,
 	service_name,
 	appointment,
@@ -995,7 +995,7 @@ def verify_approval_number(
 	)
 	card_no = appointment_info.coverage_plan_card_number or appointment_info.national_id
 
-	url = f"{settings_doc.nhifservice_url}/api/Approvals/GetReferenceNoStatus?cardNo={card_no}&referenceNo={approval_number}&itemCode={ref_code}"
+	url = f"{settings_doc.nhifservice_url}/api/Approvals/GetReferenceNoStatus?cardNo={card_no}&referenceNo={service_reference_no}&itemCode={ref_code}"
 
 	token = settings_doc.get_nhif_token()
 	headers = {
@@ -1018,7 +1018,7 @@ def verify_approval_number(
 		)
 		frappe.msgprint(
 			title="NHIF API Error",
-			msg=f"Failed to Verify Service Approval Number<br><br>Status Code: {r.status_code}<br>NHIF Response: <b>{r.text}<b>",
+			msg=f"Failed to Verify Service Reference No<br><br>Status Code: {r.status_code}<br>NHIF Response: <b>{r.text}<b>",
 			indicator="red",
 		)
 		return False
@@ -1041,7 +1041,7 @@ def verify_approval_number(
 		else:
 			frappe.msgprint(
 				f"<h4 class='text-center' style='background-color: #D3D3D3; font-weight: bold;'>\
-                This ApprovalNumber: <strong>{approval_number}</strong> for CardNo: <strong>{card_no}</strong> and ItemCode: <strong>{ref_code}</strong> is not Valid</h4>"
+                This Service Reference No: <strong>{service_reference_no}</strong> for CardNo: <strong>{card_no}</strong> and ItemCode: <strong>{ref_code}</strong> is not Valid</h4>"
 			)
 			return False
 
