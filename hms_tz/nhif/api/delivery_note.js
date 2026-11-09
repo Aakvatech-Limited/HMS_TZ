@@ -19,6 +19,7 @@ frappe.ui.form.on("Delivery Note", {
     NHIFApprovedServices.add_button(frm);
     NHIFEligibility.add_button(frm);
     NHIFApprovalList.add_button(frm);
+    NHIFIssuedServices.add_button(frm);
   },
   onload(frm) {
     $('[data-label="Not%20Serviced"]').parent().hide();
