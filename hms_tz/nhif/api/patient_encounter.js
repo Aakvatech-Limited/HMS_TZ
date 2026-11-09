@@ -1992,6 +1992,7 @@ var insurance_page_button_fields = [
   "cancel_pre_approval_btn",
   "confirm_poc_btn",
   "verify_services_btn",
+  "nhif_approval_list_btn",
 ];
 
 var remove_insurance_btns = (frm) => {
@@ -2012,6 +2013,7 @@ var is_insurance = (frm, insurer) => {
 
 var insurance_btns = (frm) => {
   remove_insurance_btns(frm);
+  approval_list_btn(frm);
   nhif_btns(frm);
   jubilee_btns(frm);
 };
@@ -2211,6 +2213,18 @@ var logout_from_nhif = (frm) => {
       })
       .$input.addClass("btn-sm");
   }
+};
+
+var approval_list_btn = (frm) => {
+  if (frm.is_new() || !NHIFServiceDialog.is_nhif(frm)) {
+    return;
+  }
+  frm.page.add_field({
+    label: __("NHIF Approval List"),
+    fieldname: "nhif_approval_list_btn",
+    fieldtype: "Button",
+    click: () => NHIFApprovalList.show(frm),
+  });
 };
 
 var pre_approval_btn = (frm) => {
