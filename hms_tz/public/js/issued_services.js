@@ -1,7 +1,7 @@
 /**
  * NHIF Issued Services: the services the facility issued to NHIF patients between two dates, at most one month.
  *
- * Usage, in the form's refresh: NHIFIssuedServices.add_button(frm);
+ * Added to the NHIF menu by NHIFServiceDialog.add_buttons(frm).
  */
 class NHIFIssuedServices {
   static add_button(frm) {
@@ -9,7 +9,7 @@ class NHIFIssuedServices {
       return;
     }
     frm.add_custom_button(
-      __("Get Issued Services by date"),
+      __("Get Issued Services by Date"),
       () => NHIFIssuedServices.ask_dates(frm),
       __("NHIF")
     );
@@ -35,7 +35,7 @@ class NHIFIssuedServices {
         },
       ],
       (values) => NHIFIssuedServices.show(frm, values),
-      __("Get Issued Services by date"),
+      __("Get Issued Services by Date"),
       __("Get")
     );
   }
