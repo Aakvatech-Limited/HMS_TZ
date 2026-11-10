@@ -2,12 +2,15 @@ from unittest.mock import patch
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
+from frappe.utils import get_datetime
 
 from hms_tz.nhif.api import healthcare_utils
 
 ENABLED = "_Test NHIF Enabled Company"
 DISABLED = "_Test NHIF Disabled Company"
 AUTO_CREATE_DISABLED = "_Test NHIF Auto Create Disabled Company"
+NOW = get_datetime("2026-01-15 13:30:00")
+TO_DATE = "2026-01-15 01:30:00"
 TODAY = "2026-01-15"
 YESTERDAY = "2026-01-14"
 
@@ -22,7 +25,7 @@ def make_setting(company, enable_nhif_api, enable_auto_create_of_claims=1):
 	).db_insert()
 
 
-def make_appointment(company, insurance_company="NHIF", appointment_date=YESTERDAY):
+def make_appointment(company, insurance_company="NHIF", appointment_datetime=f"{YESTERDAY} 09:00:00"):
 	name = frappe.generate_hash()
 	frappe.get_doc(
 		doctype="Patient Appointment",
@@ -30,7 +33,8 @@ def make_appointment(company, insurance_company="NHIF", appointment_date=YESTERD
 		company=company,
 		status="Closed",
 		insurance_company=insurance_company,
-		appointment_date=appointment_date,
+		appointment_date=get_datetime(appointment_datetime).date(),
+		appointment_datetime=appointment_datetime,
 	).db_insert()
 	frappe.get_doc(
 		doctype="Patient Encounter", name=frappe.generate_hash(), appointment=name, docstatus=1, duplicated=0
@@ -60,9 +64,9 @@ class TestAutoCreateNHIFPatientClaims(FrappeTestCase):
 	def tearDown(self):
 		frappe.db.rollback()
 
-	def get_claimed_appointments(self):
+	def get_claimed_appointments(self, now=NOW):
 		with (
-			patch.object(healthcare_utils, "nowdate", return_value=TODAY),
+			patch.object(healthcare_utils, "now_datetime", return_value=now),
 			patch.object(healthcare_utils, "create_nhif_patient_claims") as create_claims,
 		):
 			healthcare_utils.auto_create_nhif_patient_claims()
@@ -84,7 +88,34 @@ class TestAutoCreateNHIFPatientClaims(FrappeTestCase):
 	def test_skips_ongoing_and_claims_discharged_inpatients(self):
 		ongoing = make_appointment(ENABLED)
 		make_inpatient(ENABLED, ongoing, "Admitted")
-		discharged = make_appointment(ENABLED, appointment_date="2025-12-20")
+		discharged = make_appointment(ENABLED, appointment_datetime="2025-12-20 09:00:00")
 		make_inpatient(ENABLED, discharged, "Discharged", discharge_date=YESTERDAY)
 
 		self.assertEqual(self.get_claimed_appointments(), {discharged})
+
+	def test_claims_appointments_only_up_to_12_hours_before_now(self):
+		at_to_date = make_appointment(ENABLED, appointment_datetime=TO_DATE)
+		make_appointment(ENABLED, appointment_datetime=f"{TODAY} 01:31:00")
+
+		self.assertEqual(self.get_claimed_appointments(), {at_to_date})
+
+	def test_claims_previous_month_appointments_after_month_change(self):
+		last_month = make_appointment(ENABLED, appointment_datetime="2026-01-31 14:00:00")
+		make_appointment(ENABLED, appointment_datetime="2025-12-31 14:00:00")
+
+		self.assertEqual(self.get_claimed_appointments(get_datetime("2026-02-02 13:30:00")), {last_month})
+
+	def test_claims_inpatients_discharged_up_to_to_date_day(self):
+		on_to_date_day = make_appointment(ENABLED, appointment_datetime="2026-01-05 09:00:00")
+		make_inpatient(ENABLED, on_to_date_day, "Discharged", discharge_date=TODAY)
+		after_to_date_day = make_appointment(ENABLED, appointment_datetime="2026-01-06 09:00:00")
+		make_inpatient(ENABLED, after_to_date_day, "Discharged", discharge_date="2026-01-16")
+
+		self.assertEqual(self.get_claimed_appointments(get_datetime("2026-01-16 01:30:00")), {on_to_date_day})
+
+	def test_enqueue_skips_when_previous_run_is_still_queued(self):
+		with patch.object(healthcare_utils.frappe, "enqueue") as enqueue:
+			healthcare_utils.enqueue_auto_create_nhif_patient_claims()
+
+		self.assertEqual(enqueue.call_args.kwargs["job_id"], "auto_create_nhif_patient_claims")
+		self.assertTrue(enqueue.call_args.kwargs["deduplicate"])
