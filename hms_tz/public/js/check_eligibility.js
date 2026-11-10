@@ -2,7 +2,7 @@
  * NHIF Check Eligibility: ask NHIF whether the patient's card may get an approval for each restricted service of this form.
  * A Delivery Note can carry several restricted items, and all of them are checked before the dialog opens.
  *
- * Usage, in the form's refresh: NHIFEligibility.add_button(frm);
+ * Added to the NHIF menu by NHIFServiceDialog.add_buttons(frm).
  */
 class NHIFEligibility {
   static add_button(frm) {
