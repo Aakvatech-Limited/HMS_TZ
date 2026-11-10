@@ -2,7 +2,7 @@
  * NHIF Approved Services: show what NHIF approved under each approval number of this form.
  * A Delivery Note can carry several numbers, one per item, and all of them are fetched before the dialog opens.
  *
- * Usage, in the form's refresh: NHIFApprovedServices.add_button(frm);
+ * Added to the NHIF menu by NHIFServiceDialog.add_buttons(frm).
  */
 class NHIFApprovedServices {
   static add_button(frm) {
