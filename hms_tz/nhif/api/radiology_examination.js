@@ -3,11 +3,7 @@ frappe.ui.form.on("Radiology Examination", {
     $('[data-label="Not%20Serviced"]').parent().hide();
     render_re_consumables_section(frm);
     RequestApproval.show_restricted_banner(frm);
-    NHIFUnissuedServices.add_button(frm);
-    NHIFApprovedServices.add_button(frm);
-    NHIFEligibility.add_button(frm);
-    NHIFApprovalList.add_button(frm);
-    NHIFIssuedServices.add_button(frm);
+    NHIFServiceDialog.add_buttons(frm);
   },
   onload: (frm) => {
     $('[data-label="Not%20Serviced"]').parent().hide();

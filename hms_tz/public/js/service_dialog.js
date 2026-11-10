@@ -2,6 +2,14 @@
  * Shared parts of the NHIF service dialogs (Unissued Services, Approved Services, Eligibility, Approval List, Issued Services).
  */
 class NHIFServiceDialog {
+  static add_buttons(frm) {
+    NHIFEligibility.add_button(frm);
+    NHIFApprovalList.add_button(frm);
+    NHIFApprovedServices.add_button(frm);
+    NHIFUnissuedServices.add_button(frm);
+    NHIFIssuedServices.add_button(frm);
+  }
+
   static is_nhif(frm) {
     const payer =
       frm.doc.doctype === "Delivery Note"
