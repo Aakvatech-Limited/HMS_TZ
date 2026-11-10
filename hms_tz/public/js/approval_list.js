@@ -1,7 +1,7 @@
 /**
  * NHIF Approval List: every approval request NHIF holds for the patient's card, from any facility, with a search box.
  *
- * Usage, in the form's refresh: NHIFApprovalList.add_button(frm);
+ * Added to the NHIF menu by NHIFServiceDialog.add_buttons(frm).
  * Patient Encounter adds its own page button and calls NHIFApprovalList.show(frm).
  */
 class NHIFApprovalList {
