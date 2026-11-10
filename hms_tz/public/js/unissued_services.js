@@ -2,7 +2,7 @@
  * NHIF Unissued Services: list the approvals of the patient's card that still have unissued qty
  * and let the user put one on a restricted service of this form.
  *
- * Usage, in the form's refresh: NHIFUnissuedServices.add_button(frm);
+ * Added to the NHIF menu by NHIFServiceDialog.add_buttons(frm).
  */
 class NHIFUnissuedServices {
   static add_button(frm) {
@@ -10,7 +10,7 @@ class NHIFUnissuedServices {
       return;
     }
     frm.add_custom_button(
-      __("Unissued Services"),
+      __("Get Unissued Services"),
       () => NHIFUnissuedServices.show(frm),
       __("NHIF")
     );
