@@ -12,6 +12,7 @@ from frappe import _
 from frappe.query_builder import DocType
 from frappe.utils import (
 	add_days,
+	add_months,
 	add_to_date,
 	create_batch,
 	get_first_day,
@@ -2661,7 +2662,8 @@ def validate_nhif_patient_claim_status(
 def enqueue_auto_create_nhif_patient_claims():
 	frappe.enqueue(
 		method=auto_create_nhif_patient_claims,
-		job_name="auto_create_nhif_patient_claims",
+		job_id="auto_create_nhif_patient_claims",
+		deduplicate=True,
 		queue="default",
 		timeout=100000,
 		is_async=True,
@@ -2669,9 +2671,10 @@ def enqueue_auto_create_nhif_patient_claims():
 
 
 def auto_create_nhif_patient_claims():
-	"""Create NHIF Patient Claims for each company with auto create of claims enabled; runs daily at 01:30."""
-	from_date = get_first_day(nowdate())
-	to_date = add_days(nowdate(), -1)
+	"""Create NHIF Patient Claims for each company with auto create of claims enabled; runs every 12 hours."""
+	to_date = add_to_date(now_datetime(), hours=-12)
+	# include the previous month so its last hours are claimed even after a missed run
+	from_date = get_first_day(add_months(to_date, -1))
 	companies = frappe.get_all(
 		"HMS TZ Setting",
 		filters={"enable_nhif_api": 1, "enable_auto_create_of_claims": 1},
@@ -2679,7 +2682,7 @@ def auto_create_nhif_patient_claims():
 	)
 	for company in companies:
 		closed_appointments = set(get_unclaimed_nhif_appointments(company, from_date, to_date))
-		ongoing_inpatients = set(get_ongoing_nhif_inpatient_appointments(company))
+		ongoing_inpatients = set(get_ongoing_nhif_inpatient_appointments(company, to_date))
 		discharged_inpatients = set(get_discharged_nhif_inpatient_appointments(company, from_date, to_date))
 		create_nhif_patient_claims((closed_appointments - ongoing_inpatients) | discharged_inpatients)
 
@@ -2711,17 +2714,21 @@ def get_unclaimed_nhif_appointments(company, from_date, to_date):
 			get_unclaimed_appointment_condition(pa, pe)
 			& (pa.insurance_company.like("NHIF%"))
 			& (pa.company == company)
-			& (pa.appointment_date.between(from_date, to_date))
+			& (pa.appointment_datetime.between(from_date, to_date))
 		)
 	).run(pluck=True)
 
 
-def get_ongoing_nhif_inpatient_appointments(company):
+def get_ongoing_nhif_inpatient_appointments(company, to_date):
+	"""Return appointments of inpatients not discharged by the to_date day."""
 	ip = DocType("Inpatient Record")
 	return (
 		frappe.qb.from_(ip)
 		.select(ip.patient_appointment)
-		.where(get_nhif_inpatient_condition(ip, company) & (ip.status != "Discharged"))
+		.where(
+			get_nhif_inpatient_condition(ip, company)
+			& ((ip.status != "Discharged") | (ip.discharge_date > to_date.date()))
+		)
 	).run(pluck=True)
 
 
@@ -2740,7 +2747,7 @@ def get_discharged_nhif_inpatient_appointments(company, from_date, to_date):
 			get_nhif_inpatient_condition(ip, company)
 			& get_unclaimed_appointment_condition(pa, pe)
 			& (ip.status == "Discharged")
-			& (ip.discharge_date.between(from_date, to_date))
+			& (ip.discharge_date.between(from_date, to_date.date()))
 		)
 	).run(pluck=True)
 
