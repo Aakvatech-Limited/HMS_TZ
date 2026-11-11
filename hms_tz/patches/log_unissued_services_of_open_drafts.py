@@ -5,8 +5,7 @@ from frappe.query_builder import DocType
 from frappe.query_builder.functions import IfNull
 
 from hms_tz.nhif.api.healthcare_utils import get_appointment
-from hms_tz.nhif.doctype.insurance_approval_log.insurance_approval_log import insert_unissued_lines
-from hms_tz.nhif.nhif_api.approval import request_unissued_services
+from hms_tz.nhif.nhif_api.approval import get_logged_unissued_services
 from hms_tz.nhif.utils import (
 	NOT_SERVICED_STATES,
 	SERVICE_FIELDS,
@@ -67,8 +66,7 @@ def log_unissued_services_of_card(card_no, drafts):
 		return False
 
 	services = get_services_of_drafts(drafts, get_nhif_visit(doc).insurance_company)
-	data = request_unissued_services(settings_doc, card_no, doc.doctype, doc.name)
-	insert_unissued_lines(data, get_appointment(doc), services)
+	get_logged_unissued_services(settings_doc, card_no, get_appointment(doc), services, doc.doctype, doc.name)
 	return True
 
 
