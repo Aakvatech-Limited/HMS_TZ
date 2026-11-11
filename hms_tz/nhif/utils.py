@@ -10,12 +10,11 @@ from hms_tz.nhif.doctype.insurance_approval_log.insurance_approval_log import (
 	add_approval_usage,
 	get_approval_values,
 	get_open_approval_of_service,
-	insert_unissued_lines,
 )
 from hms_tz.nhif.nhif_api.approval import (
 	get_approval_status,
+	get_logged_unissued_services,
 	issue_approved_service,
-	request_unissued_services,
 )
 from hms_tz.nhif.nhif_api.approval_status import get_restricted_documents, validate_approved_qty
 from hms_tz.nhif.nhif_api.verification import get_poc_reference_no
@@ -385,8 +384,14 @@ def log_unissued_services(doc, drafts):
 	"""Log the unissued NHIF approvals of the card of `doc`, with the services of `drafts` they are for."""
 	visit = get_nhif_visit(doc)
 	settings_doc = frappe.get_cached_doc("HMS TZ Setting", doc.company)
-	data = request_unissued_services(settings_doc, visit.coverage_plan_card_number, doc.doctype, doc.name)
-	insert_unissued_lines(data, get_appointment(doc), get_services_of_drafts(drafts, visit.insurance_company))
+	get_logged_unissued_services(
+		settings_doc,
+		visit.coverage_plan_card_number,
+		get_appointment(doc),
+		get_services_of_drafts(drafts, visit.insurance_company),
+		doc.doctype,
+		doc.name,
+	)
 
 
 def get_services_of_drafts(drafts, insurance_company):
