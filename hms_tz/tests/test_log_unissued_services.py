@@ -9,9 +9,10 @@ from hms_tz.nhif import utils
 from hms_tz.nhif.doctype.insurance_approval_log import insurance_approval_log
 from hms_tz.nhif.doctype.insurance_approval_log.insurance_approval_log import (
 	INSURANCE_APPROVAL_LOG,
-	insert_unissued_lines,
+	log_unissued_lines,
 	upsert_approval_lines,
 )
+from hms_tz.nhif.nhif_api import approval
 from hms_tz.patches import log_unissued_services_of_open_drafts as job
 
 COMPANY = "_Test LU Company"
@@ -31,6 +32,20 @@ UNISSUED_DIALYSIS = {
 	"ApprovalDate": "2026-10-29T08:37:33.64",
 	"Remarks": "Approved",
 	"DateRequested": "2026-10-29T08:32:46.537",
+}
+APPROVED_DIALYSIS = {
+	"AuthorizedItemID": "AI-LU-DIALYSIS",
+	"ServiceAuthorizationID": "SA-LU-DIALYSIS",
+	"ApprovalReferenceNo": "901626062560",
+	"ApprovalDate": "2026-10-29T08:37:33.64",
+	"QuantityRequested": 12,
+	"QuantityApproved": 12,
+	"AuthorizationNo": "711627865302",
+	"ItemCode": "6234",
+	"CardNo": CARD_NO,
+	"ApprovalStatus": "Approved",
+	"ServiceDate": "2026-10-29T00:00:00",
+	"Remarks": "Approved",
 }
 
 
@@ -66,6 +81,30 @@ def patch_settings():
 	)
 
 
+def approval_status_line():
+	"""The dialysis approval shaped like the NHIF GetApprovalStatus response."""
+	line = {**APPROVED_DIALYSIS, "ReferenceNo": APPROVED_DIALYSIS["ApprovalReferenceNo"]}
+	del line["ApprovalReferenceNo"]
+	return line
+
+
+def insert_log_without_authorized_item_id():
+	"""A log written before both writers shared the AuthorizedItemID, with 2 units issued."""
+	log = frappe.new_doc(INSURANCE_APPROVAL_LOG)
+	log.update(
+		{
+			"patient": PATIENT,
+			"card_no": CARD_NO,
+			"reference_no": "901626062560",
+			"item_code": "6234",
+			"approval_status": "Approved",
+			"qty_approved": 12,
+		}
+	)
+	log.append("usages", {"qty": 2})
+	log.insert(ignore_permissions=True)
+
+
 def get_log(reference_no):
 	return frappe.get_doc(INSURANCE_APPROVAL_LOG, {"reference_no": reference_no})
 
@@ -98,6 +137,7 @@ class TestLogUnissuedServices(FrappeTestCase):
 			self.addCleanup(patcher.stop)
 		self.enqueue = utils.frappe.enqueue
 		for patcher in (
+			patch.object(approval, "request_card_approvals", return_value=[APPROVED_DIALYSIS]),
 			patch.object(utils, "get_item_refcode", return_value="6234"),
 			patch.object(insurance_approval_log, "get_item_refcode", return_value="6234"),
 		):
@@ -105,41 +145,80 @@ class TestLogUnissuedServices(FrappeTestCase):
 			self.addCleanup(patcher.stop)
 
 	def test_unissued_line_keeps_units_issued_before_the_log(self):
-		insert_unissued_lines(
-			[UNISSUED_DIALYSIS], APPOINTMENT, {"6234": ("Clinical Procedure Template", DIALYSIS)}
+		log_unissued_lines(
+			[UNISSUED_DIALYSIS],
+			[APPROVED_DIALYSIS],
+			APPOINTMENT,
+			{"6234": ("Clinical Procedure Template", DIALYSIS)},
 		)
-		insert_unissued_lines([UNISSUED_DIALYSIS], APPOINTMENT, {})
+		log_unissued_lines([UNISSUED_DIALYSIS], [APPROVED_DIALYSIS], APPOINTMENT, {})
 
 		log = get_log("901626062560")
 		self.assertEqual(frappe.db.count(INSURANCE_APPROVAL_LOG, {"reference_no": "901626062560"}), 1)
 		self.assertEqual((log.qty_approved, log.qty_issued, log.qty_remaining), (12, 2, 10))
+		self.assertEqual(log.authorized_item_id, "AI-LU-DIALYSIS")
 		self.assertEqual(
 			(log.patient, log.service_name, str(log.date_requested)), (PATIENT, DIALYSIS, "2026-10-29")
 		)
 		self.assertFalse(log.usages[0].ref_docname)
 
-	def test_approval_status_line_takes_over_the_unissued_log(self):
-		insert_unissued_lines([UNISSUED_DIALYSIS], APPOINTMENT, {})
-
+	def test_pending_log_gets_the_unissued_approval(self):
+		pending = {**APPROVED_DIALYSIS, "ApprovalReferenceNo": None, "ApprovalDate": None}
 		upsert_approval_lines(
 			[
 				{
-					"AuthorizedItemID": "AI-DIALYSIS",
-					"ReferenceNo": "901626062560",
-					"CardNo": CARD_NO,
-					"ItemCode": "6234",
-					"ApprovalStatus": "Approved",
-					"QuantityApproved": 12,
-					"ServiceDate": "2026-10-29T00:00:00",
+					**pending,
+					"ReferenceNo": None,
+					"QuantityApproved": 0,
+					"ApprovalStatus": "Waiting for Approval",
 				}
 			],
 			APPOINTMENT,
 			{},
 		)
 
+		log_unissued_lines([UNISSUED_DIALYSIS], [APPROVED_DIALYSIS], APPOINTMENT, {})
+
+		self.assertEqual(frappe.db.count(INSURANCE_APPROVAL_LOG, {"item_code": "6234"}), 1)
+		log = get_log("901626062560")
+		self.assertEqual((log.authorized_item_id, log.approval_status), ("AI-LU-DIALYSIS", "Approved"))
+		self.assertEqual((log.qty_approved, log.qty_issued, log.qty_remaining), (12, 2, 10))
+
+	def test_unissued_line_with_nothing_issued_keeps_the_approved_qty(self):
+		unissued = {**UNISSUED_DIALYSIS, "QuantityIssued": None, "QuantityRemains": None}
+
+		log_unissued_lines([unissued], [APPROVED_DIALYSIS], APPOINTMENT, {})
+
+		log = get_log("901626062560")
+		self.assertEqual((log.qty_approved, log.qty_remaining, len(log.usages)), (12, 12, 0))
+
+	def test_unissued_line_missing_from_get_approvals_is_not_logged(self):
+		with patch.object(insurance_approval_log.frappe, "log_error") as log_error:
+			log_unissued_lines([UNISSUED_DIALYSIS], [], APPOINTMENT, {})
+
+		self.assertFalse(frappe.db.exists(INSURANCE_APPROVAL_LOG, {"item_code": "6234"}))
+		self.assertIn("901626062560", log_error.call_args.kwargs["message"])
+
+	def test_approval_line_takes_over_a_log_without_authorized_item_id(self):
+		insert_log_without_authorized_item_id()
+
+		upsert_approval_lines([approval_status_line()], APPOINTMENT, {})
+
 		log = get_log("901626062560")
 		self.assertEqual(frappe.db.count(INSURANCE_APPROVAL_LOG, {"reference_no": "901626062560"}), 1)
-		self.assertEqual((log.authorized_item_id, log.qty_remaining), ("AI-DIALYSIS", 10))
+		self.assertEqual((log.authorized_item_id, log.qty_remaining), ("AI-LU-DIALYSIS", 10))
+
+	def test_log_without_authorized_item_id_is_merged_into_the_line_log(self):
+		upsert_approval_lines([{**approval_status_line(), "ReferenceNo": None}], APPOINTMENT, {})
+		insert_log_without_authorized_item_id()
+
+		upsert_approval_lines([approval_status_line()], APPOINTMENT, {})
+
+		self.assertEqual(frappe.db.count(INSURANCE_APPROVAL_LOG, {"item_code": "6234"}), 1)
+		log = get_log("901626062560")
+		self.assertEqual(
+			(log.authorized_item_id, log.qty_issued, log.qty_remaining), ("AI-LU-DIALYSIS", 2, 10)
+		)
 
 	def test_open_restricted_drafts_are_found(self):
 		insert_procedure("_Test LU Open")
@@ -196,7 +275,7 @@ class TestLogUnissuedServices(FrappeTestCase):
 				],
 			),
 			patch_settings(),
-			patch.object(job, "request_unissued_services", return_value=[UNISSUED_DIALYSIS]) as request,
+			patch.object(approval, "request_unissued_services", return_value=[UNISSUED_DIALYSIS]) as request,
 		):
 			job.log_unissued_services_of_open_drafts()
 
@@ -220,7 +299,9 @@ class TestLogUnissuedServices(FrappeTestCase):
 				return_value=[("Clinical Procedure", "_Test LU Open 1")],
 			),
 			patch_settings(),
-			patch.object(job, "request_unissued_services", side_effect=frappe.ValidationError("NHIF down")),
+			patch.object(
+				approval, "request_unissued_services", side_effect=frappe.ValidationError("NHIF down")
+			),
 			patch.object(job.frappe, "log_error") as log_error,
 		):
 			job.log_unissued_services_of_open_drafts()
@@ -245,7 +326,7 @@ class TestLogUnissuedServices(FrappeTestCase):
 		with (
 			patch.object(job, "get_open_restricted_drafts", return_value=drafts),
 			patch_settings(),
-			patch.object(job, "request_unissued_services", return_value=[UNISSUED_DIALYSIS]),
+			patch.object(approval, "request_unissued_services", return_value=[UNISSUED_DIALYSIS]),
 			patch.object(job, "set_approval_numbers_of_draft", side_effect=set_draft),
 			patch.object(job.frappe, "log_error") as log_error,
 		):
@@ -259,7 +340,7 @@ class TestLogUnissuedServices(FrappeTestCase):
 		self.assertEqual(log_error.call_args.kwargs["reference_name"], "_Test LU Open 1")
 
 	def test_delivery_note_item_gets_approval_number_and_remaining_qty(self):
-		insert_unissued_lines([UNISSUED_DIALYSIS], APPOINTMENT, {})
+		log_unissued_lines([UNISSUED_DIALYSIS], [APPROVED_DIALYSIS], APPOINTMENT, {})
 		insert("Drug Prescription", "_Test LU Drug Row", drug_code=DIALYSIS)
 		insert(
 			"Delivery Note",
@@ -307,7 +388,7 @@ class TestLogUnissuedServices(FrappeTestCase):
 			patch.object(job, "get_open_restricted_drafts", side_effect=[[open_1, open_2], [open_2]]),
 			patch.object(utils.frappe, "get_cached_value", side_effect=get_cached_value),
 			patch_settings(),
-			patch.object(job, "request_unissued_services", return_value=[UNISSUED_DIALYSIS]),
+			patch.object(approval, "request_unissued_services", return_value=[UNISSUED_DIALYSIS]),
 		):
 			job.log_unissued_services_of_open_drafts()
 

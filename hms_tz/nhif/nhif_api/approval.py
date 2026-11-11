@@ -13,7 +13,7 @@ from hms_tz.hms_tz.doctype.healthcare_service_request.healthcare_service_request
 	get_item_rate,
 	get_item_refcode,
 )
-from hms_tz.nhif.doctype.insurance_approval_log.insurance_approval_log import insert_unissued_lines
+from hms_tz.nhif.doctype.insurance_approval_log.insurance_approval_log import log_unissued_lines
 from hms_tz.nhif.doctype.nhif_response_log.nhif_response_log import add_log
 from hms_tz.nhif.nhif_api.approval_status import update_approval_status
 from hms_tz.nhif.nhif_api.referral import get_disease_code
@@ -209,8 +209,14 @@ def get_unissued_services(ref_doctype, ref_docname):
 	if not visit:
 		frappe.throw(_("Unissued services are only available for an NHIF visit with a card number"))
 
-	data = request_unissued_services(settings_doc, visit.coverage_plan_card_number, ref_doctype, ref_docname)
-	insert_unissued_lines(data, get_appointment(doc), get_services_of_drafts([doc], visit.insurance_company))
+	data = get_logged_unissued_services(
+		settings_doc,
+		visit.coverage_plan_card_number,
+		get_appointment(doc),
+		get_services_of_drafts([doc], visit.insurance_company),
+		ref_doctype,
+		ref_docname,
+	)
 	targets = get_approval_targets(doc, visit)
 	service_names = get_service_names(
 		{line.get("ItemCode") for line in data}, settings_doc.nhif_customer_name
@@ -225,11 +231,26 @@ def get_unissued_services(ref_doctype, ref_docname):
 	]
 
 
+def get_logged_unissued_services(settings_doc, card_no, appointment, services, ref_doctype, ref_docname):
+	"""Return the unissued approvals of the card after logging them with their GetApprovals line."""
+	data = request_unissued_services(settings_doc, card_no, ref_doctype, ref_docname)
+	if data:
+		approvals = request_card_approvals(settings_doc, card_no, ref_doctype, ref_docname)
+		log_unissued_lines(data, approvals, appointment, services)
+
+	return data
+
+
 def request_unissued_services(settings_doc, card_no, ref_doctype, ref_docname):
 	"""Return the approvals of the card that NHIF has not fully issued yet."""
 	return request_approvals_api(
 		settings_doc, "GetUnIssuedServices", {"cardNo": card_no}, ref_doctype, ref_docname
 	)
+
+
+def request_card_approvals(settings_doc, card_no, ref_doctype, ref_docname):
+	"""Return every approval line NHIF holds for the card, from any facility, with its AuthorizedItemID."""
+	return request_approvals_api(settings_doc, "GetApprovals", {"cardNo": card_no}, ref_doctype, ref_docname)
 
 
 @frappe.whitelist()
@@ -306,9 +327,7 @@ def get_approval_list(ref_doctype, ref_docname):
 	if not visit:
 		frappe.throw(_("Approval list is only available for an NHIF visit with a card number"))
 
-	return request_approvals_api(
-		settings_doc, "GetApprovals", {"cardNo": visit.coverage_plan_card_number}, ref_doctype, ref_docname
-	)
+	return request_card_approvals(settings_doc, visit.coverage_plan_card_number, ref_doctype, ref_docname)
 
 
 @frappe.whitelist()
