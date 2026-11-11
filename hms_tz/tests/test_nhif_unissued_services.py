@@ -6,6 +6,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from hms_tz.nhif import utils
+from hms_tz.nhif.doctype.insurance_approval_log.insurance_approval_log import INSURANCE_APPROVAL_LOG
 from hms_tz.nhif.nhif_api import approval
 
 COMPANY = "_Test US Company"
@@ -37,6 +38,11 @@ UNISSUED = [
 	},
 ]
 
+APPROVALS = [
+	{"AuthorizedItemID": f"AI-US-{line['ItemCode']}", "QuantityApproved": line["QuantityRequested"], **line}
+	for line in UNISSUED
+]
+
 
 def insert(doctype, name, **values):
 	doc = frappe.new_doc(doctype)
@@ -57,6 +63,10 @@ def insert_procedure(name, **values):
 
 def nhif_response(status_code=200, data=None):
 	return MagicMock(status_code=status_code, json=MagicMock(return_value=data), text=str(data))
+
+
+def answer_nhif(method, url, **kwargs):
+	return nhif_response(data=APPROVALS if "/GetApprovals?" in url else UNISSUED)
 
 
 class TestNHIFUnissuedServices(FrappeTestCase):
@@ -110,7 +120,7 @@ class TestNHIFUnissuedServices(FrappeTestCase):
 				"get_item_refcode",
 				side_effect=lambda doctype, name, *args: CODES[name],
 			),
-			patch.object(approval.requests, "request", return_value=nhif_response(data=UNISSUED)),
+			patch.object(approval.requests, "request", side_effect=answer_nhif),
 		]
 		for patcher in patches:
 			patcher.start()
@@ -121,7 +131,15 @@ class TestNHIFUnissuedServices(FrappeTestCase):
 
 		lines = approval.get_unissued_services("Clinical Procedure", "_Test US Procedure")
 
-		self.assertIn(f"GetUnIssuedServices?cardNo={CARD_NO}", approval.requests.request.call_args.args[1])
+		urls = [call.args[1] for call in approval.requests.request.call_args_list]
+		self.assertIn(f"GetUnIssuedServices?cardNo={CARD_NO}", urls[0])
+		self.assertIn(f"GetApprovals?cardNo={CARD_NO}", urls[1])
+		self.assertEqual(
+			frappe.db.get_value(
+				INSURANCE_APPROVAL_LOG, {"reference_no": "901626062560"}, "authorized_item_id"
+			),
+			"AI-US-6234",
+		)
 		self.assertEqual(lines[0]["targets"], [])
 		self.assertEqual(
 			lines[1]["targets"],
@@ -176,11 +194,19 @@ class TestNHIFUnissuedServices(FrappeTestCase):
 		)
 		approval.requests.request.assert_not_called()
 
+	def test_card_without_unissued_services_does_not_ask_for_approvals(self):
+		insert_procedure("_Test US Procedure")
+		approval.requests.request.side_effect = lambda method, url, **kwargs: nhif_response(data=[])
+
+		self.assertEqual(approval.get_unissued_services("Clinical Procedure", "_Test US Procedure"), [])
+		approval.requests.request.assert_called_once()
+
 	def test_other_doctype_is_refused(self):
 		self.assertRaises(frappe.ValidationError, approval.get_unissued_services, "User", "Administrator")
 
 	def test_nhif_error_is_logged_and_shown(self):
 		insert_procedure("_Test US Procedure")
+		approval.requests.request.side_effect = None
 		approval.requests.request.return_value = nhif_response(500, "Server error")
 
 		self.assertRaises(

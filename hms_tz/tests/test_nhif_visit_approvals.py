@@ -11,6 +11,7 @@ from hms_tz.nhif.doctype.insurance_approval_log.insurance_approval_log import (
 	INSURANCE_APPROVAL_LOG,
 	add_approval_usage,
 )
+from hms_tz.nhif.nhif_api import approval
 
 COMPANY = "_Test VA Company"
 PATIENT = "_Test VA Patient"
@@ -27,6 +28,17 @@ EARLIER_DIALYSIS = {
 	"ApprovalStatus": "Approved",
 	"ApprovalDate": "2026-10-29T08:37:33.64",
 	"DateRequested": "2026-10-29T08:32:46.537",
+}
+EARLIER_DIALYSIS_APPROVAL = {
+	"AuthorizedItemID": "AI-VA-DIALYSIS",
+	"ApprovalReferenceNo": "701627864200",
+	"ApprovalDate": "2026-10-29T08:37:33.64",
+	"QuantityRequested": 12,
+	"QuantityApproved": 12,
+	"ItemCode": "6234",
+	"CardNo": CARD_NO,
+	"ApprovalStatus": "Approved",
+	"ServiceDate": "2026-10-29T00:00:00",
 }
 
 
@@ -72,7 +84,10 @@ class TestNHIFVisitApprovals(FrappeTestCase):
 		self.addCleanup(frappe.db.rollback, save_point="visit_approvals_test")
 		get_cached_doc = frappe.get_cached_doc
 		patches = {
-			"request": patch.object(utils, "request_unissued_services", return_value=[EARLIER_DIALYSIS]),
+			"request": patch.object(approval, "request_unissued_services", return_value=[EARLIER_DIALYSIS]),
+			"approvals": patch.object(
+				approval, "request_card_approvals", return_value=[EARLIER_DIALYSIS_APPROVAL]
+			),
 			"status": patch.object(utils, "get_approval_status"),
 			"log_error": patch.object(utils.frappe, "log_error"),
 		}
@@ -90,7 +105,7 @@ class TestNHIFVisitApprovals(FrappeTestCase):
 		):
 			patcher.start()
 			self.addCleanup(patcher.stop)
-		self.request, self.status = utils.request_unissued_services, utils.get_approval_status
+		self.request, self.status = approval.request_unissued_services, utils.get_approval_status
 
 	def test_approval_of_earlier_visit_is_given_and_its_issue_counted(self):
 		insert_procedure("_Test VA Procedure")

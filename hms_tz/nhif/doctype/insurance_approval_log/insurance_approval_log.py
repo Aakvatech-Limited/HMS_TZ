@@ -12,6 +12,7 @@ from hms_tz.nhif.api.healthcare_utils import get_appointment
 INSURANCE_APPROVAL_LOG = "Insurance Approval Log"
 # The insurer does not return an expiry date
 APPROVAL_VALIDITY_DAYS = 30
+USAGE_FIELDS = ("ref_doctype", "ref_docname", "appointment", "qty", "service_reference_no", "issued_on")
 
 
 class InsuranceApprovalLog(Document):
@@ -56,6 +57,12 @@ class InsuranceApprovalLog(Document):
 		)
 		self.save(ignore_permissions=True)
 
+	def merge(self, name):
+		"""Take over the usages of the log `name` and delete it."""
+		for usage in frappe.get_doc(INSURANCE_APPROVAL_LOG, name).usages:
+			self.append("usages", {field: usage.get(field) for field in USAGE_FIELDS})
+		frappe.delete_doc(INSURANCE_APPROVAL_LOG, name, ignore_permissions=True)
+
 
 def get_visit_values(appointment):
 	return frappe.db.get_value(
@@ -75,79 +82,75 @@ def get_visit_values(appointment):
 def upsert_approval_lines(lines, appointment, services):
 	"""Keep one log per approval line, so a pending line becomes approved in place.
 
-	A log seeded from unissued services has no AuthorizedItemID; the approval line with the
-	same reference no, card no and item code takes it over.
 	`services` maps the insurer item code to its (service type, service name).
 	"""
 	visit = get_visit_values(appointment)
 	for line in lines:
-		authorized_item_id = line.get("AuthorizedItemID")
-		if not authorized_item_id:
-			continue
-
-		name = frappe.db.get_value(INSURANCE_APPROVAL_LOG, {"authorized_item_id": authorized_item_id})
-		if not name and line.get("ReferenceNo"):
-			name = frappe.db.get_value(
-				INSURANCE_APPROVAL_LOG,
-				{
-					"reference_no": line.get("ReferenceNo"),
-					"card_no": line.get("CardNo"),
-					"item_code": line.get("ItemCode"),
-					"authorized_item_id": ["is", "not set"],
-				},
-			)
-
-		if name:
-			log = frappe.get_doc(INSURANCE_APPROVAL_LOG, name)
-		else:
-			log = frappe.new_doc(INSURANCE_APPROVAL_LOG)
-			log.update(visit)
-
-		log.authorized_item_id = authorized_item_id
-		log.update_from_line(line)
-		service = services.get(line.get("ItemCode"))
-		if service:
-			log.service_type, log.service_name = service
-
-		log.save(ignore_permissions=True)
+		if line.get("AuthorizedItemID"):
+			get_approval_log(line, visit, services).save(ignore_permissions=True)
 
 
-def insert_unissued_lines(lines, appointment, services):
-	"""Log the unissued approvals NHIF holds for a card, once per reference no, card no and item code.
+def log_unissued_lines(lines, approvals, appointment, services):
+	"""Log the unissued approvals of a card under the AuthorizedItemID that GetApprovals gives their reference no.
 
+	`approvals` is the GetApprovals response of the card. A line it does not list is not logged.
 	NHIF counts units issued before the log existed; they are kept as one usage row without a document.
 	"""
 	visit = get_visit_values(appointment)
+	approval_of_reference = {
+		approval.get("ApprovalReferenceNo"): approval
+		for approval in approvals
+		if approval.get("ApprovalReferenceNo") and approval.get("AuthorizedItemID")
+	}
+	missing = []
 	for line in lines:
-		key = {
-			"reference_no": line.get("ApprovalReferenceNo"),
-			"card_no": line.get("CardNo"),
-			"item_code": line.get("ItemCode"),
-		}
-		if not key["reference_no"] or frappe.db.exists(INSURANCE_APPROVAL_LOG, key):
+		approval = approval_of_reference.get(line.get("ApprovalReferenceNo"))
+		if not approval:
+			missing.append(line.get("ApprovalReferenceNo"))
 			continue
 
+		log = get_approval_log({**approval, "ReferenceNo": approval["ApprovalReferenceNo"]}, visit, services)
+		if not log.usages and flt(line.get("QuantityIssued")):
+			log.append("usages", {"qty": flt(line.get("QuantityIssued"))})
+		log.save(ignore_permissions=True)
+
+	if missing:
+		frappe.log_error(
+			title=_("NHIF unissued approvals missing from GetApprovals"),
+			message=_("Reference nos not logged: {0}").format(", ".join(map(str, missing))),
+		)
+
+
+def get_approval_log(line, visit, services):
+	"""Return the log of an approval line updated from it, found by AuthorizedItemID or new.
+
+	A log of the same reference no without an AuthorizedItemID is from before both writers shared it;
+	it is taken over, or merged in when the line already has a log.
+	"""
+	name = frappe.db.get_value(INSURANCE_APPROVAL_LOG, {"authorized_item_id": line["AuthorizedItemID"]})
+	unclaimed = line.get("ReferenceNo") and frappe.db.get_value(
+		INSURANCE_APPROVAL_LOG,
+		{
+			"reference_no": line["ReferenceNo"],
+			"item_code": line.get("ItemCode"),
+			"authorized_item_id": ["is", "not set"],
+		},
+	)
+	if name or unclaimed:
+		log = frappe.get_doc(INSURANCE_APPROVAL_LOG, name or unclaimed)
+	else:
 		log = frappe.new_doc(INSURANCE_APPROVAL_LOG)
 		log.update(visit)
-		log.update_from_line(
-			{
-				"ReferenceNo": line.get("ApprovalReferenceNo"),
-				"ApprovalStatus": line.get("ApprovalStatus"),
-				"CardNo": line.get("CardNo"),
-				"ItemCode": line.get("ItemCode"),
-				"ServiceDate": line.get("DateRequested"),
-				"ApprovalDate": line.get("ApprovalDate"),
-				"QuantityRequested": line.get("QuantityRequested"),
-				"QuantityApproved": flt(line.get("QuantityIssued")) + flt(line.get("QuantityRemains")),
-				"Remarks": line.get("Remarks"),
-			}
-		)
-		if service := services.get(line.get("ItemCode")):
-			log.service_type, log.service_name = service
-		if flt(line.get("QuantityIssued")):
-			log.append("usages", {"qty": flt(line.get("QuantityIssued"))})
 
-		log.insert(ignore_permissions=True)
+	if name and unclaimed:
+		log.merge(unclaimed)
+
+	log.authorized_item_id = line["AuthorizedItemID"]
+	log.update_from_line(line)
+	if service := services.get(line.get("ItemCode")):
+		log.service_type, log.service_name = service
+
+	return log
 
 
 def get_open_approval(patient, card_no, item_code):
