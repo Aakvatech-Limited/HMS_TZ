@@ -546,14 +546,6 @@ frappe.ui.form.on("Patient Encounter", {
     }
   },
   hms_tz_convert_to_inpatient: (frm) => {
-    if (!frm.doc.mode_of_payment) {
-      frappe.msgprint(`<p class='text-center font-weight-bold h6' style='background-color: #DCDCDC; font-size: 12pt;'>\
-                This encounter has insurance of <b>${__(
-                  frm.doc.insurance_coverage_plan
-                )}</b>,\
-                no need to convert this encounter to inpatient encounter </p>`);
-      return;
-    }
     frappe
       .call(
         "hms_tz.nhif.api.patient_encounter.convert_opd_encounter_to_ipd_encounter",
