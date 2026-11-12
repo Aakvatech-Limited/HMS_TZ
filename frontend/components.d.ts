@@ -23,5 +23,6 @@ declare module 'vue' {
     RosterCell: typeof import('./src/components/roster/RosterCell.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    SlotCell: typeof import('./src/components/appointments/SlotCell.vue')['default']
   }
 }
