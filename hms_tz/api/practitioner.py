@@ -20,7 +20,6 @@ def get_practioner_list(company, date=None):
 		date = nowdate()
 
 	date = getdate(date)
-	date.strftime("%A")
 
 	available_practitioners = []
 
@@ -62,35 +61,24 @@ def get_practioner_list(company, date=None):
 
 
 def get_practitioners(company):
-	"""
-	Get all practitioners for a company, filtering by date and availability
-	"""
-
-	hp = DocType("Healthcare Practitioner")
-
-	# Base query for practitioners
-	practitioners = (
-		frappe.qb.from_(hp)
-		.select(
-			hp.name,
-			hp.practitioner_name,
-			hp.department,
-			hp.op_consulting_charge_item,
-			hp.inpatient_visit_charge_item,
-			hp.mobile_phone,
-			hp.image,
-			hp.status,
-			hp.employee,
-			hp.user_id,
-		)
-		.where((hp.status == "Active") & (hp.hms_tz_company == company))
-		.orderby(hp.name)
-	).run(as_dict=True)
-
-	# TODO: check for schedules if configured on the practitioner master
-	# use  inner join with Practitioner Schedule if needed
-
-	return practitioners
+	"""Active practitioners of the company that the user may read, after user permissions."""
+	return frappe.get_list(
+		"Healthcare Practitioner",
+		filters={"status": "Active", "hms_tz_company": company},
+		fields=[
+			"name",
+			"practitioner_name",
+			"department",
+			"op_consulting_charge_item",
+			"inpatient_visit_charge_item",
+			"mobile_phone",
+			"image",
+			"status",
+			"employee",
+			"user_id",
+		],
+		order_by="name asc",
+	)
 
 
 def check_practitioner_employee_availability(practitioner, date, employee=None, user_id=None):
