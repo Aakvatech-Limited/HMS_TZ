@@ -1,15 +1,15 @@
 <template>
   <div
-    class="appointment-card cursor-pointer transition-all duration-200 hover:shadow-md w-full h-full rounded-md border border-dotted group"
+    class="appointment-card cursor-pointer transition-colors duration-200 w-full h-full overflow-hidden rounded-md border border-dotted group"
     :class="cardStyleClasses"
-    @click="$emit('click', appointment)"
   >
     <div class="p-1 h-full flex flex-col">
       <!-- Patient Name -->
       <div class="flex-shrink-0 mb-1">
         <h4
-          class="text-xs font-bold leading-tight break-words"
+          class="text-xs font-bold leading-tight truncate"
           :class="textColorClasses"
+          :title="appointment.patient_name"
         >
           {{ appointment.patient_name || "Unknown Patient" }}
         </h4>
@@ -24,8 +24,9 @@
             class="h-2 w-2 mr-1 flex-shrink-0 mt-0.5"
           />
           <span
-            class="text-2xs font-semibold leading-tight break-words"
+            class="text-2xs font-semibold leading-tight truncate"
             style="font-size: 10px"
+            :title="appointment.insurance_company"
             >{{ appointment.insurance_company || "Cash" }}</span
           >
         </div>
@@ -41,8 +42,9 @@
             class="h-2 w-2 mr-1 flex-shrink-0 mt-0.5"
           />
           <span
-            class="text-2xs font-semibold leading-tight break-words"
+            class="text-2xs font-semibold leading-tight truncate"
             style="font-size: 10px"
+            :title="appointment.billing_item"
             >{{ appointment.billing_item }}</span
           >
         </div>
@@ -79,8 +81,6 @@ const props = defineProps({
     required: true,
   },
 });
-
-const emit = defineEmits(["click"]);
 
 // Status-based styling
 const cardStyleClasses = computed(() => {
@@ -154,5 +154,11 @@ const formatAmount = (amount) => {
 <style scoped>
 .appointment-card {
   min-height: 100%;
+}
+
+@media (prefers-contrast: high) {
+  .appointment-card {
+    border: 2px solid;
+  }
 }
 </style>
