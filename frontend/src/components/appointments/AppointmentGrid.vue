@@ -23,10 +23,9 @@
               </Button>
 
               <DatePicker
-                v-model="selectedDateForPicker"
+                v-model="selectedDate"
                 variant="outline"
                 placeholder="Select Date"
-                @change="handleDateChange"
                 class="min-w-[200px]"
               />
 
@@ -49,7 +48,7 @@
             <Button
               icon-left="refresh-cw"
               label="Refresh"
-              :loading="isRefreshing"
+              :loading="isLoadingDay"
               @click="refreshData"
             />
             <div
@@ -74,7 +73,21 @@
       </div>
     </div>
 
-    <div ref="scroller" class="grid-scroller">
+    <div
+      v-if="loadErrorMessage"
+      role="alert"
+      class="flex flex-shrink-0 items-center gap-3 border-b border-red-200 bg-red-50 px-6 py-2 text-sm text-red-800"
+    >
+      <span>Could not load this day: {{ loadErrorMessage }}</span>
+      <Button label="Retry" :loading="isLoadingDay" @click="loadDay" />
+    </div>
+
+    <div
+      ref="scroller"
+      class="grid-scroller"
+      :class="{ 'opacity-60': isLoadingDay }"
+      :aria-busy="isLoadingDay"
+    >
       <div
         ref="grid"
         role="grid"
@@ -97,7 +110,11 @@
             v-if="practitionerStore.filteredPractitioners.length === 0"
             class="header-cell empty-header"
           >
-            <span class="text-gray-500 text-sm">No practitioners found</span>
+            <span class="text-gray-500 text-sm">{{
+              practitionerStore.isFetching
+                ? "Loading practitioners..."
+                : "No practitioners found"
+            }}</span>
           </div>
           <div
             v-for="practitioner in practitionerStore.filteredPractitioners"
@@ -134,6 +151,7 @@
             :practitioner="practitioner"
             :appointment="getAppointment(slot.time, practitioner.name)"
             :is-current="row === currentSlotIndex"
+            :is-past="row < firstFutureSlotIndex"
             :tabindex="
               activeCell.row === row && activeCell.column === column ? 0 : -1
             "
@@ -167,13 +185,18 @@ import { onMounted, computed, ref, nextTick, watch } from "vue";
 import { useAppointmentStore } from "@/data/appointment";
 import { usePractitionerStore } from "@/data/practitioner";
 import { useDateStore } from "@/data/date";
-import { clamp, useResizeObserver, useScroll } from "@vueuse/core";
+import {
+  clamp,
+  useNow,
+  useResizeObserver,
+  useScroll,
+  watchDebounced,
+} from "@vueuse/core";
 import PractitionerCard from "./PractitionerCard.vue";
 import SlotCell from "./SlotCell.vue";
 import AppointmentDialog from "./AppointmentDialog.vue";
 import Link from "../controls/Link.vue";
 import { useToast } from "@/composables/useToast";
-import dayjs from "dayjs";
 
 const appointmentStore = useAppointmentStore();
 const practitionerStore = usePractitionerStore();
@@ -184,10 +207,12 @@ const scroller = ref(null);
 const grid = ref(null);
 
 // State
-const isRefreshing = ref(false);
 const searchQuery = ref("");
 const selectedCompany = ref("");
-const selectedDateForPicker = ref("");
+const selectedDate = computed({
+  get: () => dateStore.selectedDate,
+  set: (date) => date && dateStore.setSelectedDate(date),
+});
 const userCompanies = ref([]);
 
 // Simple appointment dialog state
@@ -203,76 +228,36 @@ const canScrollLeft = computed(() => !arrivedState.left);
 const canScrollRight = computed(() => !arrivedState.right);
 const activeCell = ref({ row: 0, column: 0 });
 
-// Initialize selectedDateForPicker with current date
-onMounted(() => {
-  selectedDateForPicker.value = dateStore.selectedDate;
-  // Ensure selectedCompany has a default value
-  if (!selectedCompany.value) {
-    selectedCompany.value = "";
-  }
-});
+const now = useNow({ interval: 60_000 });
+const nowTime = computed(() => now.value.getTime());
 
-// Initialize data
-onMounted(async () => {
-  try {
-    console.log("🔄 Initializing appointment grid...");
-
-    // Fetch user companies first
-    await fetchUserCompanies();
-
-    // Sync dates between stores initially
-    appointmentStore.setSelectedDate(dateStore.selectedDate);
-    selectedDateForPicker.value = dateStore.selectedDate;
-
-    // Set initial company in appointment store if one is selected
-    if (selectedCompany.value) {
-      appointmentStore.setSelectedCompany(selectedCompany.value);
-    }
-
-    await Promise.all([
-      dateStore.generateTimeSlots(),
-      selectedCompany.value
-        ? practitionerStore.fetchPractitioners(
-            selectedCompany.value,
-            dateStore.selectedDate
-          )
-        : Promise.resolve(),
-    ]);
-
-    scrollToCurrentSlot();
-  } catch (error) {
-    console.error("❌ Error initializing appointment grid:", error);
-    notifications.error.dataLoadFailed(error.message);
-  }
-});
-
-// Watch for date changes
-watch(
-  () => dateStore.selectedDate,
-  async (newDate) => {
-    console.log("🔍 DateStore date changed to:", newDate);
-    selectedDateForPicker.value = newDate;
-    appointmentStore.setSelectedDate(newDate); // Update appointment store date
-    scrollToCurrentSlot();
-    if (selectedCompany.value && selectedCompany.value.trim()) {
-      practitionerStore.fetchPractitioners(
-        selectedCompany.value,
-        dateStore.selectedDate
-      );
-    }
-  }
+const isLoadingDay = computed(
+  () => practitionerStore.isFetching || appointmentStore.isFetching
+);
+const loadErrorMessage = computed(
+  () => practitionerStore.loadError || appointmentStore.loadError
 );
 
-// Watch for company changes
-watch(selectedCompany, async (newCompany) => {
-  if (newCompany && newCompany.trim()) {
-    appointmentStore.setSelectedCompany(newCompany);
-    await Promise.all([
-      practitionerStore.fetchPractitioners(newCompany, dateStore.selectedDate),
-      appointmentStore.fetchAppointments(),
-    ]);
-  }
+const loadDay = () =>
+  appointmentStore.loadDay(selectedCompany.value, dateStore.selectedDate);
+
+onMounted(() => {
+  fetchUserCompanies();
+  dateStore.generateTimeSlots();
+  scrollToCurrentSlot();
 });
+
+// The only trigger that loads a day. The debounce collapses fast date clicks into one load.
+watchDebounced(
+  () => [selectedCompany.value, dateStore.selectedDate],
+  loadDay,
+  { debounce: 150, immediate: true }
+);
+
+watch(
+  () => dateStore.selectedDate,
+  () => scrollToCurrentSlot()
+);
 
 // Watch for search query changes
 watch(searchQuery, (newQuery) => {
@@ -295,9 +280,22 @@ const scrollPractitioners = (direction) => {
   scroller.value?.scrollBy({ left: direction * 2 * column.offsetWidth });
 };
 
-const currentSlotIndex = computed(() =>
-  dateStore.timeSlots.findIndex(isCurrentTimeSlot)
-);
+// A computed changes only at slot boundaries, so the minute tick does not re-render every cell.
+const firstFutureSlotIndex = computed(() => {
+  const index = dateStore.timeSlots.findIndex(
+    (slot) => slot.timestamp >= nowTime.value
+  );
+  return index < 0 ? dateStore.timeSlots.length : index;
+});
+
+const currentSlotIndex = computed(() => {
+  const slotLength = dateStore.slotDuration * 60_000;
+  return dateStore.timeSlots.findIndex(
+    (slot) =>
+      nowTime.value >= slot.timestamp &&
+      nowTime.value < slot.timestamp + slotLength
+  );
+});
 
 const scrollToCurrentSlot = () => {
   nextTick(() => {
@@ -367,23 +365,10 @@ const focusCell = (row, column) => {
   });
 };
 
-// Helper functions
-const getAppointment = (timeSlot, practitionerId) => {
-  const key = `${timeSlot}-${practitionerId}`;
-  const appointment = appointmentStore.appointmentsByTimeSlot[key];
-
-  return appointment;
-};
-
-const isCurrentTimeSlot = (slot) => {
-  if (!dateStore.isToday) return false;
-
-  const now = dayjs();
-  const slotTime = dayjs(`${dateStore.selectedDate} ${slot.time}`);
-  const nextSlotTime = slotTime.add(dateStore.slotDuration, "minute");
-
-  return now.isAfter(slotTime) && now.isBefore(nextSlotTime);
-};
+const getAppointment = (slotTime, practitionerName) =>
+  appointmentStore.appointmentsBySlot
+    .get(slotTime)
+    ?.get(practitionerName)?.[0];
 
 // Date navigation functions
 const goToPreviousDay = () => {
@@ -394,52 +379,10 @@ const goToNextDay = () => {
   dateStore.goToNextDay();
 };
 
-// Handle date change from DatePicker
-const handleDateChange = async (selectedDate) => {
-  if (selectedDate) {
-    console.log("🔍 Date picker changed to:", selectedDate);
-    dateStore.setSelectedDate(selectedDate);
-
-    await Promise.all([
-      practitionerStore.fetchPractitioners(
-        selectedCompany.value,
-        selectedDate
-      ),
-      appointmentStore.fetchAppointments(),
-    ]);
-
-    selectedDateForPicker.value = selectedDate;
-  }
-};
-
-// Handle company change from Link component
-const handleCompanyChange = async (selectedCompanyValue) => {
-  if (selectedCompanyValue && typeof selectedCompanyValue === "string") {
-    selectedCompany.value = selectedCompanyValue;
-
-    await Promise.all([
-      practitionerStore.fetchPractitioners(
-        selectedCompanyValue,
-        dateStore.selectedDate
-      ),
-      appointmentStore.setSelectedCompany(selectedCompanyValue),
-    ]);
-
-    console.log("Company changed to:", selectedCompanyValue);
-  } else if (selectedCompanyValue && selectedCompanyValue.name) {
-    // Handle if Link component returns an object
-    selectedCompany.value = selectedCompanyValue.name;
-
-    await Promise.all([
-      practitionerStore.fetchPractitioners(
-        selectedCompanyValue.name,
-        dateStore.selectedDate
-      ),
-      appointmentStore.setSelectedCompany(selectedCompanyValue.name),
-    ]);
-
-    console.log("Company changed to:", selectedCompanyValue.name);
-  }
+// The Link control returns either a name or a document.
+const handleCompanyChange = (company) => {
+  const name = typeof company === "string" ? company : company?.name;
+  if (name) selectedCompany.value = name;
 };
 
 // Fetch user companies function
@@ -456,7 +399,6 @@ const fetchUserCompanies = async () => {
       selectedCompany.value = userCompanies.value[0].name;
     }
   } catch (error) {
-    console.error("Error fetching user companies:", error);
     userCompanies.value = [{ name: "Default Company" }];
     selectedCompany.value = "Default Company";
   }
@@ -491,37 +433,16 @@ const closeAppointmentDialog = () => {
 };
 
 const refreshData = async () => {
-  if (isRefreshing.value) return;
-
-  isRefreshing.value = true;
-  try {
-    await Promise.all([
-      dateStore.generateTimeSlots(),
-      selectedCompany.value && selectedCompany.value.trim()
-        ? practitionerStore.fetchPractitioners(
-            selectedCompany.value,
-            dateStore.selectedDate
-          )
-        : Promise.resolve(),
-      selectedCompany.value && selectedCompany.value.trim()
-        ? appointmentStore.fetchAppointments()
-        : Promise.resolve(),
-    ]);
-    notifications.success.dataRefreshed();
-  } catch (error) {
-    notifications.error.dataLoadFailed(error.message);
-    console.error(error);
-  } finally {
-    isRefreshing.value = false;
-  }
+  dateStore.generateTimeSlots();
+  await loadDay();
+  if (!loadErrorMessage.value) notifications.success.dataRefreshed();
 };
 
-const handleAppointmentCreated = async (data) => {
-  // Refresh appointments after creating new one
-  if (selectedCompany.value && selectedCompany.value.trim()) {
-    await appointmentStore.fetchAppointments();
-  }
-};
+const handleAppointmentCreated = () =>
+  appointmentStore.fetchAppointments(
+    selectedCompany.value,
+    dateStore.selectedDate
+  );
 
 const handleModeChanged = (newMode, appointmentData) => {
   // Update dialog mode and appointment data
