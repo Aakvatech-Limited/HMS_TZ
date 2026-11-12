@@ -7,13 +7,12 @@
             <h1 class="text-2xl font-semibold text-black">Appointments</h1>
 
             <div class="flex items-center">
-              <Link
-                class="form-control min-w-[240px]"
-                :value="selectedCompany || ''"
-                doctype="Company"
-                placeholder="Select Company"
-                @change="handleCompanyChange"
+              <Select
+                v-model="selectedCompany"
+                class="min-w-[240px]"
                 variant="outline"
+                placeholder="Select Company"
+                :options="companies"
               />
             </div>
 
@@ -95,7 +94,7 @@
       class="flex flex-shrink-0 items-center gap-3 border-b border-red-200 bg-red-50 px-6 py-2 text-sm text-red-800"
     >
       <span>Could not load this day: {{ loadErrorMessage }}</span>
-      <Button label="Retry" :loading="isLoadingDay" @click="loadDay" />
+      <Button label="Retry" :loading="isLoadingDay" @click="retryLoad" />
     </div>
 
     <div
@@ -196,7 +195,10 @@
 </template>
 
 <script setup>
-import { onMounted, computed, ref, nextTick, watch } from "vue";
+import { onMounted, onUnmounted, computed, ref, nextTick, watch } from "vue";
+import { call } from "frappe-ui";
+import { useSocket } from "@/socket";
+import { sessionUser } from "@/data/session";
 // All Frappe UI components are now globally available from main.js
 import { useAppointmentStore } from "@/data/appointment";
 import { usePractitionerStore } from "@/data/practitioner";
@@ -205,6 +207,7 @@ import {
   clamp,
   useNow,
   useResizeObserver,
+  useDebounceFn,
   useScroll,
   watchDebounced,
 } from "@vueuse/core";
@@ -212,13 +215,13 @@ import PractitionerCard from "./PractitionerCard.vue";
 import SlotCell from "./SlotCell.vue";
 import { APPOINTMENT_STATUSES } from "./appointmentStatus";
 import AppointmentDialog from "./AppointmentDialog.vue";
-import Link from "../controls/Link.vue";
 import { useToast } from "@/composables/useToast";
 
 const appointmentStore = useAppointmentStore();
 const practitionerStore = usePractitionerStore();
 const dateStore = useDateStore();
 const { notifications } = useToast();
+const socket = useSocket();
 
 const scroller = ref(null);
 const grid = ref(null);
@@ -230,7 +233,8 @@ const selectedDate = computed({
   get: () => dateStore.selectedDate,
   set: (date) => date && dateStore.setSelectedDate(date),
 });
-const userCompanies = ref([]);
+const companies = ref([]);
+const companyError = ref(null);
 
 // Simple appointment dialog state
 const showAppointmentDialog = ref(false);
@@ -252,7 +256,10 @@ const isLoadingDay = computed(
   () => practitionerStore.isFetching || appointmentStore.isFetching
 );
 const loadErrorMessage = computed(
-  () => practitionerStore.loadError || appointmentStore.loadError
+  () =>
+    companyError.value ||
+    practitionerStore.loadError ||
+    appointmentStore.loadError
 );
 
 const loadDay = () =>
@@ -260,7 +267,16 @@ const loadDay = () =>
 
 onMounted(() => {
   fetchUserCompanies();
+  if (socket?.connected) subscribeToAppointments();
+  socket?.on("connect", subscribeToAppointments);
+  socket?.on("patient_appointment_update", onAppointmentUpdate);
   scrollToCurrentSlot();
+});
+
+onUnmounted(() => {
+  socket?.off("connect", subscribeToAppointments);
+  socket?.off("patient_appointment_update", onAppointmentUpdate);
+  socket?.emit("doctype_unsubscribe", "Patient Appointment");
 });
 
 // The only trigger that loads a day. The debounce collapses fast date clicks into one load.
@@ -397,30 +413,51 @@ const goToNextDay = () => {
   dateStore.goToNextDay();
 };
 
-// The Link control returns either a name or a document.
-const handleCompanyChange = (company) => {
-  const name = typeof company === "string" ? company : company?.name;
-  if (name) selectedCompany.value = name;
-};
-
-// Fetch user companies function
+// The server lists companies from user permissions, so no Company read access is needed.
 const fetchUserCompanies = async () => {
+  companyError.value = null;
   try {
-    // Mock data for now - replace with actual API call
-    userCompanies.value = [
-      { name: "Nephro One Dialysis Clinic" },
-      // { name: 'Shree Hindu Mandal Hospital - Mwanza' },
-    ];
-
-    // Set default company if none selected
-    if (userCompanies.value.length > 0 && !selectedCompany.value) {
-      selectedCompany.value = userCompanies.value[0].name;
+    const { companies: permitted, default_company } = await call(
+      "hms_tz.api.appointment.get_user_companies"
+    );
+    companies.value = permitted;
+    if (!default_company) {
+      companyError.value = "No company is permitted for your user.";
+    } else if (!selectedCompany.value) {
+      selectedCompany.value = default_company;
     }
   } catch (error) {
-    userCompanies.value = [{ name: "Default Company" }];
-    selectedCompany.value = "Default Company";
+    companyError.value = error.message || "Failed to load companies";
   }
 };
+
+const retryLoad = () =>
+  companyError.value ? fetchUserCompanies() : loadDay();
+
+// Another user's save on this company and date reloads the day. maxWait keeps a
+// steady stream of saves from delaying the reload forever.
+const reloadAppointments = useDebounceFn(
+  () =>
+    appointmentStore.fetchAppointments(
+      selectedCompany.value,
+      dateStore.selectedDate
+    ),
+  500,
+  { maxWait: 2000 }
+);
+
+const onAppointmentUpdate = ({ company, appointment_date, user }) => {
+  if (
+    company === selectedCompany.value &&
+    appointment_date === dateStore.selectedDate &&
+    user !== sessionUser()
+  )
+    reloadAppointments();
+};
+
+// Rooms are lost on reconnect, so subscribe on every connect.
+const subscribeToAppointments = () =>
+  socket?.emit("doctype_subscribe", "Patient Appointment");
 
 // Event handlers
 const createAppointment = (timeSlot, practitioner) => {
