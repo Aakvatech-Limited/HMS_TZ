@@ -140,6 +140,7 @@ doc_events = {
 		"onload": "hms_tz.nhif.api.patient_appointment.onload",
 		"before_insert": "hms_tz.nhif.api.patient_appointment.before_insert",
 		"validate": "hms_tz.nhif.api.patient_appointment.make_next_doc",
+		"on_update": "hms_tz.nhif.api.patient_appointment.publish_grid_update",
 	},
 	"Vital Signs": {
 		"on_submit": "hms_tz.nhif.api.patient_appointment.make_encounter",
