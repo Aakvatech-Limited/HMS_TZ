@@ -55,6 +55,7 @@ const props = defineProps({
   practitioner: { type: Object, required: true },
   appointment: { type: Object, default: null },
   isCurrent: { type: Boolean, default: false },
+  isPast: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(["view", "create"]);
@@ -62,12 +63,12 @@ const emit = defineEmits(["view", "create"]);
 const kind = computed(() => {
   if (props.appointment) return "appointment";
   if (props.timeSlot.isDuringBreak) return "break";
-  if (!props.timeSlot.isPast && props.practitioner.is_available) return "add";
+  if (!props.isPast && props.practitioner.is_available) return "add";
   return "unavailable";
 });
 
 const unavailableReason = computed(() =>
-  props.timeSlot.isPast ? "Past time slot" : "Practitioner unavailable"
+  props.isPast ? "Past time slot" : "Practitioner unavailable"
 );
 
 const ariaLabel = computed(() => {
