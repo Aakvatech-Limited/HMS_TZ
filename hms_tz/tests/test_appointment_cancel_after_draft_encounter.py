@@ -8,16 +8,11 @@ from hms_tz.api import appointment as appointment_api
 from hms_tz.hms_tz.doctype.patient_appointment import patient_appointment
 from hms_tz.nhif.api import patient_appointment as nhif_appointment
 from hms_tz.nhif.nhif_api import pre_approval
+from hms_tz.tests.utils import insert
 
 PATIENT = "_Test Cancel Patient"
 APPOINTMENT = "_Test Cancel Appointment"
 ENCOUNTER = "_Test Cancel PE"
-
-
-def insert(doctype, name, **values):
-	doc = frappe.new_doc(doctype)
-	doc.update({"name": name, **values})
-	doc.db_insert()
 
 
 def insert_encounter(docstatus=0):
