@@ -1,13 +1,11 @@
 <template>
-  <div class="appointment-grid-container min-h-screen bg-gray-100">
-    <!-- Header with Date Controls -->
-    <div class="sticky top-0 z-10 bg-white border-b border-gray-300 shadow-sm">
+  <div class="appointment-grid-container flex h-screen flex-col bg-gray-100">
+    <div class="flex-shrink-0 bg-white border-b border-gray-300 shadow-sm">
       <div class="px-6 py-4">
         <div class="flex items-center justify-between flex-wrap gap-4">
           <div class="flex items-center space-x-6">
             <h1 class="text-2xl font-semibold text-black">Appointments</h1>
 
-            <!-- Company Selector -->
             <div class="flex items-center">
               <Link
                 class="form-control min-w-[240px]"
@@ -19,7 +17,6 @@
               />
             </div>
 
-            <!-- Date Controls -->
             <div class="flex items-center space-x-2">
               <Button variant="ghost" @click="goToPreviousDay">
                 <FeatherIcon name="chevron-left" class="h-4 w-4 text-black" />
@@ -40,190 +37,115 @@
           </div>
 
           <div class="flex items-center space-x-3">
-            <div class="relative">
-              <FeatherIcon
-                name="search"
-                class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-600"
+            <TextInput
+              placeholder="Search practitioners..."
+              class="w-64 text-black"
+              v-model="searchQuery"
+            >
+              <template #prefix>
+                <FeatherIcon name="search" class="h-4 w-4 text-gray-600" />
+              </template>
+            </TextInput>
+            <Button
+              icon-left="refresh-cw"
+              label="Refresh"
+              :loading="isRefreshing"
+              @click="refreshData"
+            />
+            <div
+              v-if="canScrollLeft || canScrollRight"
+              class="flex items-center space-x-1"
+            >
+              <Button
+                icon="arrow-left"
+                label="Scroll practitioners left"
+                :disabled="!canScrollLeft"
+                @click="scrollPractitioners(-1)"
               />
-              <TextInput
-                placeholder="Search practitioners..."
-                class="pl-10 w-64 text-black"
-                v-model="searchQuery"
+              <Button
+                icon="arrow-right"
+                label="Scroll practitioners right"
+                :disabled="!canScrollRight"
+                @click="scrollPractitioners(1)"
               />
             </div>
-            <Button @click="refreshData" :loading="isRefreshing">
-              <FeatherIcon name="refresh-cw" class="h-4 w-4 mr-2 text-black" />
-              <span class="text-black">Refresh</span>
-            </Button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Main Grid Container -->
-    <div class="appointment-grid">
-      <!-- Time Column -->
-      <div class="time-column">
-        <!-- Time Slots Header -->
-        <div class="time-header">
-          <div
-            class="h-24 border-b-2 border-gray-200 bg-gray-50 flex items-center justify-center sticky top-0 z-10"
-          >
+    <div ref="scroller" class="grid-scroller">
+      <div
+        ref="grid"
+        role="grid"
+        aria-label="Appointments by time slot and practitioner"
+        class="appointment-grid"
+        :style="{
+          '--columns': Math.max(
+            practitionerStore.filteredPractitioners.length,
+            1
+          ),
+        }"
+        @keydown="onGridKeydown"
+        @focusin="onCellFocus"
+      >
+        <div role="row" class="contents">
+          <div role="columnheader" class="corner-cell">
             <span class="text-sm font-semibold text-gray-600">Time Slots</span>
           </div>
-        </div>
-
-        <!-- Time Slots Body - Scrollable -->
-        <div class="time-slots" ref="timeSlots">
           <div
-            v-for="slot in dateStore.timeSlots"
-            :key="slot.time"
-            class="time-slot"
-            :class="{
-              'current-time': isCurrentTimeSlot(slot),
-            }"
+            v-if="practitionerStore.filteredPractitioners.length === 0"
+            class="header-cell empty-header"
           >
-            <div class="flex flex-col items-center">
-              <span class="text-sm font-bold text-gray-900">{{
-                slot.display
-              }}</span>
-            </div>
+            <span class="text-gray-500 text-sm">No practitioners found</span>
           </div>
-        </div>
-      </div>
-
-      <!-- Practitioners Area -->
-      <div class="practitioners-area" ref="practitionersArea">
-        <!-- Practitioners Header with Navigation Controls -->
-        <div class="practitioners-header-container">
-          <!-- Practitioners Header - Fixed -->
-          <div class="practitioners-header-fixed" ref="practitionersHeader">
-            <div class="flex gap-4">
-              <div
-                v-if="practitionerStore.filteredPractitioners.length === 0"
-                class="flex items-center justify-center min-w-[320px] h-full border-b-2 border-gray-300"
-              >
-                <span class="text-gray-500 text-sm"
-                  >No practitioners found</span
-                >
-              </div>
-              <div
-                v-for="practitioner in practitionerStore.filteredPractitioners"
-                :key="practitioner.name"
-                class="practitioner-header-cell"
-              >
-                <PractitionerCard :practitioner="practitioner" />
-              </div>
-            </div>
+          <div
+            v-for="practitioner in practitionerStore.filteredPractitioners"
+            :key="practitioner.name"
+            role="columnheader"
+            class="header-cell"
+          >
+            <PractitionerCard :practitioner="practitioner" />
           </div>
         </div>
 
-        <!-- Scrollable Appointments Grid -->
-        <div class="appointments-grid" ref="appointmentsGrid">
-          <div class="grid-content">
-            <div
-              v-for="slot in dateStore.timeSlots"
-              :key="slot.time"
-              class="grid-row"
-              :class="{
-                'current-time': isCurrentTimeSlot(slot),
-              }"
-            >
-              <div
-                v-for="practitioner in practitionerStore.filteredPractitioners"
-                :key="`${slot.time}-${practitioner.name}`"
-                class="grid-cell"
-                :class="{
-                  'bg-gray-50': !practitioner.is_available,
-                }"
-              >
-                <!-- Existing Appointment -->
-                <AppointmentCard
-                  v-if="getAppointment(slot.time, practitioner.name)"
-                  :appointment="getAppointment(slot.time, practitioner.name)"
-                  @click="viewAppointment"
-                />
-
-                <!-- Break Time Slot -->
-                <div
-                  v-else-if="slot.isDuringBreak"
-                  class="break-slot"
-                  :title="slot.breakLabel"
-                >
-                  <span class="text-xs font-bold text-orange-800">{{
-                    slot.breakLabel || "Break"
-                  }}</span>
-                </div>
-
-                <!-- Empty Slot with Add Button -->
-                <div
-                  v-else-if="!slot.isPast && practitioner.is_available"
-                  class="add-appointment-button group cursor-pointer"
-                  @click="createAppointment(slot.time, practitioner)"
-                  :title="`Create appointment for ${practitioner.name} at ${slot.display}`"
-                >
-                  <div class="add-button-content">
-                    <FeatherIcon
-                      name="plus"
-                      class="h-4 w-4 text-gray-900 group-hover:text-blue-600 transition-colors"
-                    />
-                    <span
-                      class="add-text text-xs font-bold text-gray-900 group-hover:text-blue-600 transition-colors mt-1"
-                      >Add</span
-                    >
-                  </div>
-                </div>
-
-                <!-- Unavailable Slot -->
-                <div
-                  v-else
-                  class="unavailable-slot"
-                  :title="getUnavailableReason(slot, practitioner)"
-                >
-                  <span class="text-xs font-bold text-gray-600">—</span>
-                </div>
-              </div>
-            </div>
+        <div
+          v-for="(slot, row) in dateStore.timeSlots"
+          :key="slot.time"
+          role="row"
+          class="contents"
+        >
+          <div
+            role="rowheader"
+            class="time-cell"
+            :class="{ 'current-time': row === currentSlotIndex }"
+            :data-time-row="row"
+          >
+            <span class="text-sm font-bold text-gray-900">{{
+              slot.display
+            }}</span>
           </div>
+          <SlotCell
+            v-for="(
+              practitioner, column
+            ) in practitionerStore.filteredPractitioners"
+            :key="`${slot.time}-${practitioner.name}`"
+            :time-slot="slot"
+            :practitioner="practitioner"
+            :appointment="getAppointment(slot.time, practitioner.name)"
+            :is-current="row === currentSlotIndex"
+            :tabindex="
+              activeCell.row === row && activeCell.column === column ? 0 : -1
+            "
+            :data-row="row"
+            :data-column="column"
+            @view="viewAppointment"
+            @create="createAppointment"
+          />
         </div>
       </div>
     </div>
 
-    <!-- Bottom Scroll Controls -->
-    <div
-      class="bottom-scroll-controls"
-      :class="{ hidden: showAppointmentDialog }"
-    >
-      <!-- Left Scroll Button -->
-      <button
-        v-if="canScrollLeft && !showAppointmentDialog"
-        @click="scrollHorizontally('left')"
-        class="scroll-control scroll-control-left"
-        :disabled="!canScrollLeft"
-        title="Scroll left"
-      >
-        <FeatherIcon
-          name="chevron-left"
-          class="h-5 w-5 text-white drop-shadow-sm"
-        />
-      </button>
-
-      <!-- Right Scroll Button -->
-      <button
-        v-if="canScrollRight && !showAppointmentDialog"
-        @click="scrollHorizontally('right')"
-        class="scroll-control scroll-control-right"
-        :disabled="!canScrollRight"
-        title="Scroll right"
-      >
-        <FeatherIcon
-          name="chevron-right"
-          class="h-5 w-5 text-white drop-shadow-sm"
-        />
-      </button>
-    </div>
-
-    <!-- Appointment Dialog with v-model approach -->
     <AppointmentDialog
       v-model:show-dialog="showAppointmentDialog"
       :time-slot="selectedTimeSlot"
@@ -240,13 +162,14 @@
 </template>
 
 <script setup>
-import { onMounted, computed, ref, onUnmounted, nextTick, watch } from "vue";
+import { onMounted, computed, ref, nextTick, watch } from "vue";
 // All Frappe UI components are now globally available from main.js
 import { useAppointmentStore } from "@/data/appointment";
 import { usePractitionerStore } from "@/data/practitioner";
 import { useDateStore } from "@/data/date";
+import { clamp, useResizeObserver, useScroll } from "@vueuse/core";
 import PractitionerCard from "./PractitionerCard.vue";
-import AppointmentCard from "./AppointmentCard.vue";
+import SlotCell from "./SlotCell.vue";
 import AppointmentDialog from "./AppointmentDialog.vue";
 import Link from "../controls/Link.vue";
 import { useToast } from "@/composables/useToast";
@@ -257,11 +180,8 @@ const practitionerStore = usePractitionerStore();
 const dateStore = useDateStore();
 const { notifications } = useToast();
 
-// Refs for DOM elements
-const practitionersArea = ref(null);
-const practitionersHeader = ref(null);
-const appointmentsGrid = ref(null);
-const timeSlots = ref(null);
+const scroller = ref(null);
+const grid = ref(null);
 
 // State
 const isRefreshing = ref(false);
@@ -277,10 +197,11 @@ const selectedPractitioner = ref(null);
 const dialogMode = ref("create");
 const selectedAppointmentData = ref({});
 
-// Horizontal scroll control state
-const canScrollLeft = ref(false);
-const canScrollRight = ref(false);
-const scrollAmount = 320; // 2 practitioner cards width (160px each)
+const { arrivedState, measure } = useScroll(scroller);
+useResizeObserver([scroller, grid], () => measure());
+const canScrollLeft = computed(() => !arrivedState.left);
+const canScrollRight = computed(() => !arrivedState.right);
+const activeCell = ref({ row: 0, column: 0 });
 
 // Initialize selectedDateForPicker with current date
 onMounted(() => {
@@ -318,19 +239,11 @@ onMounted(async () => {
         : Promise.resolve(),
     ]);
 
-    setupSynchronizedScrolling();
-
-    // Add window resize listener for scroll button states
-    window.addEventListener("resize", updateScrollButtonStates);
+    scrollToCurrentSlot();
   } catch (error) {
     console.error("❌ Error initializing appointment grid:", error);
     notifications.error.dataLoadFailed(error.message);
   }
-});
-
-onUnmounted(() => {
-  cleanupSynchronizedScrolling();
-  window.removeEventListener("resize", updateScrollButtonStates);
 });
 
 // Watch for date changes
@@ -340,6 +253,7 @@ watch(
     console.log("🔍 DateStore date changed to:", newDate);
     selectedDateForPicker.value = newDate;
     appointmentStore.setSelectedDate(newDate); // Update appointment store date
+    scrollToCurrentSlot();
     if (selectedCompany.value && selectedCompany.value.trim()) {
       practitionerStore.fetchPractitioners(
         selectedCompany.value,
@@ -365,123 +279,92 @@ watch(searchQuery, (newQuery) => {
   practitionerStore.setSearchQuery(newQuery);
 });
 
-// Watch for practitioners changes to update scroll states
+// Keep one cell reachable by Tab when the practitioner list shrinks.
 watch(
   () => practitionerStore.filteredPractitioners,
   () => {
-    nextTick(() => {
-      updateScrollButtonStates();
-    });
+    activeCell.value = clampCell(
+      activeCell.value.row,
+      activeCell.value.column
+    );
   }
 );
 
-// Synchronized scrolling setup (vertical only)
-let scrollListeners = [];
+const scrollPractitioners = (direction) => {
+  const column = scroller.value?.querySelector(".header-cell");
+  scroller.value?.scrollBy({ left: direction * 2 * column.offsetWidth });
+};
 
-// Simplified vertical-only synchronized scrolling
-const setupSynchronizedScrolling = () => {
+const currentSlotIndex = computed(() =>
+  dateStore.timeSlots.findIndex(isCurrentTimeSlot)
+);
+
+const scrollToCurrentSlot = () => {
   nextTick(() => {
-    if (appointmentsGrid.value && timeSlots.value) {
-      let isScrolling = false;
-
-      // Vertical sync: appointments grid to time slots
-      const handleAppointmentsGridScroll = () => {
-        if (isScrolling) return;
-        isScrolling = true;
-
-        const scrollTop = appointmentsGrid.value.scrollTop;
-
-        // Sync vertical with time slots only
-        if (timeSlots.value.scrollTop !== scrollTop) {
-          timeSlots.value.scrollTop = scrollTop;
-        }
-
-        // Update horizontal scroll button states
-        updateScrollButtonStates();
-
-        isScrolling = false;
-      };
-
-      // Vertical sync: time slots to appointments grid
-      const handleTimeSlotsScroll = () => {
-        if (isScrolling) return;
-        isScrolling = true;
-
-        const scrollTop = timeSlots.value.scrollTop;
-        if (appointmentsGrid.value.scrollTop !== scrollTop) {
-          appointmentsGrid.value.scrollTop = scrollTop;
-        }
-
-        isScrolling = false;
-      };
-
-      // Add event listeners with passive: true for better performance
-      appointmentsGrid.value.addEventListener(
-        "scroll",
-        handleAppointmentsGridScroll,
-        { passive: true }
-      );
-      timeSlots.value.addEventListener("scroll", handleTimeSlotsScroll, {
-        passive: true,
-      });
-
-      scrollListeners.push(
-        () =>
-          appointmentsGrid.value?.removeEventListener(
-            "scroll",
-            handleAppointmentsGridScroll
-          ),
-        () =>
-          timeSlots.value?.removeEventListener("scroll", handleTimeSlotsScroll)
-      );
-
-      // Initial scroll button state check
-      updateScrollButtonStates();
-    }
+    const row = currentSlotIndex.value;
+    if (row < 0) return;
+    activeCell.value = { row, column: activeCell.value.column };
+    grid.value
+      ?.querySelector(`[data-time-row="${row}"]`)
+      ?.scrollIntoView({ block: "start" });
   });
 };
 
-// Horizontal scroll control functions
-const scrollHorizontally = (direction) => {
-  if (!practitionersHeader.value || !appointmentsGrid.value) return;
+const slotsPerHour = computed(() => Math.round(60 / dateStore.slotDuration));
 
-  const currentScrollLeft = practitionersHeader.value.scrollLeft;
-  const newScrollLeft =
-    direction === "left"
-      ? Math.max(0, currentScrollLeft - scrollAmount)
-      : currentScrollLeft + scrollAmount;
+function jumpToNow({ column }) {
+  return currentSlotIndex.value < 0 ? null : [currentSlotIndex.value, column];
+}
 
-  // Smooth scroll both elements simultaneously
-  practitionersHeader.value.scrollTo({
-    left: newScrollLeft,
-    behavior: "smooth",
-  });
-
-  appointmentsGrid.value.scrollTo({
-    left: newScrollLeft,
-    top: appointmentsGrid.value.scrollTop,
-    behavior: "smooth",
-  });
-
-  // Update button states after scroll animation
-  setTimeout(updateScrollButtonStates, 300);
+const keyTargets = {
+  ArrowUp: ({ row, column }) => [row - 1, column],
+  ArrowDown: ({ row, column }) => [row + 1, column],
+  ArrowLeft: ({ row, column }) => [row, column - 1],
+  ArrowRight: ({ row, column }) => [row, column + 1],
+  PageUp: ({ row, column }) => [row - slotsPerHour.value, column],
+  PageDown: ({ row, column }) => [row + slotsPerHour.value, column],
+  Home: ({ row }) => [row, 0],
+  End: ({ row }) => [row, practitionerStore.filteredPractitioners.length - 1],
+  t: jumpToNow,
+  T: jumpToNow,
 };
 
-const updateScrollButtonStates = () => {
-  if (!practitionersHeader.value) return;
-
-  const scrollLeft = practitionersHeader.value.scrollLeft;
-  const maxScrollLeft =
-    practitionersHeader.value.scrollWidth -
-    practitionersHeader.value.clientWidth;
-
-  canScrollLeft.value = scrollLeft > 0;
-  canScrollRight.value = scrollLeft < maxScrollLeft - 1; // -1 for precision issues
+const onGridKeydown = (event) => {
+  const target = keyTargets[event.key];
+  if (!target || event.ctrlKey || event.metaKey || event.altKey) return;
+  const position = target(activeCell.value);
+  if (!position) return;
+  event.preventDefault();
+  focusCell(...position);
 };
 
-const cleanupSynchronizedScrolling = () => {
-  scrollListeners.forEach((cleanup) => cleanup());
-  scrollListeners = [];
+const clampCell = (row, column) => {
+  const lastRow = dateStore.timeSlots.length - 1;
+  const lastColumn = practitionerStore.filteredPractitioners.length - 1;
+  return {
+    row: clamp(row, 0, Math.max(lastRow, 0)),
+    column: clamp(column, 0, Math.max(lastColumn, 0)),
+  };
+};
+
+const onCellFocus = (event) => {
+  const { row, column } = event.target.dataset;
+  if (row === undefined) return;
+  if (activeCell.value.row === +row && activeCell.value.column === +column)
+    return;
+  activeCell.value = { row: +row, column: +column };
+};
+
+const focusCell = (row, column) => {
+  activeCell.value = clampCell(row, column);
+  nextTick(() => {
+    const { row, column } = activeCell.value;
+    const cell = grid.value?.querySelector(
+      `[data-row="${row}"][data-column="${column}"]`
+    );
+    cell?.focus({ preventScroll: true });
+    cell?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  });
 };
 
 // Helper functions
@@ -500,14 +383,6 @@ const isCurrentTimeSlot = (slot) => {
   const nextSlotTime = slotTime.add(dateStore.slotDuration, "minute");
 
   return now.isAfter(slotTime) && now.isBefore(nextSlotTime);
-};
-
-const getUnavailableReason = (slot, practitioner) => {
-  if (slot.isPast) return "Past time slot";
-  if (slot.isDuringBreak) return `${slot.breakLabel || "Break time"}`;
-  if (!practitioner.is_available) return "Practitioner unavailable";
-  if (!dateStore.canBookAppointment(slot.time)) return "Booking not allowed";
-  return "Unavailable";
 };
 
 // Date navigation functions
@@ -663,486 +538,98 @@ const handleEditAppointment = () => {
 </script>
 
 <style scoped>
-.appointment-grid {
-  display: flex;
-  height: 100%;
+.grid-scroller {
+  --time-column-width: 96px;
+  --column-width: 144px;
+  --column-gap: 8px;
+  --row-height: 80px;
+  --header-height: 96px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background-color: white;
   border-top: 1px solid #d1d5db;
-  background-color: white;
-  position: relative;
-  min-height: calc(80vh - 80px);
-  height: calc(100vh - 100px);
-  z-index: 1; /* Lower z-index for the grid */
+  scroll-padding-top: var(--header-height);
+  scroll-padding-left: calc(var(--time-column-width) + var(--column-gap));
 }
 
-.time-column {
-  width: 7rem;
-  flex-shrink: 0;
-  background-color: #f9fafb;
-  border-right: 1px solid #d1d5db;
-  position: relative;
-  display: flex;
-  flex-direction: column;
+/* Each track holds its own gutter so sticky cells cover it when cards scroll under. */
+.appointment-grid {
+  display: grid;
+  grid-template-columns:
+    calc(var(--time-column-width) + var(--column-gap))
+    repeat(var(--columns), calc(var(--column-width) + var(--column-gap)));
+  grid-template-rows: var(--header-height);
+  grid-auto-rows: var(--row-height);
+  width: max-content;
+  min-width: 100%;
 }
 
-.time-header {
+.corner-cell,
+.header-cell,
+.time-cell {
   position: sticky;
+  background-color: var(--sticky-background);
+}
+
+.corner-cell,
+.header-cell {
+  --sticky-background: white;
   top: 0;
-  z-index: 15; /* Lower z-index to be below dialog */
-  background-color: #f9fafb;
-  flex-shrink: 0;
-}
-
-.practitioners-header-fixed {
-  background-color: white;
-  border-bottom: 1px solid #d1d5db;
-  height: 6rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-  position: sticky;
-  top: 0;
-  z-index: 20; /* Lower z-index to be below dialog */
-  flex-shrink: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-behavior: auto; /* Remove smooth scrolling for instant sync */
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* Internet Explorer 10+ */
-}
-
-.practitioners-header-fixed::-webkit-scrollbar {
-  display: none; /* WebKit */
-}
-
-.time-slots {
-  /* space-y-0 equivalent: margin-top: 0; margin-bottom: 0; */
-  background-color: #f9fafb;
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  scroll-behavior: auto; /* Remove smooth scrolling for instant sync */
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* Internet Explorer 10+ */
-}
-
-.time-slots::-webkit-scrollbar {
-  display: none; /* WebKit */
-}
-
-.time-slot {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-bottom: 1px solid #e5e7eb;
-  padding-left: 0.75rem;
-  padding-right: 0.75rem;
-  text-align: center;
-  transition-property: color, background-color, border-color,
-    text-decoration-color, fill, stroke;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms;
-  background-color: #f9fafb;
-  height: 108px; /* Match grid cell height + margin */
-  min-height: 96px;
-}
-
-.time-slot.current-time {
-  background-color: #dbeafe;
-  color: #1e40af;
-  font-weight: 600;
-  border-bottom-color: #93c5fd;
-}
-
-.grid-row.current-time {
-  background-color: #eff6ff;
-}
-
-.practitioners-area {
-  flex: 1;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.practitioners-header-container {
-  position: relative;
-  display: flex;
-  align-items: center;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  z-index: 2;
   border-bottom: 2px solid #e5e7eb;
-  height: 96px;
-  flex-shrink: 0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-.scroll-control {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
+.corner-cell,
+.time-cell {
+  --sticky-background: #f9fafb;
+  left: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px rgba(96, 165, 250, 0.25), 0 2px 4px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  backdrop-filter: blur(8px);
-  background: linear-gradient(
-    135deg,
-    rgba(96, 165, 250, 0.9) 0%,
-    rgba(59, 130, 246, 0.9) 100%
-  );
-  border: 2px solid #60a5fa;
+  border-right: 1px solid #d1d5db;
 }
 
-.scroll-control:hover:not(:disabled) {
-  box-shadow: 0 8px 25px rgba(96, 165, 250, 0.35),
-    0 4px 12px rgba(0, 0, 0, 0.15);
-  transform: scale(1.1);
-  background: linear-gradient(
-    135deg,
-    rgba(59, 130, 246, 0.95) 0%,
-    rgba(37, 99, 235, 0.95) 100%
-  );
-  border-color: #3b82f6;
+.corner-cell {
+  z-index: 3;
 }
 
-.scroll-control:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  background: #9ca3af;
-  border-color: #6b7280;
-}
-
-.scroll-control:active:not(:disabled) {
-  transform: scale(0.95);
-  box-shadow: 0 2px 8px rgba(96, 165, 250, 0.3);
-}
-
-.scroll-control:focus {
-  outline: none;
-  box-shadow: 0 4px 12px rgba(96, 165, 250, 0.25), 0 2px 4px rgba(0, 0, 0, 0.1),
-    0 0 0 2px #3b82f6, 0 0 0 4px rgba(96, 165, 250, 0.2);
-}
-
-/* Subtle pulse animation to draw attention */
-@keyframes pulse-blue {
-  0%,
-  100% {
-    box-shadow: 0 4px 12px rgba(96, 165, 250, 0.25),
-      0 2px 4px rgba(0, 0, 0, 0.1);
-  }
-  50% {
-    box-shadow: 0 4px 12px rgba(96, 165, 250, 0.4),
-      0 2px 4px rgba(0, 0, 0, 0.1);
-  }
-}
-
-.scroll-control:not(:disabled) {
-  animation: pulse-blue 3s ease-in-out infinite;
-}
-
-/* Entrance animation */
-@keyframes slideIn {
-  0% {
-    opacity: 0;
-    transform: scale(0.5);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-.scroll-control {
-  animation: slideIn 0.3s ease-out;
-}
-
-.practitioners-header-fixed {
-  background-color: white;
-  height: 6rem; /* h-24 equivalent */
-  flex: 1;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-behavior: smooth;
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* Internet Explorer 10+ */
-  border-radius: 8px;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
-}
-
-.practitioners-header-fixed::-webkit-scrollbar {
-  display: none; /* WebKit */
-}
-
-.appointments-grid-wrapper {
-  flex: 1;
-  overflow: hidden;
-  position: relative;
-}
-
-.practitioner-header-cell {
-  width: 10rem;
-  flex-shrink: 0;
-  height: 100%;
-  background-color: white;
-  border-radius: 0.375rem;
-  border-right: 1px dotted #d1d5db;
-  border-bottom: 2px dotted #d1d5db;
-}
-
-.appointments-grid {
-  overflow-y: auto;
-  overflow-x: auto;
-  scroll-behavior: smooth;
-  background: linear-gradient(to right, #f3f4f6 1px, transparent 1px),
-    linear-gradient(to bottom, #d1d5db 1px, transparent 1px);
-  background-size: 176px 96px; /* 160px width + 16px gap, 96px height to match time slots */
-  height: 100%;
-  width: 100%;
-  border-top: 2px solid #e5e7eb;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.06);
-}
-
-.appointments-grid::-webkit-scrollbar-horizontal {
-  display: none; /* Hide horizontal scrollbar */
-}
-
-.appointments-grid::-webkit-scrollbar:vertical {
-  width: 0.5rem;
-}
-
-.appointments-grid::-webkit-scrollbar-track {
-  background-color: #f3f4f6;
-}
-
-.appointments-grid::-webkit-scrollbar-thumb {
-  background-color: #9ca3af;
-  border-radius: 9999px;
-}
-
-.appointments-grid::-webkit-scrollbar-thumb:hover {
-  background-color: #6b7280;
-}
-
-.grid-row {
+.header-cell {
   display: flex;
-  transition-property: color, background-color, border-color,
-    text-decoration-color, fill, stroke;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms;
-  background-color: white;
-  gap: 1rem;
-  min-height: 96px; /* Match time slot height */
-  margin-bottom: 0; /* Remove row margin since cells have their own spacing */
+  padding-right: var(--column-gap);
 }
 
-.grid-cell {
-  width: 10rem;
-  flex-shrink: 0;
-  position: relative;
-  display: flex;
-  align-items: stretch;
-  justify-content: stretch;
-  padding: 0.25rem;
-  transition-property: all;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms;
-  background-color: white;
-  height: 100px;
-  min-height: 100px;
-  margin-bottom: 8px; /* Add space between cards to show bottom borders */
-  /* border-right: 1px dotted #d1d5db; */
-  /* border-bottom: 1px dotted #d1d5db; */
-}
-
-.grid-cell:hover {
-  background-color: #eff6ff;
-}
-
-.add-appointment-button {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition-property: all;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms;
-  border: 1px dotted #9ca3af;
-  border-radius: 0.375rem;
-  height: 86px; /* Slightly smaller than cell to show spacing */
-  background-color: #f8f9fa;
-}
-
-.add-appointment-button:hover {
-  background-color: #bfdbfe;
-  border-color: #2563eb;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
-    0 2px 4px -1px rgba(0, 0, 0, 0.06);
-}
-
-.add-appointment-button:hover .add-button-content {
-  transform: scale(1.1);
-}
-
-.add-appointment-button:active {
-  transform: scale(0.95);
-}
-
-.add-button-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+.empty-header {
   justify-content: center;
   text-align: center;
 }
 
-.add-button-content .add-text {
-  font-size: 0.75rem;
-  line-height: 1rem;
-  font-weight: 700;
+.time-cell {
+  grid-column: 1;
+  z-index: 1;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: center;
 }
 
-.unavailable-slot {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #4b5563;
-  background-color: #e5e7eb;
-  border: 1px dotted #9ca3af;
-  border-radius: 0.375rem;
-}
-
-.break-slot {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: #fed7aa;
-  color: #9a3412;
-  border: 1px dotted #f97316;
-  border-radius: 0.375rem;
-}
-
-/* Enhanced visual elements for better grid visibility */
-.current-time-indicator {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 0.125rem;
-  background-color: #ef4444;
-  z-index: 20;
-  box-shadow: 0 0 4px rgba(239, 68, 68, 0.5);
-}
-
-/* Focus styles for accessibility */
-.add-appointment-button:focus {
-  outline: 2px solid transparent;
-  outline-offset: 2px;
-  box-shadow: 0 0 0 2px #3b82f6, 0 0 0 4px rgba(59, 130, 246, 0.2);
-}
-
-.practitioners-header-fixed:focus,
-.appointments-grid:focus {
-  outline: 2px solid transparent;
-  outline-offset: 2px;
-  box-shadow: 0 0 0 2px #3b82f6, 0 0 0 4px rgba(59, 130, 246, 0.2);
-}
-
-/* Current time slot highlighting */
-.time-slot.current-time {
-  background-color: #fecaca;
-  border-bottom-color: #fca5a5;
+.time-cell.current-time {
+  --sticky-background: #fecaca;
   color: #b91c1c;
-  font-weight: 700;
   box-shadow: inset 3px 0 0 #ef4444;
 }
 
-.grid-row.current-time {
-  background-color: #fef2f2;
-  border-color: #fca5a5;
-}
-
-.grid-row.current-time .grid-cell {
-  border-color: #fecaca;
-}
-
-/* Synchronized scrolling */
-.practitioners-header-fixed,
-.appointments-grid {
-  scroll-behavior: smooth;
-}
-
-/* Bottom scroll controls */
-.bottom-scroll-controls {
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 20px;
-  z-index: 30; /* Lower z-index to be below dialog */
-  pointer-events: none; /* Allow clicks to pass through the container */
-}
-
-.bottom-scroll-controls .scroll-control {
-  pointer-events: auto; /* Re-enable clicks on the buttons */
-}
-
-/* Mobile responsive adjustments */
 @media (max-width: 768px) {
   .appointment-grid-container {
     font-size: 0.875rem;
     line-height: 1.25rem;
   }
 
-  .time-column {
-    width: 5rem;
-  }
-
-  .grid-cell,
-  .practitioner-header-cell {
-    width: 9rem;
-    height: 80px;
-    min-height: 80px;
-  }
-
-  .time-slot {
-    height: 80px;
-    min-height: 80px;
-  }
-
-  .practitioners-header {
-    height: 80px;
+  .grid-scroller {
+    --time-column-width: 80px;
+    --column-width: 128px;
   }
 }
 
 @media (max-width: 640px) {
-  .grid-cell,
-  .practitioner-header-cell {
-    width: 8rem;
-    height: 4rem;
-    min-height: 64px;
-  }
-
-  .time-slot {
-    height: 4rem;
-    font-size: 0.75rem;
-    line-height: 1rem;
-    min-height: 64px;
-  }
-
-  .time-column {
-    width: 5rem;
-  }
-
-  .practitioners-header {
-    height: 4rem;
-  }
-
   .appointment-grid-container .px-6 {
     padding-left: 1rem;
     padding-right: 1rem;
@@ -1154,58 +641,9 @@ const handleEditAppointment = () => {
   }
 }
 
-/* Loading and error states */
-.loading-overlay {
-  position: absolute;
-  inset: 0;
-  background-color: rgba(255, 255, 255, 0.75);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 20;
-}
-
-/* Smooth transitions */
-.appointment-card {
-  transition-property: all;
-  transition-duration: 200ms;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.appointment-card:hover {
-  transform: scale(1.05);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
-    0 2px 4px -1px rgba(0, 0, 0, 0.06);
-}
-
-/* High contrast mode support */
 @media (prefers-contrast: high) {
-  .grid-cell {
+  .time-cell {
     border-color: #9ca3af;
-  }
-
-  .time-slot {
-    border-color: #9ca3af;
-  }
-
-  .appointment-card {
-    border: 2px solid;
-  }
-}
-
-/* Reduced motion support */
-@media (prefers-reduced-motion: reduce) {
-  .appointment-card,
-  .add-appointment-button,
-  .time-slot,
-  .grid-row,
-  .grid-cell {
-    transition: none;
-  }
-
-  .practitioners-header,
-  .appointments-grid {
-    scroll-behavior: auto;
   }
 }
 </style>
