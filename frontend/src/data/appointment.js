@@ -143,37 +143,6 @@ export const useAppointmentStore = defineStore("appointments", {
       );
     },
 
-    async updateAppointment(appointmentId, updates) {
-      this.isLoading = true;
-      this.error = null;
-
-      try {
-        // TODO: Replace with actual API call
-        // const response = await createResource({
-        //   url: 'hms_tz.api.appointments.update_appointment',
-        //   params: { id: appointmentId, ...updates }
-        // }).fetch()
-
-        const index = this.appointments.findIndex(
-          (app) => app.id === appointmentId
-        );
-        if (index !== -1) {
-          this.appointments[index] = {
-            ...this.appointments[index],
-            ...updates,
-            modified_at: new Date().toISOString(),
-          };
-        }
-
-        return { success: true };
-      } catch (error) {
-        this.error = error.message;
-        return { success: false, error: error.message };
-      } finally {
-        this.isLoading = false;
-      }
-    },
-
     async fetchUserRoles() {
       this.rolesLoading = true;
       this.error = null;
