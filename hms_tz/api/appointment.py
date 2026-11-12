@@ -1,6 +1,8 @@
 import frappe
+from frappe import _
+from frappe.core.doctype.user_permission.user_permission import get_user_permissions
 from frappe.query_builder import DocType
-from frappe.utils import get_time
+from frappe.utils import get_datetime, get_time, getdate, now_datetime
 
 from hms_tz.nhif.api.patient_appointment import (
 	add_cancel_comment,
@@ -11,14 +13,36 @@ from hms_tz.nhif.api.patient_appointment import (
 
 
 @frappe.whitelist()
+def get_user_companies():
+	"""Companies the user may book for, and the one to select first.
+
+	Read from the user's Company user permissions, not from Company read access: a receptionist
+	restricted to one company usually has no permission on the Company doctype itself.
+	"""
+	permitted = [
+		permission.get("doc")
+		for permission in get_user_permissions().get("Company", [])
+		if permission.get("applicable_for") in (None, "", "Patient Appointment")
+	]
+	companies = permitted or frappe.get_all("Company", pluck="name", order_by="name asc")
+	default_company = frappe.defaults.get_user_default("Company")
+	if default_company not in companies:
+		default_company = companies[0] if companies else None
+
+	return {"companies": companies, "default_company": default_company}
+
+
+@frappe.whitelist()
 def create_appointment(appointment_data):
 	"""
 	Create a new appointment with the provided data.
 	"""
 
-	# frappe.throw(str(appointment_data))
 	appointment_doc = frappe.new_doc("Patient Appointment")
 	appointment_doc.update(appointment_data)
+	# Checks the role and the user's company permission before ignore_permissions saves.
+	appointment_doc.check_permission("create")
+	validate_not_in_past(appointment_doc.appointment_date, appointment_doc.appointment_time)
 
 	billing_item = get_consulting_charge_item(
 		appointment_data.get("appointment_type"),
@@ -53,7 +77,8 @@ def update_appointment(appointment_id, practitioner, appointment_time, appointme
 	"""
 
 	has_changed = False
-	appointment_doc = frappe.get_cached_doc("Patient Appointment", appointment_id)
+	appointment_doc = frappe.get_doc("Patient Appointment", appointment_id)
+	appointment_doc.check_permission("write")
 	if appointment_doc.practitioner != practitioner:
 		validate_practitioner_level(
 			appointment_doc.practitioner, practitioner, appointment_doc.inpatient_record
@@ -64,6 +89,7 @@ def update_appointment(appointment_id, practitioner, appointment_time, appointme
 
 	new_appointment_time = get_time(appointment_time)
 	if get_time(appointment_doc.appointment_time) != new_appointment_time:
+		validate_not_in_past(appointment_doc.appointment_date, new_appointment_time)
 		has_changed = True
 		appointment_doc.appointment_time = new_appointment_time
 
@@ -86,7 +112,8 @@ def cancel_appointment(appointment_id):
 	Cancel an existing appointment.
 	"""
 
-	appointment_doc = frappe.get_cached_doc("Patient Appointment", appointment_id)
+	appointment_doc = frappe.get_doc("Patient Appointment", appointment_id)
+	appointment_doc.check_permission("write")
 	if appointment_doc.status == "Cancelled":
 		frappe.throw(f"Appointment {appointment_id} is already cancelled.")
 
@@ -144,8 +171,7 @@ def get_appointment_details(appointment_id):
 	Fetch details of a specific appointment with related patient and insurance data.
 	"""
 	appointment_doc = frappe.get_doc("Patient Appointment", appointment_id)
-	if not appointment_doc:
-		frappe.throw(f"Appointment {appointment_id} not found.")
+	appointment_doc.check_permission("read")
 
 	# Get appointment data
 	appointment_data = appointment_doc.as_dict()
@@ -191,6 +217,18 @@ def get_user_roles():
 		frappe.throw(f"No roles found for user: {user}")
 
 	return roles
+
+
+def validate_not_in_past(appointment_date, appointment_time):
+	"""Reject an appointment whose date and time are before now."""
+	appointment_datetime = get_datetime(f"{getdate(appointment_date)} {get_time(appointment_time)}")
+	if appointment_datetime < now_datetime():
+		frappe.throw(
+			_("Appointment time {0} is in the past. Choose a future date and time.").format(
+				frappe.bold(appointment_datetime.strftime("%Y-%m-%d %H:%M"))
+			),
+			title=_("Past Appointment Time"),
+		)
 
 
 def validate_practitioner_level(current_practitioner, new_practitioner, inpatient_record=None):
