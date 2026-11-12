@@ -1,28 +1,108 @@
 import { defineStore } from "pinia";
-import { createListResource, createResource } from "frappe-ui";
+import { call, createResource } from "frappe-ui";
 import dayjs from "dayjs";
 import { useToast } from "../composables/useToast";
+import { getSlotTime, useDateStore } from "./date";
+import { fetchLatest } from "./latestRequest";
+import { usePractitionerStore } from "./practitioner";
+
+const APPOINTMENT_FIELDS = [
+  "name",
+  "patient",
+  "patient_name",
+  "patient_sex",
+  "practitioner",
+  "appointment_time",
+  "appointment_date",
+  "status",
+  "appointment_type",
+  "department",
+  "company",
+  "insurance_company",
+  "mode_of_payment",
+  "billing_item",
+  "paid_amount",
+  "invoiced",
+  "ref_sales_invoice",
+  "referral_no",
+  "remarks",
+  "coverage_plan_name",
+  "nhif_employer_name",
+  "daily_limit",
+  "apply_fasttrack_charge",
+  "authorization_number",
+  "poc_reference_no",
+  "require_fingerprint",
+  "require_facial_recognation",
+  "biometric_method",
+  "fpcode",
+];
+
+const toAppointment = (appointment) => ({
+  id: appointment.name,
+  name: appointment.name,
+  patient: appointment.patient,
+  patient_name: appointment.patient_name,
+  patient_sex: appointment.patient_sex,
+  practitioner: appointment.practitioner,
+  appointment_time: dayjs(`2024-01-01 ${appointment.appointment_time}`).format(
+    "HH:mm"
+  ), // Normalize to HH:mm format
+  appointment_date: appointment.appointment_date,
+  status: appointment.status?.toLowerCase() || "scheduled",
+  appointment_type: appointment.appointment_type,
+  department: appointment.department,
+  company: appointment.company,
+  insurance_company: appointment.insurance_company || "Cash",
+  insurance_subscription: appointment.insurance_subscription,
+  billing_item: appointment.billing_item,
+  paid_amount: appointment.paid_amount || 0,
+  mode_of_payment: appointment.mode_of_payment,
+  invoiced: appointment.invoiced,
+  ref_sales_invoice: appointment.ref_sales_invoice,
+  referral_no: appointment.referral_no,
+  remarks: appointment.remarks,
+  coverage_plan_name: appointment.coverage_plan_name,
+  nhif_employer_name: appointment.nhif_employer_name,
+  daily_limit: appointment.daily_limit,
+  apply_fasttrack_charge: appointment.apply_fasttrack_charge,
+  authorization_number: appointment.authorization_number,
+  poc_reference_no: appointment.poc_reference_no,
+  require_fingerprint: appointment.require_fingerprint,
+  require_facial_recognation: appointment.require_facial_recognation,
+  biometric_method: appointment.biometric_method,
+  fpcode: appointment.fpcode,
+});
 
 export const useAppointmentStore = defineStore("appointments", {
   state: () => ({
     appointments: [],
-    selectedDate: dayjs().format("YYYY-MM-DD"),
-    selectedCompany: "",
     isLoading: false,
     error: null,
-    appointmentsResource: null,
+    isFetching: false,
+    loadError: null,
+    latestRequest: 0,
     userRoles: [],
     rolesLoading: false,
   }),
 
   getters: {
-    appointmentsByTimeSlot: (state) => {
-      const grouped = {};
-      state.appointments.forEach((appointment) => {
-        const key = `${appointment.appointment_time}-${appointment.practitioner}`;
-        grouped[key] = appointment;
-      });
-      return grouped;
+    /** Slot time to practitioner to appointments, with each time floored to its slot. */
+    appointmentsBySlot: (state) => {
+      const { slotDuration } = useDateStore();
+      const bySlot = new Map();
+      for (const appointment of state.appointments) {
+        const slotTime = getSlotTime(
+          appointment.appointment_time,
+          slotDuration
+        );
+        if (!bySlot.has(slotTime)) bySlot.set(slotTime, new Map());
+        const byPractitioner = bySlot.get(slotTime);
+        if (!byPractitioner.has(appointment.practitioner))
+          byPractitioner.set(appointment.practitioner, []);
+        byPractitioner.get(appointment.practitioner).push(appointment);
+      }
+      return bySlot;
     },
 
     canCancelAppointment: (state) => {
@@ -36,137 +116,31 @@ export const useAppointmentStore = defineStore("appointments", {
   },
 
   actions: {
-    initializeResource() {
-      if (!this.appointmentsResource) {
-        this.appointmentsResource = createListResource({
-          doctype: "Patient Appointment",
-          fields: [
-            "name",
-            "patient",
-            "patient_name",
-            "patient_sex",
-            "practitioner",
-            "appointment_time",
-            "appointment_date",
-            "status",
-            "appointment_type",
-            "department",
-            "company",
-            "insurance_company",
-            "mode_of_payment",
-            "billing_item",
-            "paid_amount",
-            "invoiced",
-            "ref_sales_invoice",
-            "referral_no",
-            "remarks",
-            "coverage_plan_name",
-            "nhif_employer_name",
-            "daily_limit",
-            "apply_fasttrack_charge",
-            "authorization_number",
-            "poc_reference_no",
-            "require_fingerprint",
-            "require_facial_recognation",
-            "biometric_method",
-            "fpcode",
-          ],
-          filters: {},
-          orderBy: "appointment_time asc",
-          pageLength: 999,
-          auto: false,
-        });
-      }
+    /** Load practitioners and appointments for one company and date. */
+    async loadDay(company, date) {
+      await Promise.all([
+        usePractitionerStore().fetchPractitioners(company, date),
+        this.fetchAppointments(company, date),
+      ]);
     },
 
-    setSelectedDate(date) {
-      // Ensure date is in YYYY-MM-DD format for Frappe
-      const formattedDate = dayjs(date).format("YYYY-MM-DD");
-      this.selectedDate = formattedDate;
-      this.fetchAppointments();
-    },
-
-    setSelectedCompany(company) {
-      this.selectedCompany = company;
-      this.fetchAppointments();
-    },
-
-    async fetchAppointments() {
-      this.initializeResource();
-      this.isLoading = true;
-      this.error = null;
-
-      try {
-        // Build filters - start with date filter
-        const filters = {
-          appointment_date: this.selectedDate,
-        };
-
-        // Only add company filter if a specific company is selected
-        if (
-          this.selectedCompany &&
-          this.selectedCompany.trim() &&
-          this.selectedCompany !== ""
-        ) {
-          filters.company = this.selectedCompany;
+    fetchAppointments(company, date) {
+      return fetchLatest(
+        this,
+        () =>
+          company
+            ? call("frappe.client.get_list", {
+                doctype: "Patient Appointment",
+                fields: APPOINTMENT_FIELDS,
+                filters: { appointment_date: date, company },
+                order_by: "appointment_time asc",
+                limit_page_length: 0,
+              })
+            : [],
+        (rows) => {
+          this.appointments = rows.map(toAppointment);
         }
-
-        // Update resource filters
-        this.appointmentsResource.update({
-          filters: filters,
-        });
-
-        // Fetch data
-        await this.appointmentsResource.reload();
-
-        // Transform the data to match our expected format
-        this.appointments = (this.appointmentsResource.data || []).map(
-          (appointment) => ({
-            id: appointment.name,
-            name: appointment.name,
-            patient: appointment.patient,
-            patient_name: appointment.patient_name,
-            patient_sex: appointment.patient_sex,
-            practitioner: appointment.practitioner,
-            appointment_time: dayjs(
-              `2024-01-01 ${appointment.appointment_time}`
-            ).format("HH:mm"), // Normalize to HH:mm format
-            appointment_date: appointment.appointment_date,
-            status: appointment.status?.toLowerCase() || "scheduled",
-            appointment_type: appointment.appointment_type,
-            department: appointment.department,
-            company: appointment.company,
-            insurance_company: appointment.insurance_company || "Cash",
-            insurance_subscription: appointment.insurance_subscription,
-            billing_item: appointment.billing_item,
-            paid_amount: appointment.paid_amount || 0,
-            mode_of_payment: appointment.mode_of_payment,
-            invoiced: appointment.invoiced,
-            ref_sales_invoice: appointment.ref_sales_invoice,
-            referral_no: appointment.referral_no,
-            remarks: appointment.remarks,
-            coverage_plan_name: appointment.coverage_plan_name,
-            nhif_employer_name: appointment.nhif_employer_name,
-            daily_limit: appointment.daily_limit,
-            apply_fasttrack_charge: appointment.apply_fasttrack_charge,
-            authorization_number: appointment.authorization_number,
-            poc_reference_no: appointment.poc_reference_no,
-            require_fingerprint: appointment.require_fingerprint,
-            require_facial_recognation: appointment.require_facial_recognation,
-            biometric_method: appointment.biometric_method,
-            fpcode: appointment.fpcode,
-          })
-        );
-      } catch (error) {
-        this.error = error.message || "Failed to fetch appointments";
-        console.error("❌ Error fetching appointments:", error);
-        const { notifications } = useToast();
-        notifications.error.dataLoadFailed(error.message || "appointments");
-        this.appointments = [];
-        throw error;
-      } finally {
-        this.isLoading = false;
-      }
+      );
     },
 
     async updateAppointment(appointmentId, updates) {
@@ -194,7 +168,6 @@ export const useAppointmentStore = defineStore("appointments", {
         return { success: true };
       } catch (error) {
         this.error = error.message;
-        console.error("Error updating appointment:", error);
         return { success: false, error: error.message };
       } finally {
         this.isLoading = false;
@@ -217,7 +190,6 @@ export const useAppointmentStore = defineStore("appointments", {
         return { success: true, roles: this.userRoles };
       } catch (error) {
         this.error = error.message || "Failed to fetch user roles";
-        console.error("❌ Error fetching user roles:", error);
         const { notifications } = useToast();
         notifications.error.dataLoadFailed(error.message || "user roles");
         this.userRoles = [];
