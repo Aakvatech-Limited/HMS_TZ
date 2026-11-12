@@ -1418,8 +1418,6 @@ const resetAppointment = () => {
 const loadAppointmentData = (appointmentData) => {
   if (!appointmentData) return;
 
-  console.log("Loading appointment data:", appointmentData); // Debug log
-
   // Handle both nested structure and flat structure
   if (appointmentData["Patient Appointment"]) {
     // Nested structure
@@ -1498,8 +1496,6 @@ const loadAppointmentData = (appointmentData) => {
       }
     }
   }
-
-  console.log("Loaded appointment:", appointment); // Debug log
 
   // Reset loading states
   isCreating.value = false;
@@ -1712,7 +1708,6 @@ const patient_doc = createResource({
     appointment["Healthcare Insurance Subscription"][
       "patient_name"
     ] = `${data.first_name} ${data.last_name}`;
-    console.log("Patient created successfully");
   },
   onError: (err) => {
     handleResourceError(err);
@@ -1748,7 +1743,6 @@ const insurance_doc = createResource({
   },
   onSuccess: (data) => {
     appointment["Patient Appointment"]["insurance_subscription"] = data.name;
-    console.log("Insurance subscription created successfully");
   },
   onError: (err) => {
     handleResourceError(err);
@@ -1767,7 +1761,6 @@ const get_appointment_details_doc = createResource({
     };
   },
   onSuccess: (data) => {
-    console.log("Latest appointment data fetched:", data);
     // Load the latest appointment data
     loadAppointmentData(data);
     // Emit event to refresh parent component data
@@ -1783,12 +1776,7 @@ const get_appointment_details_doc = createResource({
 // Function to fetch latest appointment data
 const fetchLatestAppointmentData = async (appointmentId) => {
   try {
-    if (!appointmentId) {
-      console.warn("No appointment ID provided for fetching latest data");
-      return;
-    }
-
-    console.log("Fetching latest data for appointment:", appointmentId);
+    if (!appointmentId) return;
 
     // Update the appointment ID in the resource params
     get_appointment_details_doc.params = { appointment_id: appointmentId };
