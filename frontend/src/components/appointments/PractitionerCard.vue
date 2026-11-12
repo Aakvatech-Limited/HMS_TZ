@@ -1,7 +1,7 @@
 <template>
-  <div class="practitioner-card">
+  <div class="w-full h-full">
     <div
-      class="flex flex-col items-center p-3 bg-white border-2 border-gray-300 rounded-md hover:bg-blue-50 transition-colors w-40 h-24 overflow-hidden shadow-sm"
+      class="flex flex-col items-center p-3 bg-white border-2 border-gray-300 rounded-md hover:bg-blue-50 transition-colors w-full h-full overflow-hidden shadow-sm"
     >
       <!-- Avatar on top -->
       <div class="mb-1 flex-shrink-0">
@@ -21,6 +21,7 @@
       <div class="text-center w-full flex-1 min-h-0">
         <h3
           class="text-xs font-bold text-gray-900 truncate mb-1 leading-tight"
+          :title="practitioner.name"
         >
           {{ practitioner.name }}
         </h3>
@@ -45,13 +46,3 @@ const props = defineProps({
   },
 });
 </script>
-
-<style scoped>
-.practitioner-card {
-  @apply transition-all duration-200;
-}
-
-.practitioner-card:hover {
-  @apply transform translate-y-[-1px];
-}
-</style>
