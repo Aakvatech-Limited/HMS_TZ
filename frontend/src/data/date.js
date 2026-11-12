@@ -12,19 +12,30 @@ export const getSlotTime = (time, slotDuration) => {
 export const useDateStore = defineStore("date", {
   state: () => ({
     selectedDate: dayjs().format("YYYY-MM-DD"),
-    timeSlots: [],
-    workingHours: {
-      start: "08:00",
-      end: "07:50",
-    },
     slotDuration: 10, // minutes
     bufferTime: 5, // minutes buffer for future bookings
   }),
 
+  getters: {
+    /** Slots of `slotDuration` minutes across the whole selected day. */
+    timeSlots: (state) => {
+      const day = dayjs(state.selectedDate);
+      const slots = [];
+      for (let minute = 0; minute < 24 * 60; minute += state.slotDuration) {
+        const slotStart = day.add(minute, "minute");
+        slots.push({
+          time: slotStart.format("HH:mm"),
+          display: slotStart.format("h:mm A"),
+          timestamp: slotStart.valueOf(),
+        });
+      }
+      return slots;
+    },
+  },
+
   actions: {
     setSelectedDate(date) {
       this.selectedDate = dayjs(date).format("YYYY-MM-DD");
-      this.generateTimeSlots();
     },
 
     goToPreviousDay() {
@@ -35,32 +46,6 @@ export const useDateStore = defineStore("date", {
     goToNextDay() {
       const nextDay = dayjs(this.selectedDate).add(1, "day");
       this.setSelectedDate(nextDay);
-    },
-
-    generateTimeSlots() {
-      const slots = [];
-      const startTime = dayjs(
-        `${this.selectedDate} ${this.workingHours.start}`
-      );
-      const endTime = dayjs(
-        `${this.selectedDate} ${this.workingHours.end}`
-      ).add(1, "day");
-
-      let startTimeSlot = startTime;
-
-      while (startTimeSlot.isBefore(endTime)) {
-        const timeString = startTimeSlot.format("HH:mm");
-
-        slots.push({
-          time: timeString,
-          display: startTimeSlot.format("h:mm A"),
-          timestamp: startTimeSlot.valueOf(),
-        });
-
-        startTimeSlot = startTimeSlot.add(this.slotDuration, "minute");
-      }
-
-      this.timeSlots = slots;
     },
   },
 });
