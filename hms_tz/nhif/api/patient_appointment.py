@@ -7,6 +7,7 @@ import json
 import frappe
 from frappe import _
 from frappe.model.mapper import get_mapped_doc
+from frappe.realtime import get_doctype_room
 from frappe.utils import cint, date_diff, nowdate, nowtime
 from healthcare.healthcare.doctype.healthcare_settings.healthcare_settings import get_receivable_account
 
@@ -28,6 +29,20 @@ def before_insert(doc, method):
 	patient_doc = frappe.get_cached_doc("Patient", doc.patient)
 	if not patient_doc.customer:
 		create_customer(patient_doc)
+
+
+def publish_grid_update(doc, method):
+	"""Tell open appointment grids which company and date changed, once the save commits."""
+	frappe.publish_realtime(
+		"patient_appointment_update",
+		{
+			"company": doc.company,
+			"appointment_date": str(doc.appointment_date),
+			"user": frappe.session.user,
+		},
+		room=get_doctype_room(doc.doctype),
+		after_commit=True,
+	)
 
 
 def onload(doc, method):
