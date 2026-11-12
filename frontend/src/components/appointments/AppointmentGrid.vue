@@ -70,6 +70,22 @@
             </div>
           </div>
         </div>
+        <ul
+          class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-700"
+          aria-label="Appointment status colours"
+        >
+          <li
+            v-for="style in APPOINTMENT_STATUSES"
+            :key="style.status"
+            class="flex items-center gap-1.5"
+          >
+            <span
+              class="h-3 w-3 rounded-sm border border-dotted"
+              :class="style.card"
+            />
+            {{ style.label }}
+          </li>
+        </ul>
       </div>
     </div>
 
@@ -149,7 +165,7 @@
             :key="`${slot.time}-${practitioner.name}`"
             :time-slot="slot"
             :practitioner="practitioner"
-            :appointment="getAppointment(slot.time, practitioner.name)"
+            :appointments="getAppointments(slot.time, practitioner.name)"
             :is-current="row === currentSlotIndex"
             :is-past="row < firstFutureSlotIndex"
             :tabindex="
@@ -194,6 +210,7 @@ import {
 } from "@vueuse/core";
 import PractitionerCard from "./PractitionerCard.vue";
 import SlotCell from "./SlotCell.vue";
+import { APPOINTMENT_STATUSES } from "./appointmentStatus";
 import AppointmentDialog from "./AppointmentDialog.vue";
 import Link from "../controls/Link.vue";
 import { useToast } from "@/composables/useToast";
@@ -243,7 +260,6 @@ const loadDay = () =>
 
 onMounted(() => {
   fetchUserCompanies();
-  dateStore.generateTimeSlots();
   scrollToCurrentSlot();
 });
 
@@ -365,10 +381,12 @@ const focusCell = (row, column) => {
   });
 };
 
-const getAppointment = (slotTime, practitionerName) =>
-  appointmentStore.appointmentsBySlot
-    .get(slotTime)
-    ?.get(practitionerName)?.[0];
+// One shared empty list keeps the prop stable, so empty cells skip re-rendering.
+const NO_APPOINTMENTS = Object.freeze([]);
+
+const getAppointments = (slotTime, practitionerName) =>
+  appointmentStore.appointmentsBySlot.get(slotTime)?.get(practitionerName) ??
+  NO_APPOINTMENTS;
 
 // Date navigation functions
 const goToPreviousDay = () => {
@@ -433,7 +451,6 @@ const closeAppointmentDialog = () => {
 };
 
 const refreshData = async () => {
-  dateStore.generateTimeSlots();
   await loadDay();
   if (!loadErrorMessage.value) notifications.success.dataRefreshed();
 };
