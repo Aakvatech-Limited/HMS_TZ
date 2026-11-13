@@ -28,6 +28,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
+      "@desk": path.resolve(__dirname, "../hms_tz/public/js"),
+      WebSdk: path.resolve(__dirname, "src/shims/websdk.js"),
       "tailwind.config.js": path.resolve(__dirname, "tailwind.config.js"),
     },
   },
