@@ -20,26 +20,30 @@ def validate(doc, method):
 		return
 	set_prescribed(doc)
 	set_missing_values(doc)
-	check_item_for_out_of_stock(doc)
+	update_dosage_details(doc)
 	update_dimensions(doc)
+	set_original_item(doc)
+	check_item_for_out_of_stock(doc)
 
 
 def after_insert(doc, method):
-	set_original_item(doc)
-
 	if doc.is_return == 0:
 		create_revenue_entry(doc)
 
 
 def set_original_item(doc):
+	"""Snapshot the items as originally prescribed, if not done yet.
+
+	Runs in validate, so a new Delivery Note saves the snapshot with its first insert.
+	An amendment keeps the snapshot it copied from the cancelled document.
+	"""
+	if doc.hms_tz_original_items:
+		return
+
 	for item in doc.items:
 		if item.item_code:
 			item.original_item = item.item_code
 			item.original_stock_uom_qty = item.stock_qty
-
-		# SHM Rock: #168
-		if doc.form_sales_invoice and doc.patient:
-			update_dosage_details(item)
 
 		new_row = item.as_dict()
 		for fieldname in get_fields_to_clear():
@@ -54,16 +58,23 @@ def set_original_item(doc):
 			}
 		)
 		doc.append("hms_tz_original_items", new_row)
-	doc.save(ignore_permissions=True)
 
 
-def update_dosage_details(item):
-	"""Update dosage details for Cash Patient only if dosage is not set"""
+def update_dosage_details(doc):
+	"""SHM Rock: #168. Set dosage details of a new cash Delivery Note from its Drug Prescriptions.
 
-	if item.si_detail:
+	Runs before update_dimensions, which needs the prescription reference.
+	"""
+	if not doc.is_new() or not (doc.form_sales_invoice and doc.patient):
+		return
+
+	for item in doc.items:
+		if not item.si_detail:
+			continue
+
 		reference_dn = frappe.get_cached_value("Sales Invoice Item", item.si_detail, "reference_dn")
 		if not reference_dn:
-			return
+			continue
 
 		drug_doc = frappe.get_cached_doc("Drug Prescription", reference_dn)
 
@@ -466,8 +477,8 @@ def check_item_for_out_of_stock(doc):
 				):
 					original_item.hms_tz_is_out_of_stock = 0
 
+			# keep the row itself: a new name would make every save delete and re-insert all items
 			if not dni_row.hms_tz_is_out_of_stock:
-				dni_row.name = None
 				items.append(dni_row)
 
 				doc.total += dni_row.amount
