@@ -19,9 +19,9 @@ class LabMachineMessage(Document):  # nosemgrep
 		if not self.message:
 			return
 		msg_lines = self.message.splitlines()
-		self.machine_make = msg_lines[0].split("|")[2]
-		self.machine_model = msg_lines[0].split("|")[3]
-		self.lab_test_name = msg_lines[3].split("|")[3]
+		self.machine_make = get_hl7_field(msg_lines, 0, 2)
+		self.machine_model = get_hl7_field(msg_lines, 0, 3)
+		self.lab_test_name = get_hl7_field(msg_lines, 3, 3)
 		self.sample_collection = self.get_sample_collection(msg_lines)
 
 	def get_sample_collection(self, msg_lines):
@@ -29,10 +29,7 @@ class LabMachineMessage(Document):  # nosemgrep
 		for line in msg_lines:
 			if line.startswith("OBR"):
 				fields = line.split("|")
-				if fields[2]:
-					sample_collection = fields[2]
-				elif fields[3]:
-					sample_collection = fields[3]
+				sample_collection = get_list_item(fields, 2) or get_list_item(fields, 3)
 				break
 
 		if sample_collection:
@@ -104,3 +101,13 @@ class LabMachineMessage(Document):  # nosemgrep
 								lab_test_row.result_value = test_result
 				lab_test_doc.save(ignore_permissions=True)
 				frappe.db.commit()
+
+
+def get_hl7_field(lines, line_no, field_no):
+	"""Field `field_no` of line `line_no`, or None if the message is too short (e.g. HL7 queries)."""
+	line = get_list_item(lines, line_no)
+	return get_list_item(line.split("|"), field_no) if line is not None else None
+
+
+def get_list_item(items, index):
+	return items[index] if index < len(items) else None
