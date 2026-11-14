@@ -64,7 +64,10 @@ def create_appointment(appointment_data):
 			patient=appointment_data.get("patient"),
 		)
 
-	appointment_doc.save(ignore_permissions=True)
+	appointment_doc.insert(ignore_permissions=True)
+	if appointment_doc.insurance_subscription and appointment_doc.authorization_number:
+		# make_next_doc creates the vital signs only on a save after insert, as the desk does.
+		appointment_doc.save(ignore_permissions=True)
 	appointment_doc.reload()
 
 	return appointment_doc.as_dict()

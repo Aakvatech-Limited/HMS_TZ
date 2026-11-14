@@ -25,7 +25,10 @@
     <template #body-content>
       <div class="space-y-4 relative">
         <!-- Mode Badge -->
-        <div class="flex justify-between items-center mb-4">
+        <div
+          v-if="!isCreateMode"
+          class="flex justify-between items-center mb-4"
+        >
           <div class="flex items-center space-x-2">
             <span
               class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium"
@@ -197,8 +200,18 @@
             </div> -->
           </div>
           <div class="relative">
+            <CreateAppointmentForm
+              v-if="isCreateMode && localShowDialog"
+              ref="createForm"
+              :company="props.company"
+              :practitioner="props.practitionerData?.name"
+              :appointment-date="dateStore.selectedDate"
+              :appointment-time="props.timeSlot"
+              @progress="onProgress"
+              @created="onCreated"
+            />
             <FieldMap
-              v-if="sections"
+              v-else-if="sections"
               :sections="sections"
               :data="appointment"
             />
@@ -297,6 +310,9 @@
     <template #actions>
       <div class="flex gap-2 justify-between">
         <div class="flex items-center">
+          <p v-if="isCreateMode" class="text-xs text-gray-500">
+            {{ createForm?.creates }}
+          </p>
           <Button
             v-if="isViewMode"
             variant="subtle"
@@ -346,6 +362,28 @@
             </Button>
           </template>
 
+          <template v-else-if="isCreateMode">
+            <Button
+              variant="subtle"
+              size="lg"
+              theme="gray"
+              :disabled="isCreating"
+              @click="closeDialog()"
+            >
+              Close
+            </Button>
+
+            <Button
+              variant="solid"
+              size="lg"
+              :loading="isCreating"
+              :disabled="isCreating || !createForm?.canSubmit"
+              @click="createForm.submit()"
+            >
+              Create appointment
+            </Button>
+          </template>
+
           <template v-else>
             <Button
               variant="subtle"
@@ -368,7 +406,7 @@
               :disabled="isCreating"
               @click="handleSubmit()"
             >
-              {{ isCreateMode ? "Create" : "Update" }}
+              Update
               <template #suffix>
                 <FeatherIcon name="check-circle" class="w-4 h-4 mr-1" />
               </template>
@@ -470,10 +508,10 @@ import {
 } from "vue";
 import { createResource } from "frappe-ui";
 import { useAppointmentStore } from "@/data/appointment";
-import { usePractitionerStore } from "@/data/practitioner";
 import { useDateStore } from "@/data/date";
 import { useToast } from "@/composables/useToast";
 import FieldMap from "@/components/controls/FieldMap.vue";
+import CreateAppointmentForm from "@/components/appointments/create/CreateAppointmentForm.vue";
 import PaymentDialog from "@/components/appointments/PaymentDialog.vue";
 import Print from "@/components/controls/Print.vue";
 import dayjs from "dayjs";
@@ -516,7 +554,6 @@ const emit = defineEmits([
 ]);
 
 const appointmentStore = useAppointmentStore();
-const practitionerStore = usePractitionerStore();
 const dateStore = useDateStore();
 const { notifications, handleResourceError, showError } = useToast();
 
@@ -530,9 +567,6 @@ const justCreated = ref(false);
 const showCancelConfirmation = ref(false);
 const showPaymentDialog = ref(false);
 
-// Form validation errors
-const errors = reactive({});
-
 // Dialog computed properties
 const isViewMode = computed(() => props.mode === "view");
 const isCreateMode = computed(() => props.mode === "create");
@@ -540,7 +574,7 @@ const isCreateMode = computed(() => props.mode === "create");
 const dialogTitle = computed(() => {
   switch (props.mode) {
     case "create":
-      return "Create New Appointment";
+      return "New Appointment";
     case "edit":
       return "Edit Appointment";
     case "view":
@@ -582,11 +616,9 @@ const canShowCancelButton = computed(() => {
   return appointmentStore.canCancelAppointment;
 });
 
-const appointment = reactive({
+const emptyAppointment = () => ({
   "Patient Appointment": {
     payment_mode: "",
-    insurance_provider: "",
-    is_new_patient: false,
     patient: "",
     patient_name: "",
     patient_sex: "",
@@ -601,11 +633,9 @@ const appointment = reactive({
     paid_amount: "",
     referral_no: "",
     remarks: "",
-    is_new_his: false,
     insurance_subscription: "",
     coverage_plan_card_number: "",
     national_id: "",
-    card_no: "",
     authorization_number: "",
     require_fingerprint: "",
     require_facial_recognation: "",
@@ -643,529 +673,100 @@ const appointment = reactive({
   },
 });
 
-// Computed property to reorder sections with "Initial Data" first
+const appointment = reactive(emptyAppointment());
+
+const EDITABLE_FIELDS = ["practitioner", "appointment_time"];
+
+const field = (name, label, type, extra = {}) => ({
+  name,
+  label,
+  type,
+  placeholder: label,
+  ...extra,
+});
+
+// View and edit show the saved appointment; only EDITABLE_FIELDS open in edit mode.
 const sections = computed(() => {
-  const paymentMode = appointment["Patient Appointment"]["payment_mode"];
-  const insuranceFields = [
-    "insurance_provider",
-    "card_no",
-    "national_id",
-    "insurance_company",
-    "coverage_plan",
-    "is_new_his",
-    "insurance_subscription",
-    "referral_no",
-    "remarks",
-    "require_fingerprint",
-    "require_facial_recognation",
-    "biometric_method",
-    "fpcode",
-    "poc_reference_no",
-    "authorization_number",
+  const readOnly = (fields) =>
+    fields.map((item) => ({
+      ...item,
+      read_only: isViewMode.value || !EDITABLE_FIELDS.includes(item.name),
+    }));
+  const revenueFields = [
+    field("mode_of_payment", "Mode of Payment", "Data"),
+    field("billing_item", "Billing Item", "Link", { options: "Item" }),
+    field("paid_amount", "Paid Amount", "Currency"),
   ];
-  const currentMode = props.mode;
+  if (appointment["Patient Appointment"]["ref_sales_invoice"]) {
+    revenueFields.push(field("ref_sales_invoice", "Sales Invoice", "Data"));
+  }
 
-  // Helper function to filter fields based on payment mode and dialog mode
-  const filterFieldsByPaymentMode = (fields, doctype) => {
-    let filteredFields = fields;
-
-    // Only apply payment mode filtering in create mode
-    if (currentMode === "create") {
-      if (!paymentMode) {
-        // If payment mode is empty in create mode, only show payment_mode field
-        filteredFields = fields.filter(
-          (field) => field.name === "payment_mode"
-        );
-      } else if (paymentMode === "Cash") {
-        // Hide insurance-related fields when payment mode is Cash in create mode
-        filteredFields = fields.filter(
-          (field) => !insuranceFields.includes(field.name)
-        );
-      }
-
-      const nonCreationFields = [
-        "patient_sex",
-        "department",
-        "billing_item",
-        "paid_amount",
-        "has_no_consultation_charges",
-        "mode_of_payment",
-        "ref_sales_invoice",
-      ];
-      filteredFields = filteredFields.filter(
-        (field) => !nonCreationFields.includes(field.name)
-      );
-    }
-
-    // In view/edit mode, show ALL fields - don't filter by payment mode
-    // Then filter by dialog mode
-    if (currentMode === "view") {
-      // In view mode, hide fields that are only relevant during creation
-      const excludeFields = ["is_new_patient", "is_new_his"].concat(
-        insuranceFields
-      );
-
-      if (!appointment["Patient Appointment"]["ref_sales_invoice"]) {
-        excludeFields.push("ref_sales_invoice");
-      }
-
-      filteredFields = filteredFields.filter(
-        (field) => !excludeFields.includes(field.name)
-      );
-
-      // Make all fields read-only in view mode
-      filteredFields = filteredFields.map((field) => ({
-        ...field,
-        read_only: true,
-      }));
-    } else if (currentMode === "edit") {
-      // In edit mode, hide creation-only fields and make most fields read-only except specific editable ones
-      const excludeFields = ["is_new_patient", "is_new_his"].concat(
-        insuranceFields
-      );
-
-      if (!appointment["Patient Appointment"]["ref_sales_invoice"]) {
-        excludeFields.push("ref_sales_invoice");
-      }
-
-      filteredFields = filteredFields.filter(
-        (field) => !excludeFields.includes(field.name)
-      );
-
-      const editableFields = ["practitioner", "appointment_time"];
-      filteredFields = filteredFields.map((field) => ({
-        ...field,
-        read_only: !editableFields.includes(field.name),
-      }));
-    }
-
-    return filteredFields;
-  };
-
-  const allSections = [
-    // Initial Data section - always first
+  return [
     {
       label: "Initial Data",
       doctype: "Patient Appointment",
-      fields: filterFieldsByPaymentMode(
-        [
-          {
-            name: "payment_mode",
-            label: "Payment Mode",
-            type: "Select",
-            options: [
-              { label: "", value: "" },
-              { label: "Cash", value: "Cash" },
-              { label: "Insurance", value: "Insurance" },
-            ],
-            reqd: true,
-          },
-          {
-            name: "insurance_provider",
-            label: "Insurance Provider",
-            type: "Select",
-            options: [
-              { label: "", value: "" },
-              { label: "NHIF", value: "NHIF" },
-              { label: "Jubilee", value: "Jubilee" },
-            ],
-            placeholder: "for API triggering",
-            reqd: false,
-          },
-          {
-            name: "card_no",
-            label: "Card No",
-            type: "Data",
-            placeholder: "Card No",
-            reqd: false,
-          },
-          {
-            name: "national_id",
-            label: "National ID",
-            type: "Data",
-            placeholder: "National ID",
-            reqd: false,
-          },
-        ],
-        "Patient Appointment"
-      ),
+      fields: readOnly([
+        field("payment_mode", "Payment Mode", "Select", {
+          options: [
+            { label: "", value: "" },
+            { label: "Cash", value: "Cash" },
+            { label: "Insurance", value: "Insurance" },
+          ],
+          reqd: true,
+        }),
+      ]),
       columns: 2,
       hideLabel: true,
     },
-
-    // Patient
     {
-      label: "Patient Details",
-      doctype: "Patient",
-      fields: filterFieldsByPaymentMode(
-        [
-          {
-            name: "first_name",
-            label: "First Name",
-            type: "Data",
-            placeholder: "First Name",
-            reqd: true,
-          },
-          {
-            name: "middle_name",
-            label: "Middle Name",
-            type: "Data",
-            placeholder: "Middle Name",
-            reqd: false,
-          },
-          {
-            name: "last_name",
-            label: "Last Name",
-            type: "Data",
-            placeholder: "Last Name",
-            reqd: true,
-          },
-          {
-            name: "sex",
-            label: "Gender",
-            type: "Select",
-            placeholder: "Gender",
-            options: [
-              { label: "Male", value: "Male" },
-              { label: "Female", value: "Female" },
-            ],
-            reqd: true,
-          },
-          {
-            name: "dob",
-            label: "Date of Birth",
-            type: "Date",
-            placeholder: "Date of Birth",
-            reqd: true,
-          },
-          {
-            name: "mobile",
-            label: "Mobile",
-            type: "Int",
-            placeholder: "Mobile",
-            reqd: true,
-          },
-          {
-            name: "next_to_kin_name",
-            label: "Next of Kin Name",
-            type: "Data",
-            placeholder: "Next of Kin Name",
-            reqd: false,
-          },
-          {
-            name: "next_to_kin_mobile_no",
-            label: "Next of Kin Mobile",
-            type: "Data",
-            placeholder: "Next of Kin Mobile",
-            reqd: false,
-          },
-          {
-            name: "next_to_kin_relationship",
-            label: "Next of Kin Relationship",
-            type: "Data",
-            placeholder: "Next of Kin Relationship",
-            reqd: false,
-          },
-        ],
-        "Patient"
-      ),
-      columns: 3,
-      hideLabel: false,
-      hideBorder: false,
-    },
-
-    // Healthcare Insurance Subscription
-    {
-      label: "Healthcare Insurance Subscription",
-      doctype: "Healthcare Insurance Subscription",
-      fields: filterFieldsByPaymentMode(
-        [
-          {
-            name: "insurance_company",
-            label: "Insurance Company",
-            type: "Link",
-            placeholder: "Insurance Company",
-            options: "Healthcare Insurance Company",
-            reqd: true,
-          },
-          {
-            name: "healthcare_insurance_coverage_plan",
-            label: "Coverage Plan",
-            type: "Link",
-            placeholder: "Coverage Plan",
-            options: "Healthcare Insurance Coverage Plan",
-            reqd: true,
-          },
-        ],
-        "Healthcare Insurance Subscription"
-      ),
-      columns: 2,
-      hideLabel: false,
-      hideBorder: false,
-    },
-
-    // Check box fields
-    {
-      label: "",
+      label: "Flags",
       doctype: "Patient Appointment",
-      fields: filterFieldsByPaymentMode(
-        [
-          {
-            name: "is_new_patient",
-            label: "Is New Patient",
-            type: "Check",
-            reqd: false,
-          },
-          {
-            name: "is_new_his",
-            label: "Is New HIS",
-            type: "Check",
-            reqd: false,
-          },
-          {
-            name: "follow_up",
-            label: "Follow Up",
-            type: "Check",
-            placeholder: "Follow Up",
-            reqd: false,
-          },
-          {
-            name: "has_no_consultation_charges",
-            label: "Has No Consultation Charges",
-            type: "Check",
-            placeholder: "Has No Consultation Charges",
-            reqd: false,
-          },
-          {
-            name: "require_fingerprint",
-            label: "Require Fingerprint",
-            type: "Check",
-            placeholder: "Require Fingerprint",
-            reqd: false,
-          },
-          {
-            name: "require_facial_recognation",
-            label: "Require Facial Recognition",
-            type: "Check",
-            placeholder: "Require Facial Recognition",
-            reqd: false,
-          },
-        ],
-        "Patient Appointment"
-      ),
+      fields: readOnly([
+        field("follow_up", "Follow Up", "Check"),
+        field(
+          "has_no_consultation_charges",
+          "Has No Consultation Charges",
+          "Check"
+        ),
+      ]),
       columns: 2,
       hideLabel: true,
     },
-
     {
       label: "Appointment Details",
       doctype: "Patient Appointment",
-      fields: filterFieldsByPaymentMode(
-        [
-          {
-            name: "patient",
-            label: "Patient",
-            type: "Link",
-            placeholder: "Patient",
-            options: "Patient",
-            reqd: true,
-          },
-          {
-            name: "patient_name",
-            label: "Patient Name",
-            type: "Data",
-            placeholder: "Patient Name",
-            reqd: false,
-          },
-          {
-            name: "patient_sex",
-            label: "Gender",
-            type: "Data",
-            placeholder: "Gender",
-            reqd: false,
-          },
-          {
-            name: "practitioner",
-            label: "Practitioner",
-            type: "Link",
-            placeholder: "Practitioner",
-            options: "Healthcare Practitioner",
-            reqd: true,
-          },
-          {
-            name: "department",
-            label: "Department",
-            type: "Link",
-            placeholder: "Department",
-            options: "Medical Department",
-            reqd: false,
-          },
-          {
-            name: "appointment_type",
-            label: "Appointment Type",
-            type: "Link",
-            placeholder: "Appointment Type",
-            options: "Appointment Type",
-            reqd: true,
-          },
-          {
-            name: "appointment_date",
-            label: "Appointment Date",
-            type: "Date",
-            placeholder: "Appointment Date",
-            reqd: true,
-          },
-          {
-            name: "appointment_time",
-            label: "Appointment Time",
-            type: "Time",
-            placeholder: "Appointment Time",
-            reqd: true,
-          },
-        ],
-        "Patient Appointment"
-      ),
+      fields: readOnly([
+        field("patient", "Patient", "Link", {
+          options: "Patient",
+          reqd: true,
+        }),
+        field("patient_name", "Patient Name", "Data"),
+        field("patient_sex", "Gender", "Data"),
+        field("practitioner", "Practitioner", "Link", {
+          options: "Healthcare Practitioner",
+          reqd: true,
+        }),
+        field("department", "Department", "Link", {
+          options: "Medical Department",
+        }),
+        field("appointment_type", "Appointment Type", "Link", {
+          options: "Appointment Type",
+          reqd: true,
+        }),
+        field("appointment_date", "Appointment Date", "Date", { reqd: true }),
+        field("appointment_time", "Appointment Time", "Time", { reqd: true }),
+      ]),
       columns: 3,
-      hideLabel: ["view", "edit"].includes(currentMode), // Hide label in view mode since it duplicates dialog title
-      hideBorder: false,
+      hideLabel: true,
     },
-
-    // insurance based appointment fields
     {
-      label: "Insurance Details",
+      label: "Revenue",
       doctype: "Patient Appointment",
-      fields: filterFieldsByPaymentMode(
-        [
-          {
-            name: "insurance_subscription",
-            label: "Insurance Subscription",
-            type: "Link",
-            placeholder: "Insurance Subscription",
-            options: "Healthcare Insurance Subscription",
-            reqd: false,
-          },
-          {
-            name: "insurance_company",
-            label: "Insurance Company",
-            type: "Data",
-            placeholder: "Insurance Company",
-            reqd: false,
-          },
-          {
-            name: "coverage_plan",
-            label: "Coverage Plan",
-            type: "Data",
-            placeholder: "Coverage Plan",
-            reqd: false,
-          },
-          {
-            name: "referral_no",
-            label: "Referral No",
-            type: "Data",
-            placeholder: "Referral No",
-            reqd: false,
-          },
-          {
-            name: "remarks",
-            label: "Remarks",
-            type: "Small Text",
-            placeholder: "Remarks",
-            reqd: false,
-          },
-          {
-            name: "biometric_method",
-            label: "Biometric Method",
-            type: "Select",
-            placeholder: "Biometric Method",
-            options: [
-              { value: "FINGERPRINT", label: "FINGERPRINT" },
-              { value: "FACIAL", label: "FACIAL" },
-              { value: "NONE", label: "NONE" },
-            ],
-            reqd: false,
-          },
-          {
-            name: "authorization_number",
-            label: "Authorization Number",
-            type: "Data",
-            placeholder: "Authorization Number",
-            reqd: false,
-          },
-        ],
-        "Patient Appointment"
-      ),
+      fields: readOnly(revenueFields),
       columns: 3,
-      hideLabel: ["view", "edit"].includes(currentMode),
-      hideBorder: false,
-    },
-
-    // Revenue based appointment fields
-    {
-      label: "",
-      doctype: "Patient Appointment",
-      fields: filterFieldsByPaymentMode(
-        [
-          {
-            name: "mode_of_payment",
-            label: "Mode of Payment",
-            type: "Data",
-            placeholder: "Mode of Payment",
-            reqd: false,
-          },
-          {
-            name: "billing_item",
-            label: "Billing Item",
-            type: "Link",
-            placeholder: "Billing Item",
-            options: "Item",
-            reqd: false,
-          },
-          {
-            name: "paid_amount",
-            label: "Paid Amount",
-            type: "Currency",
-            placeholder: "Paid Amount",
-            reqd: false,
-          },
-          {
-            name: "ref_sales_invoice",
-            label: "Sales Invoice",
-            type: "Data",
-            placeholder: "Sales Invoice",
-            reqd: false,
-          },
-        ],
-        "Patient Appointment"
-      ),
-      columns: 3,
-      hideLabel: ["view", "edit"].includes(currentMode),
-      hideBorder: false,
+      hideLabel: true,
     },
   ];
-
-  // Filter sections based on payment mode and dialog mode
-  if (currentMode === "create") {
-    // In create mode, filter sections based on payment mode selection
-    if (!paymentMode) {
-      // If payment mode is empty in create mode, only show Initial Data section
-      return allSections.filter((section) => section.label === "Initial Data");
-    }
-
-    if (paymentMode === "Cash") {
-      // For Cash payment mode in create mode, hide Healthcare Insurance Subscription section
-      return allSections.filter(
-        (section) =>
-          section.doctype !== "Healthcare Insurance Subscription" &&
-          section.label !== "Insurance Details"
-      );
-    }
-
-    // For Insurance payment mode in create mode, show all sections
-    return allSections;
-  }
-
-  // For view mode or edit mode, always show all sections (user needs to see all data)
-  return allSections;
 });
 
 // Dialog state update handler
@@ -1292,14 +893,6 @@ watch(
           if (props.appData && Object.keys(props.appData).length > 0) {
             // Load existing appointment data for view/edit mode
             loadAppointmentData(props.appData);
-          } else if (isCreateMode.value) {
-            // Pre-fill data for create mode
-            appointment["Patient Appointment"]["appointment_time"] =
-              props.timeSlot;
-            appointment["Patient Appointment"]["practitioner"] =
-              props.practitionerData?.name;
-            appointment["Patient Appointment"]["appointment_date"] =
-              dateStore.selectedDate;
           }
         });
       } else {
@@ -1345,68 +938,7 @@ watch(
 // Watch for dialog prop changes (v-model approach)
 
 const resetAppointment = () => {
-  appointment["Patient Appointment"] = {
-    payment_mode: "",
-    insurance_provider: "",
-    is_new_patient: false,
-    patient: "",
-    patient_name: "",
-    patient_sex: "",
-    practitioner: "",
-    department: "",
-    appointment_type: "",
-    appointment_date: "",
-    appointment_time: "",
-    follow_up: false,
-    has_no_consultation_charges: false,
-    billing_item: "",
-    paid_amount: "",
-    referral_no: "",
-    remarks: "",
-    is_new_his: false,
-    insurance_subscription: "",
-    coverage_plan_card_number: "",
-    national_id: "",
-    card_no: "",
-    authorization_number: "",
-    require_fingerprint: "",
-    require_facial_recognation: "",
-    biometric_method: "",
-    fpcode: "",
-    poc_reference_no: "",
-    mode_of_payment: "",
-    ref_sales_invoice: "",
-    status: "",
-    company: "",
-  };
-
-  appointment["Patient"] = {
-    first_name: "",
-    middle_name: "",
-    last_name: "",
-    sex: "",
-    dob: "",
-    mobile: "",
-    product_code: "",
-    scheme_id: "",
-    membership_no: "",
-    card_no: "",
-    national_id: "",
-    next_to_kin_name: "",
-    next_to_kin_mobile_no: "",
-    next_to_kin_relationship: "",
-  };
-
-  appointment["Healthcare Insurance Subscription"] = {
-    patient: "",
-    patient_name: "",
-    insurance_company: "",
-    healthcare_insurance_coverage_plan: "",
-    coverage_plan_card_number: "",
-    national_id: "",
-  };
-
-  // Reset loading states
+  Object.assign(appointment, emptyAppointment());
   isCreating.value = false;
   statusMessage.value = "";
   loadingProgress.value = 0;
@@ -1475,7 +1007,6 @@ const loadAppointmentData = (appointmentData) => {
     // Check multiple ways an appointment might have insurance
     const hasInsurance =
       appointment["Patient Appointment"]["insurance_subscription"] ||
-      appointment["Patient Appointment"]["insurance_provider"] ||
       appointment["Healthcare Insurance Subscription"]["insurance_company"];
 
     appointment["Patient Appointment"]["payment_mode"] = hasInsurance
@@ -1506,249 +1037,25 @@ const loadAppointmentData = (appointmentData) => {
 };
 
 const validateForm = () => {
-  // Clear previous errors
-  Object.keys(errors).forEach((key) => delete errors[key]);
-
   const appointmentData = appointment["Patient Appointment"];
-  const patientData = appointment["Patient"];
-  const insuranceData = appointment["Healthcare Insurance Subscription"];
   const validationErrors = [];
-
-  // For edit mode, only validate editable fields
-  if (props.mode === "edit") {
-    // Only validate practitioner, appointment_time, and appointment_type for edit mode
-    if (!appointmentData.practitioner) {
-      validationErrors.push("Practitioner is required");
-    }
-
-    if (!appointmentData.appointment_time) {
-      validationErrors.push("Appointment Time is required");
-    }
-  } else {
-    // Full validation for create mode
-    // Payment mode validation
-    if (!appointmentData.payment_mode) {
-      validationErrors.push("Payment Mode is required");
-    }
-
-    // Insurance-specific validations
-    if (appointmentData.payment_mode === "Insurance") {
-      if (!appointmentData.insurance_provider) {
-        validationErrors.push("Insurance Provider is required");
-      }
-      if (!appointmentData.card_no && !appointmentData.national_id) {
-        validationErrors.push("Card No or National ID is required");
-      }
-
-      // Insurance subscription validations
-      if (appointmentData.is_new_his) {
-        if (!insuranceData.insurance_company) {
-          validationErrors.push("Insurance Company is required");
-        }
-        if (!insuranceData.healthcare_insurance_coverage_plan) {
-          validationErrors.push("Coverage Plan is required");
-        }
-      }
-    }
-
-    // Patient validations
-    if (appointmentData.is_new_patient) {
-      if (!patientData.first_name?.trim()) {
-        validationErrors.push("First Name is required");
-      }
-      if (!patientData.last_name?.trim()) {
-        validationErrors.push("Last Name is required");
-      }
-      if (!patientData.sex) {
-        validationErrors.push("Sex is required");
-      }
-      if (!patientData.dob) {
-        validationErrors.push("Date of Birth is required");
-      }
-      if (!patientData.mobile) {
-        validationErrors.push("Mobile is required");
-      }
-    } else {
-      if (!appointmentData.patient) {
-        validationErrors.push("Patient is required");
-      }
-    }
-
-    // Appointment details validations
-    if (!appointmentData.practitioner) {
-      validationErrors.push("Practitioner is required");
-    }
-
-    if (!appointmentData.appointment_type) {
-      validationErrors.push("Appointment Type is required");
-    }
-
-    if (!appointmentData.appointment_date) {
-      validationErrors.push("Appointment Date is required");
-    }
-
-    if (!appointmentData.appointment_time) {
-      validationErrors.push("Appointment Time is required");
-    }
+  if (!appointmentData.practitioner) {
+    validationErrors.push("Practitioner is required");
   }
-
-  // Show validation errors as a single toast notification
-  if (validationErrors.length > 0) {
-    let errorMessage;
-
-    if (validationErrors.length === 1) {
-      errorMessage = validationErrors[0];
-    } else {
-      // Create a clean, readable error message with proper formatting
-      const title = "Please fill in all required fields:";
-      const errorList = validationErrors
-        .map((error) => `• ${error}`)
-        .join("\n");
-      errorMessage = `${title}\n\n${errorList}`;
-    }
-
-    showError(errorMessage, {
-      timeout: 10000, // Show for 10 seconds as requested
-      position: "bottom-right", // Use bottom-right position consistently
-      closeOnClick: true,
-      pauseOnHover: true,
-      draggable: false, // Disable dragging to prevent accidental dismissal
-    });
-    return false;
+  if (!appointmentData.appointment_time) {
+    validationErrors.push("Appointment Time is required");
   }
+  if (validationErrors.length === 0) return true;
 
-  return true;
+  showError(validationErrors.join("\n"), {
+    timeout: 10000,
+    position: "bottom-right",
+    closeOnClick: true,
+    pauseOnHover: true,
+    draggable: false,
+  });
+  return false;
 };
-
-// Create resources for document creation
-const appointment_doc = createResource({
-  url: "hms_tz.api.appointment.create_appointment",
-  method: "POST",
-  makeParams() {
-    return {
-      appointment_data: appointment["Patient Appointment"],
-    };
-  },
-  onSuccess: async (data) => {
-    notifications.success.appointmentCreated();
-
-    appointment["Patient Appointment"].name = data.name;
-
-    // Fetch latest appointment data after successful creation
-    await fetchLatestAppointmentData(data.name);
-
-    // For cash appointments, automatically switch to view mode
-    if (appointment["Patient Appointment"]["payment_mode"] === "Cash") {
-      // Reset loading state
-      isCreating.value = false;
-      statusMessage.value = "";
-      loadingProgress.value = 0;
-
-      // Set flag to show success banner
-      justCreated.value = true;
-
-      // Small delay to let the UI update, then emit mode change with complete appointment data
-      setTimeout(() => {
-        // Emit mode change to view with complete appointment object
-        emit("modeChanged", "view", {
-          "Patient Appointment": appointment["Patient Appointment"],
-          Patient: appointment["Patient"],
-          "Healthcare Insurance Subscription":
-            appointment["Healthcare Insurance Subscription"],
-        });
-      }, 300);
-    } else {
-      // For insurance appointments, just close and reset as before
-      closeDialog();
-      resetAppointment();
-    }
-  },
-  onError: (err) => {
-    handleResourceError(err);
-    notifications.error.appointmentCreateFailed(err.message);
-  },
-});
-
-const patient_doc = createResource({
-  url: "frappe.client.insert",
-  method: "POST",
-  makeParams() {
-    return {
-      doc: {
-        doctype: "Patient",
-        ...appointment["Patient"],
-      },
-    };
-  },
-  validate(params) {
-    error.value = null;
-    if (!params.doc.first_name) {
-      error.value = "First Name is required";
-      return error.value;
-    }
-    if (!params.doc.last_name) {
-      error.value = "Last Name is required";
-      return error.value;
-    }
-    if (!params.doc.sex) {
-      error.value = "Sex is required";
-      return error.value;
-    }
-    if (!params.doc.dob) {
-      error.value = "Date of Birth is required";
-      return error.value;
-    }
-  },
-  onSuccess: (data) => {
-    appointment["Patient Appointment"]["patient"] = data.name;
-    appointment["Patient Appointment"][
-      "patient_name"
-    ] = `${data.first_name} ${data.last_name}`;
-    appointment["Healthcare Insurance Subscription"]["patient"] = data.name;
-    appointment["Healthcare Insurance Subscription"][
-      "patient_name"
-    ] = `${data.first_name} ${data.last_name}`;
-  },
-  onError: (err) => {
-    handleResourceError(err);
-    notifications.error.patientCreateFailed(err.message);
-  },
-});
-
-const insurance_doc = createResource({
-  url: "frappe.client.insert",
-  method: "POST",
-  makeParams() {
-    return {
-      doc: {
-        doctype: "Healthcare Insurance Subscription",
-        ...appointment["Healthcare Insurance Subscription"],
-      },
-    };
-  },
-  validate(params) {
-    error.value = null;
-    if (!params.doc.patient) {
-      error.value = "Patient is required";
-      return error.value;
-    }
-    if (!params.doc.insurance_company) {
-      error.value = "Insurance Company is required";
-      return error.value;
-    }
-    if (!params.doc.healthcare_insurance_coverage_plan) {
-      error.value = "Coverage Plan is required";
-      return error.value;
-    }
-  },
-  onSuccess: (data) => {
-    appointment["Patient Appointment"]["insurance_subscription"] = data.name;
-  },
-  onError: (err) => {
-    handleResourceError(err);
-    notifications.error.appointmentCreateFailed(err.message);
-  },
-});
 
 // Create resource for fetching latest appointment details
 const get_appointment_details_doc = createResource({
@@ -1837,89 +1144,36 @@ const update_appointment_doc = createResource({
   },
 });
 
-async function create_appointment_docs() {
-  isCreating.value = true;
-  error.value = null;
-  loadingProgress.value = 0;
-
-  try {
-    // Calculate total steps for progress tracking
-    let totalSteps = 1; // Always create appointment
-    let currentStep = 0;
-
-    if (appointment["Patient Appointment"]["is_new_patient"]) {
-      totalSteps++;
-    }
-
-    if (appointment["Patient Appointment"]["is_new_his"]) {
-      totalSteps++;
-    }
-
-    if (!appointment["Patient Appointment"]["company"] && props.company) {
-      appointment["Patient Appointment"]["company"] = props.company;
-    }
-
-    // Step 1: Create patient if needed
-    if (appointment["Patient Appointment"]["is_new_patient"]) {
-      currentStep++;
-      statusMessage.value = "Creating new patient record...";
-      loadingProgress.value = Math.round((currentStep / totalSteps) * 100);
-      await patient_doc.submit();
-
-      // Small delay for better UX
-      await new Promise((resolve) => setTimeout(resolve, 500));
-    }
-
-    // Step 2: Create insurance subscription if needed
-    if (appointment["Patient Appointment"]["is_new_his"]) {
-      currentStep++;
-      statusMessage.value = "Setting up healthcare insurance subscription...";
-      loadingProgress.value = Math.round((currentStep / totalSteps) * 100);
-      await insurance_doc.submit();
-
-      // Small delay for better UX
-      await new Promise((resolve) => setTimeout(resolve, 500));
-    }
-
-    // Final Step: Create appointment
-    currentStep++;
-    statusMessage.value = "Finalizing appointment booking...";
-    loadingProgress.value = Math.round((currentStep / totalSteps) * 100);
-    await appointment_doc.submit();
-  } catch (err) {
-    error.value = "Error while creating appointment documents";
-    statusMessage.value = "An error occurred. Please try again.";
-    loadingProgress.value = 0;
-  } finally {
-    // Keep loading for a brief moment to show completion
-    if (!error.value) {
-      statusMessage.value = "Appointment created successfully!";
-      loadingProgress.value = 100;
-      await new Promise((resolve) => setTimeout(resolve, 800));
-    }
-
-    isCreating.value = false;
-    loadingProgress.value = 0;
-  }
-}
-
 const handleSubmit = async () => {
-  // Clear any previous errors
   error.value = "";
-
-  // Validate the form - validation errors will be shown as toast notifications
-  if (!validateForm()) {
-    return;
-  }
-
-  // Differentiate between create and edit modes
-  if (isCreateMode.value) {
-    // Create mode: proceed with creating appointment documents
-    await create_appointment_docs();
-  } else if (props.mode === "edit") {
-    // Edit mode: update existing appointment
+  if (props.mode === "edit" && validateForm()) {
     await update_appointment();
   }
+};
+
+const createForm = ref(null);
+
+const onProgress = ({ busy, message, percent }) => {
+  isCreating.value = busy;
+  statusMessage.value = message;
+  loadingProgress.value = percent;
+};
+
+const onCreated = async (appointmentDoc, payment) => {
+  notifications.success.appointmentCreated();
+  appointment["Patient Appointment"].name = appointmentDoc.name;
+  await fetchLatestAppointmentData(appointmentDoc.name);
+  if (payment !== "Cash") {
+    closeDialog();
+    return;
+  }
+  justCreated.value = true;
+  emit("modeChanged", "view", {
+    "Patient Appointment": appointment["Patient Appointment"],
+    Patient: appointment["Patient"],
+    "Healthcare Insurance Subscription":
+      appointment["Healthcare Insurance Subscription"],
+  });
 };
 
 async function update_appointment() {
