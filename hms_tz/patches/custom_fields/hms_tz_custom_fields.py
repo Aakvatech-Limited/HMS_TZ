@@ -263,6 +263,7 @@ def execute():
 				insert_after="original_prescription",
 				options="Original Delivery Note Item",
 				read_only=1,
+				no_copy=1,
 			),
 			dict(
 				fieldtype="Data",
