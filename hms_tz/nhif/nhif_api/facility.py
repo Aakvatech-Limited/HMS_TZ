@@ -2,9 +2,38 @@ import json
 
 import frappe
 import requests
+from frappe.utils import cast
 from frappe.utils.background_jobs import enqueue
 
 from hms_tz.nhif.doctype.nhif_response_log.nhif_response_log import add_log
+
+# Healthcare Facility fieldname -> NHIF GetFacilities key
+FACILITY_FIELD_MAP = {
+	"facility_name": "FacilityName",
+	"facility_code": "FacilityCode",
+	"facility_level_code": "FacilityLevelCode",
+	"certification_no": "CertificationNo",
+	"abbreviation_code": "AbbreviationCode",
+	"classification": "Classification",
+	"classification_id": "ClassificationID",
+	"ward_code": "WardCode",
+	"postal_address": "PostalAddress",
+	"owner_code": "OwnerCode",
+	"ownership_type_code": "OwnershipTypeCode",
+	"pay_to_code": "PayToCode",
+	"percent_sent": "PercentSent",
+	"certification_application_date": "CertificationApplicationDate",
+	"status": "Status",
+	"has_eclaims": "HasEClaims",
+	"send_amount_to_msd": "SendAmountToMSD",
+	"key_contact": "KeyContact",
+	"telephone_no": "TelephoneNo",
+	"email_address": "EmailAddress",
+	"website": "Website",
+	"fax": "Fax",
+	"longitude": "Longitude",
+	"latitude": "Latitude",
+}
 
 
 @frappe.whitelist()
@@ -90,136 +119,26 @@ def get_facilities(company=None):
 
 
 def update_facility(facility):
+	hf_doc = frappe.get_doc("Healthcare Facility", facility.get("FacilityName"))
 	has_changed = False
-	hf_doc = frappe.get_cached_doc("Healthcare Facility", facility.get("FacilityName"))
 
-	if hf_doc.facility_name != facility.get("FacilityName"):
-		has_changed = True
-		hf_doc.facility_name = facility.get("FacilityName")
+	for fieldname, key in FACILITY_FIELD_MAP.items():
+		value = facility.get(key)
+		fieldtype = hf_doc.meta.get_field(fieldname).fieldtype
 
-	if hf_doc.facility_code != facility.get("FacilityCode"):
-		has_changed = True
-		hf_doc.facility_code = facility.get("FacilityCode")
-
-	if hf_doc.facility_level_code != facility.get("FacilityLevelCode"):
-		has_changed = True
-		hf_doc.facility_level_code = facility.get("FacilityLevelCode")
-
-	if hf_doc.certification_no != facility.get("CertificationNo"):
-		has_changed = True
-		hf_doc.certification_no = facility.get("CertificationNo")
-
-	if hf_doc.abbreviation_code != facility.get("AbbreviationCode"):
-		has_changed = True
-		hf_doc.abbreviation_code = facility.get("AbbreviationCode")
-
-	if hf_doc.classification != facility.get("Classification"):
-		has_changed = True
-		hf_doc.classification = facility.get("Classification")
-
-	if hf_doc.classification_id != facility.get("ClassificationID"):
-		has_changed = True
-		hf_doc.classification_id = facility.get("ClassificationID")
-
-	if hf_doc.ward_code != facility.get("WardCode"):
-		has_changed = True
-		hf_doc.ward_code = facility.get("WardCode")
-
-	if hf_doc.postal_address != facility.get("PostalAddress"):
-		has_changed = True
-		hf_doc.postal_address = facility.get("PostalAddress")
-
-	if hf_doc.owner_code != facility.get("OwnerCode"):
-		has_changed = True
-		hf_doc.owner_code = facility.get("OwnerCode")
-
-	if hf_doc.ownership_type_code != facility.get("OwnershipTypeCode"):
-		has_changed = True
-		hf_doc.ownership_type_code = facility.get("OwnershipTypeCode")
-
-	if hf_doc.pay_to_code != facility.get("PayToCode"):
-		has_changed = True
-		hf_doc.pay_to_code = facility.get("PayToCode")
-
-	if hf_doc.percent_sent != facility.get("PercentSent"):
-		has_changed = True
-		hf_doc.percent_sent = facility.get("PercentSent")
-
-	if hf_doc.certification_application_date != facility.get("CertificationApplicationDate"):
-		has_changed = True
-		hf_doc.certification_application_date = facility.get("CertificationApplicationDate")
-
-	if hf_doc.status != facility.get("Status"):
-		has_changed = True
-		hf_doc.status = facility.get("Status")
-
-	if hf_doc.has_eclaims != facility.get("HasEClaims"):
-		has_changed = True
-		hf_doc.has_eclaims = facility.get("HasEClaims")
-
-	if hf_doc.send_amount_to_msd != facility.get("SendAmountToMSD"):
-		has_changed = True
-		hf_doc.send_amount_to_msd = facility.get("SendAmountToMSD")
-
-	if hf_doc.key_contact != facility.get("KeyContact"):
-		has_changed = True
-		hf_doc.key_contact = facility.get("KeyContact")
-
-	if hf_doc.telephone_no != facility.get("TelephoneNo"):
-		has_changed = True
-		hf_doc.telephone_no = facility.get("TelephoneNo")
-
-	if hf_doc.email_address != facility.get("EmailAddress"):
-		has_changed = True
-		hf_doc.email_address = facility.get("EmailAddress")
-
-	if hf_doc.website != facility.get("Website"):
-		has_changed = True
-		hf_doc.website = facility.get("Website")
-
-	if hf_doc.fax != facility.get("Fax"):
-		has_changed = True
-		hf_doc.fax = facility.get("Fax")
-
-	if hf_doc.longitude != facility.get("Longitude"):
-		has_changed = True
-		hf_doc.longitude = facility.get("Longitude")
-
-	if hf_doc.latitude != facility.get("Latitude"):
-		has_changed = True
-		hf_doc.latitude = facility.get("Latitude")
+		# API values are untyped JSON ("2" vs 2, None vs 0); compare as the field's type
+		# so unchanged facilities aren't re-saved (and versioned) on every sync
+		if cast(fieldtype, hf_doc.get(fieldname)) != cast(fieldtype, value):
+			hf_doc.set(fieldname, value)
+			has_changed = True
 
 	if has_changed:
 		hf_doc.save(ignore_permissions=True)
-		hf_doc.reload()
 
 
 def create_facility(record):
 	hf_doc = frappe.new_doc("Healthcare Facility")
-	hf_doc.facility_name = record.get("FacilityName")
-	hf_doc.facility_code = record.get("FacilityCode")
-	hf_doc.certification_no = record.get("CertificationNo")
-	hf_doc.abbreviation_code = record.get("AbbreviationCode")
-	hf_doc.postal_address = record.get("PostalAddress")
-	hf_doc.ward_code = record.get("WardCode")
-	hf_doc.classification_id = record.get("ClassificationID")
-	hf_doc.classification = record.get("Classification")
-	hf_doc.facility_level_code = record.get("FacilityLevelCode")
-	hf_doc.ownership_type_code = record.get("OwnershipTypeCode")
-	hf_doc.status = record.get("Status")
-	hf_doc.has_eclaims = record.get("HasEClaims")
-	hf_doc.owner_code = record.get("OwnerCode")
-	hf_doc.pay_to_code = record.get("PayToCode")
-	hf_doc.email_address = record.get("EmailAddress")
-	hf_doc.telephone_no = record.get("TelephoneNo")
-	hf_doc.website = record.get("Website")
-	hf_doc.key_contact = record.get("KeyContact")
-	hf_doc.fax = record.get("Fax")
-	hf_doc.send_amount_to_msd = record.get("SendAmountToMSD")
-	hf_doc.percent_sent = record.get("PercentSent")
-	hf_doc.longitude = record.get("Longitude")
-	hf_doc.latitude = record.get("Latitude")
-	hf_doc.certification_application_date = record.get("CertificationApplicationDate")
+	for fieldname, key in FACILITY_FIELD_MAP.items():
+		hf_doc.set(fieldname, record.get(key))
+
 	hf_doc.insert(ignore_permissions=True)
-	hf_doc.reload()
-	hf_doc.reload()
