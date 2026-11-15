@@ -33,11 +33,19 @@ from hms_tz.hms_tz.doctype.insurance_folio_counter.insurance_folio_counter impor
 from hms_tz.jubilee.doctype.jubilee_response_log.jubilee_response_log import add_jubilee_log
 from hms_tz.nhif.api.healthcare_utils import to_base64
 from hms_tz.nhif.api.patient_encounter import finalized_encounter
+from hms_tz.nhif.doctype.nhif_patient_claim.nhif_patient_claim import get_row_values, keep_saved_rows
 
 pa = DocType("Patient Appointment")
 pe = DocType("Patient Encounter")
 ct = DocType("Codification Table")
 hsr = DocType("Healthcare Service Request")
+
+# Child tables rebuilt on every draft save, with the fields that identify a row across rebuilds
+REBUILT_TABLE_KEYS = {
+	"practitioners": ("practitioner",),
+	"jubilee_patient_claim_disease": ("medical_code", "status"),
+	"jubilee_patient_claim_item": ("ref_doctype", "ref_docname", "item_code"),
+}
 
 
 class JubileePatientClaim(Document):
@@ -58,25 +66,11 @@ class JubileePatientClaim(Document):
 		self.validate_appointment_info()
 		self.validate_multiple_appointments_per_authorization_no("before_insert")
 
-	def after_insert(self):
-		items = []
-		for row in self.jubilee_patient_claim_item:
-			new_row = row.as_dict()
-			for fieldname in [
-				"name",
-				"owner",
-				"creation",
-				"modified",
-				"modified_by",
-				"docstatus",
-			]:
-				new_row[fieldname] = None
-
-			items.append(new_row)
-
-		if len(items) > 0:
-			frappe.set_value(self.doctype, self.name, "original_jubilee_patient_claim_item", items)
-			self.reload()
+	def on_update(self):
+		# links the appointment to its claim
+		frappe.qb.update(pa).set(pa.jubilee_patient_claim, self.name).where(
+			pa.name == self.patient_appointment
+		).run()
 
 	def before_save(self):
 		if not self.allow_changes:
@@ -97,12 +91,29 @@ class JubileePatientClaim(Document):
 		self.calculate_totals()
 		self.set_folio_count()
 
-		if not self.is_new():
+		if self.is_new():
+			self.set_original_items()
+		else:
 			self.update_original_patient_claim()
 
-			frappe.qb.update(pa).set(pa.jubilee_patient_claim, self.name).where(
-				pa.name == self.patient_appointment
-			).run()
+	def set_original_items(self):
+		"""Snapshot the claim items as created, to track later changes against them."""
+		if not self.jubilee_patient_claim_item:
+			return
+
+		self.set(
+			"original_jubilee_patient_claim_item",
+			[
+				# new_doc applies the defaults that Frappe sets before before_save
+				frappe.new_doc(
+					"Original Jubilee Patient Claim Item",
+					parent_doc=self,
+					parentfield="original_jubilee_patient_claim_item",
+					**get_row_values(row, no_nulls=True),
+				)
+				for row in self.jubilee_patient_claim_item
+			],
+		)
 
 	def validate(self):
 		self.validate_appointment_info()
@@ -177,6 +188,8 @@ class JubileePatientClaim(Document):
 		return patient_encounters
 
 	def set_claim_values(self, encounter_list):
+		saved_rows = {fieldname: self.get(fieldname) for fieldname in REBUILT_TABLE_KEYS}
+
 		self.provider_id = frappe.get_cached_value(
 			"HMS TZ Setting",
 			self.company,
@@ -184,7 +197,7 @@ class JubileePatientClaim(Document):
 		)
 		self.folio_id = uuid.uuid1()
 		self.posting_date = nowdate()
-		self.serial_no = cint(self.name[-9:])
+		self.serial_no = str(int(self.name[-9:]))  # Data field: an int differs from the saved value
 		self.item_crt_by = get_fullname(frappe.session.user)
 		self.attendance_date, self.attendance_time = frappe.get_cached_value(
 			"Patient Appointment",
@@ -211,6 +224,9 @@ class JubileePatientClaim(Document):
 		self.set_practitioner_values(encounter_list)
 		self.set_patient_claim_disease(encounter_list)
 		self.set_patient_claim_item(encounter_list)
+
+		for fieldname, rows in saved_rows.items():
+			keep_saved_rows(self, fieldname, rows, REBUILT_TABLE_KEYS[fieldname])
 
 	def set_practitioner_values(self, encounter_list):
 		self.practitioners = []
