@@ -148,6 +148,9 @@ class TestNHIFClaimChildRows(FrappeTestCase):
 		# a second save from after_insert would bump modified
 		self.assertEqual(claim.modified, claim.creation)
 		self.assertEqual(claim.folio_no, 771)
+		self.assertEqual(
+			{row.claim_status for row in claim.original_nhif_patient_claim_item}, {"Pending Response"}
+		)
 
 	def test_unchanged_save_keeps_every_row(self):
 		before = frappe.get_doc("NHIF Patient Claim", self.claim.name)
