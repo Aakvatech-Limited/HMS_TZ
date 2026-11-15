@@ -38,6 +38,13 @@ pe = DocType("Patient Encounter")
 ct = DocType("Codification Table")
 hsr = DocType("Healthcare Service Request")
 
+# Child tables rebuilt on every draft save, with the fields that identify a row across rebuilds
+REBUILT_TABLE_KEYS = {
+	"practitioners": ("practitioner",),
+	"nhif_patient_claim_disease": ("patient_encounter", "codification_table"),
+	"nhif_patient_claim_item": ("ref_doctype", "ref_docname", "item_code"),
+}
+
 
 class NHIFPatientClaim(Document):
 	def before_insert(self):
@@ -57,31 +64,11 @@ class NHIFPatientClaim(Document):
 		self.validate_appointment_info()
 		self.validate_multiple_appointments_per_authorization_no("before_insert")
 
-	def after_insert(self):
-		self.set_folio_count()
-
-		items = []
-		for row in self.nhif_patient_claim_item:
-			new_row = row.as_dict()
-			for fieldname in [
-				"name",
-				"owner",
-				"creation",
-				"modified",
-				"modified_by",
-				"docstatus",
-			]:
-				new_row[fieldname] = None
-
-			items.append(new_row)
-
-		if len(items) > 0:
-			frappe.set_value(
-				self.doctype,
-				self.name,
-				"original_nhif_patient_claim_item",
-				items,
-			)
+	def on_update(self):
+		# links the appointment to its claim; also keeps it out of automatic claim creation
+		frappe.qb.update(pa).set(pa.nhif_patient_claim, self.name).where(
+			pa.name == self.patient_appointment
+		).run()
 
 	def before_save(self):
 		if not self.allow_changes:
@@ -94,14 +81,22 @@ class NHIFPatientClaim(Document):
 			self.set_claim_values(encounter_list)
 
 		self.calculate_totals()
+		self.set_folio_count()
 
-		if not self.is_new():
-			self.set_folio_count()
+		if self.is_new():
+			self.set_original_items()
+		else:
 			update_original_patient_claim(self)
 
-			frappe.qb.update(pa).set(pa.nhif_patient_claim, self.name).where(
-				pa.name == self.patient_appointment
-			).run()
+	def set_original_items(self):
+		"""Snapshot the claim items as created, to track later changes against them."""
+		if not self.nhif_patient_claim_item:
+			return
+
+		self.set(
+			"original_nhif_patient_claim_item",
+			[get_row_values(row) for row in self.nhif_patient_claim_item],
+		)
 
 	def validate(self):
 		self.validate_appointment_info()
@@ -184,9 +179,11 @@ class NHIFPatientClaim(Document):
 		return patient_encounters
 
 	def set_claim_values(self, encounter_list):
+		saved_rows = {fieldname: self.get(fieldname) for fieldname in REBUILT_TABLE_KEYS}
+
 		self.facility_code = frappe.get_cached_value("HMS TZ Setting", self.company, "facility_code")
 		self.posting_date = nowdate()
-		self.serial_no = int(self.name[-9:])
+		self.serial_no = str(int(self.name[-9:]))  # Data field: an int differs from the saved value
 		self.item_crt_by = get_fullname(frappe.session.user)
 		self.attendance_date, self.attendance_time = frappe.get_cached_value(
 			"Patient Appointment",
@@ -211,6 +208,33 @@ class NHIFPatientClaim(Document):
 		self.set_inpatient_values(encounter_list)
 		self.set_patient_claim_disease(encounter_list)
 		self.set_patient_claim_item(encounter_list)
+
+		for fieldname, rows in saved_rows.items():
+			self.keep_saved_rows(fieldname, rows)
+
+	def keep_saved_rows(self, fieldname, saved_rows):
+		"""Reuse the saved row matching each rebuilt row, so a save updates the table in place.
+
+		Rebuilt rows are new, so saving would delete and re-insert the whole table,
+		and every version would store both copies.
+		"""
+		key_fields = REBUILT_TABLE_KEYS[fieldname]
+		rows_by_key = {}
+		for row in saved_rows:
+			if not row.is_new():
+				rows_by_key.setdefault(tuple(row.get(f) for f in key_fields), []).append(row)
+
+		rows = []
+		for idx, row in enumerate(self.get(fieldname), start=1):
+			if matches := rows_by_key.get(tuple(row.get(f) for f in key_fields)):
+				saved_row = matches.pop(0)
+				saved_row.update(get_row_values(row))
+				row = saved_row
+
+			row.idx = idx
+			rows.append(row)
+
+		self.set(fieldname, rows)
 
 	def set_practitioner_values(self, encounter_list):
 		self.practitioners = []
@@ -888,8 +912,8 @@ class NHIFPatientClaim(Document):
 		if cint(self.folio_no) != 0:
 			return
 
+		# saved with the claim; needs claim_year and claim_month
 		self.folio_no = get_or_create_folio_counter(self, "NHIF")
-		self.db_set("folio_no", self.folio_no)
 
 	def validate_reqd_fields(self):
 		if not self.main_diagnosis_code:
@@ -905,6 +929,11 @@ class NHIFPatientClaim(Document):
 					fmt_money(self.total_amount, precision=0), fmt_money(self.signed_amount, precision=0)
 				)
 			)
+
+
+def get_row_values(row):
+	"""Field values of a child row, without its identity (name, parent, idx, ...)."""
+	return row.as_dict(no_default_fields=True, no_child_table_fields=True, no_private_properties=True)
 
 
 def get_claim_appointments(claim):

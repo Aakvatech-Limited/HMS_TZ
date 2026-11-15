@@ -59,8 +59,6 @@ class JubileePatientClaim(Document):
 		self.validate_multiple_appointments_per_authorization_no("before_insert")
 
 	def after_insert(self):
-		self.set_folio_count()
-
 		items = []
 		for row in self.jubilee_patient_claim_item:
 			new_row = row.as_dict()
@@ -97,6 +95,7 @@ class JubileePatientClaim(Document):
 			self.set_claim_values(opd_encounters)
 
 		self.calculate_totals()
+		self.set_folio_count()
 
 		if not self.is_new():
 			self.update_original_patient_claim()
@@ -907,8 +906,8 @@ class JubileePatientClaim(Document):
 		if cint(self.folio_no) != 0:
 			return
 
+		# saved with the claim; needs claim_year and claim_month
 		self.folio_no = get_or_create_folio_counter(self, "Jubilee")
-		self.db_set("folio_no", self.folio_no)
 
 	def send_jubilee_claim(self):
 		json_data, json_data_wo_files = self.get_payload()
