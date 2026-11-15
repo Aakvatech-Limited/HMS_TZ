@@ -95,7 +95,16 @@ class NHIFPatientClaim(Document):
 
 		self.set(
 			"original_nhif_patient_claim_item",
-			[get_row_values(row) for row in self.nhif_patient_claim_item],
+			[
+				# new_doc applies the defaults (e.g. claim_status) that Frappe sets before before_save
+				frappe.new_doc(
+					"Original NHIF Patient Claim Item",
+					parent_doc=self,
+					parentfield="original_nhif_patient_claim_item",
+					**get_row_values(row, no_nulls=True),
+				)
+				for row in self.nhif_patient_claim_item
+			],
 		)
 
 	def validate(self):
@@ -931,9 +940,11 @@ class NHIFPatientClaim(Document):
 			)
 
 
-def get_row_values(row):
+def get_row_values(row, no_nulls=False):
 	"""Field values of a child row, without its identity (name, parent, idx, ...)."""
-	return row.as_dict(no_default_fields=True, no_child_table_fields=True, no_private_properties=True)
+	return row.as_dict(
+		no_nulls=no_nulls, no_default_fields=True, no_child_table_fields=True, no_private_properties=True
+	)
 
 
 def get_claim_appointments(claim):
