@@ -1091,9 +1091,6 @@ def set_amounts(doc):
 
 
 def show_last_prescribed(doc, method):
-	if doc.is_new():
-		return
-
 	if method != "before_save":
 		return
 
