@@ -164,76 +164,18 @@ def before_insert(doc, method):
 
 
 # regency rock: 95
-def after_insert(doc, method):
-	if not doc.patient_age:
-		doc.patient_age = calculate_patient_age(doc.patient)
+def set_new_encounter_values(doc, method):
+	"""Defaults of a new encounter, set before its first save so it isn't saved twice."""
+	if not doc.is_new():
+		return
 
-	if doc.company and doc.mode_of_payment:
-		pharmacy_details = frappe.get_cached_value(
-			"HMS TZ Setting",
-			doc.company,
-			[
-				"auto_set_pharmacy_on_patient_encounter",
-				"opd_cash_pharmacy",
-				"ipd_cash_pharmacy",
-			],
-			as_dict=1,
-		)
-
-		if pharmacy_details and pharmacy_details.auto_set_pharmacy_on_patient_encounter == 1:
-			if doc.inpatient_record:
-				if not pharmacy_details.ipd_cash_pharmacy:
-					frappe.throw(
-						_(
-							f"<b>Please set IPD Cash Pharmacy in Company: <b>{doc.company}</b> to allow auto set of pharmacy</b>"
-						)
-					)
-				doc.default_healthcare_service_unit = pharmacy_details.ipd_cash_pharmacy
-			else:
-				if not pharmacy_details.opd_cash_pharmacy:
-					frappe.throw(
-						_(
-							f"<b>Please set OPD Cash Pharmacy in Company: <b>{doc.company}</b>  to allow auto set of pharmacy</b>"
-						)
-					)
-				doc.default_healthcare_service_unit = pharmacy_details.opd_cash_pharmacy
-
-	if doc.insurance_coverage_plan:
-		pharmacy_details = frappe.get_cached_value(
-			"Healthcare Insurance Coverage Plan",
-			doc.insurance_coverage_plan,
-			[
-				"auto_set_pharmacy_on_patient_encounter",
-				"opd_insurance_pharmacy",
-				"ipd_insurance_pharmacy",
-			],
-			as_dict=1,
-		)
-
-		if pharmacy_details and pharmacy_details.auto_set_pharmacy_on_patient_encounter == 1:
-			if doc.inpatient_record:
-				if not pharmacy_details.ipd_insurance_pharmacy:
-					frappe.throw(
-						_(
-							f"<b>Please set IPD Insurance Pharmacy in Healthcare Insurance Coverage Plan: <b>{doc.insurance_coverage_plan}</b> to allow auto set of pharmacy</b>"
-						)
-					)
-				doc.default_healthcare_service_unit = pharmacy_details.ipd_insurance_pharmacy
-			else:
-				if not pharmacy_details.opd_insurance_pharmacy:
-					frappe.throw(
-						_(
-							f"<b>Please set OPD Insurance Pharmacy in Healthcare Insurance Coverage Plan: <b>{doc.insurance_coverage_plan}</b> to allow auto set of pharmacy</b>"
-						)
-					)
-				doc.default_healthcare_service_unit = pharmacy_details.opd_insurance_pharmacy
 	set_price_list(doc)
 
 	if doc.encounter_type == "Initial":
 		doc.poc_reference_no = ""
 
-	doc.save()
 
+def after_insert(doc, method):
 	if doc.appointment and doc.encounter_type == "Initial":
 		appointment_doc = frappe.get_cached_doc("Patient Appointment", doc.appointment)
 		create_revenue_entry(appointment_doc)
