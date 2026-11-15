@@ -150,9 +150,6 @@ def before_insert(doc, method):
 	doc.encounter_date = nowdate()
 	doc.encounter_time = nowtime()
 
-	if not doc.patient_age:
-		doc.patient_age = calculate_patient_age(doc.patient)
-
 	if doc.insurance_company and "NHIF" in doc.insurance_company:
 		validate_nhif_patient_claim_status(
 			"Patient Encounter",
@@ -161,6 +158,14 @@ def before_insert(doc, method):
 			doc.insurance_company,
 		)
 	set_admission_service_type(doc)
+
+
+def set_patient_age(doc, method):
+	"""Fetched from the appointment on every save, computed when that leaves it blank."""
+	if doc.patient_age:
+		return
+
+	doc.patient_age = calculate_patient_age(doc.patient, warn_if_no_dob=doc.is_new())
 
 
 # regency rock: 95

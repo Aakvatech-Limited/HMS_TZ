@@ -4,7 +4,7 @@ import frappe
 from frappe.model.document import Document
 from frappe.tests.utils import FrappeTestCase
 
-from hms_tz.nhif.api.patient_encounter import after_insert, set_new_encounter_values
+from hms_tz.nhif.api.patient_encounter import after_insert, set_new_encounter_values, set_patient_age
 from hms_tz.patches import delete_duplicate_patient_encounter_versions as patch_module
 from hms_tz.tests.utils import insert
 
@@ -46,6 +46,45 @@ class TestEncounterDoubleSave(FrappeTestCase):
 			after_insert(doc, "after_insert")
 
 		save.assert_not_called()
+
+	def test_fetched_age_is_kept(self):
+		doc = frappe.new_doc("Patient Encounter")
+		doc.update({"patient": "_Test Patient", "patient_age": "30 Year(s)"})
+
+		with patch("hms_tz.nhif.api.patient_encounter.calculate_patient_age") as calculate:
+			set_patient_age(doc, "before_validate")
+
+		calculate.assert_not_called()
+		self.assertEqual(doc.patient_age, "30 Year(s)")
+
+	def test_age_is_computed_when_not_fetched(self):
+		doc = frappe.new_doc("Patient Encounter")
+		doc.patient = "_Test Patient"
+
+		with patch(
+			"hms_tz.nhif.api.patient_encounter.calculate_patient_age", return_value="5 Year(s) 1 Month(s)"
+		):
+			set_patient_age(doc, "before_validate")
+
+		self.assertEqual(doc.patient_age, "5 Year(s) 1 Month(s)")
+
+	def test_missing_dob_warns_only_on_insert(self):
+		doc = frappe.new_doc("Patient Encounter")
+		doc.patient = "_Test Patient"
+
+		with (
+			patch.object(frappe, "get_cached_value", return_value=None),
+			patch.object(frappe, "msgprint") as msgprint,
+		):
+			set_patient_age(doc, "before_validate")
+			msgprint.assert_called_once()
+
+			msgprint.reset_mock()
+			with patch.object(Document, "is_new", return_value=False):
+				set_patient_age(doc, "before_validate")
+			msgprint.assert_not_called()
+
+		self.assertIsNone(doc.patient_age)
 
 	def test_only_back_to_back_duplicates_are_deleted(self):
 		insert_version("_Test DS V1", '{"changed": [["a", null, ""]]}', "2026-11-01 08:00:00")
