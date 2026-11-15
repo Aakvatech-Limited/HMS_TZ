@@ -219,31 +219,7 @@ class NHIFPatientClaim(Document):
 		self.set_patient_claim_item(encounter_list)
 
 		for fieldname, rows in saved_rows.items():
-			self.keep_saved_rows(fieldname, rows)
-
-	def keep_saved_rows(self, fieldname, saved_rows):
-		"""Reuse the saved row matching each rebuilt row, so a save updates the table in place.
-
-		Rebuilt rows are new, so saving would delete and re-insert the whole table,
-		and every version would store both copies.
-		"""
-		key_fields = REBUILT_TABLE_KEYS[fieldname]
-		rows_by_key = {}
-		for row in saved_rows:
-			if not row.is_new():
-				rows_by_key.setdefault(tuple(row.get(f) for f in key_fields), []).append(row)
-
-		rows = []
-		for idx, row in enumerate(self.get(fieldname), start=1):
-			if matches := rows_by_key.get(tuple(row.get(f) for f in key_fields)):
-				saved_row = matches.pop(0)
-				saved_row.update(get_row_values(row))
-				row = saved_row
-
-			row.idx = idx
-			rows.append(row)
-
-		self.set(fieldname, rows)
+			keep_saved_rows(self, fieldname, rows, REBUILT_TABLE_KEYS[fieldname])
 
 	def set_practitioner_values(self, encounter_list):
 		self.practitioners = []
@@ -938,6 +914,30 @@ class NHIFPatientClaim(Document):
 					fmt_money(self.total_amount, precision=0), fmt_money(self.signed_amount, precision=0)
 				)
 			)
+
+
+def keep_saved_rows(doc, fieldname, saved_rows, key_fields):
+	"""Reuse the saved row matching each rebuilt row, so a save updates the table in place.
+
+	Rebuilt rows are new, so saving would delete and re-insert the whole table,
+	and every version would store both copies.
+	"""
+	rows_by_key = {}
+	for row in saved_rows:
+		if not row.is_new():
+			rows_by_key.setdefault(tuple(row.get(f) for f in key_fields), []).append(row)
+
+	rows = []
+	for idx, row in enumerate(doc.get(fieldname), start=1):
+		if matches := rows_by_key.get(tuple(row.get(f) for f in key_fields)):
+			saved_row = matches.pop(0)
+			saved_row.update(get_row_values(row))
+			row = saved_row
+
+		row.idx = idx
+		rows.append(row)
+
+	doc.set(fieldname, rows)
 
 
 def get_row_values(row, no_nulls=False):
