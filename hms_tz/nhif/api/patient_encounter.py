@@ -8,6 +8,7 @@ import json
 import frappe
 from erpnext.accounts.utils import get_balance_on
 from frappe import _
+from frappe.model import child_table_fields, default_fields
 from frappe.query_builder import DocType
 from frappe.query_builder.functions import Date
 from frappe.utils import cint, cstr, date_diff, flt, fmt_money, getdate, nowdate, nowtime, strip_html
@@ -42,10 +43,94 @@ from hms_tz.nhif.doctype.nhif_stg.nhif_stg import validate_moh_stg
 from hms_tz.nhif.nhif_api.pre_approval import get_service_rows
 from hms_tz.nhif.utils import validate_main_diagnosis_code, validate_point_of_care
 
+# Current table → previous table, which shows the rows of earlier encounters in the duplicate chain
+PREVIOUS_TABLES = {
+	"drug_prescription": "previous_drug_prescription",
+	"lab_test_prescription": "previous_lab_prescription",
+	"procedure_prescription": "previous_procedure_prescription",
+	"radiology_procedure_prescription": "previous_radiology_procedure_prescription",
+	"therapies": "previous_therapy_plan_detail",
+}
+IDENTITY_FIELDS = {*default_fields, *child_table_fields}
+
 
 def onload(doc, method):
 	if doc.appointment:
 		doc.set_onload("cancelled_appointment_message", get_cancelled_appointment_message(doc.appointment))
+
+	set_previous_details(doc)
+
+
+def before_print(doc, method, print_settings=None):
+	set_previous_details(doc)
+
+
+def set_previous_details(doc):
+	"""Show what earlier encounters in the duplicate chain prescribed and noted.
+
+	Derived on every load instead of being copied into each duplicate.
+	"""
+	encounters = get_previous_encounters(doc)
+	if not encounters:
+		return
+
+	doc.hms_tz_previous_examination_detail = "".join(
+		f"\n{cstr(encounter.examination_detail)}" for encounter in encounters
+	)
+
+	position = {encounter.name: i for i, encounter in enumerate(encounters)}
+	for table, previous_table in PREVIOUS_TABLES.items():
+		previous_fields = [
+			field
+			for field in frappe.get_meta(doc.meta.get_options(previous_table)).get_valid_columns()
+			if field not in IDENTITY_FIELDS
+		]
+		rows = frappe.get_all(
+			doc.meta.get_options(table),
+			filters={"parenttype": doc.doctype, "parentfield": table, "parent": ["in", list(position)]},
+			fields=["*"],
+			order_by="idx",
+		)
+		rows.sort(key=lambda row: position[row.parent])  # stable: keeps idx order within an encounter
+		doc.set(
+			previous_table,
+			[{field: row.get(field) for field in previous_fields} for row in rows],
+		)
+
+
+def get_previous_encounters(doc):
+	"""Encounters this one was duplicated from, oldest first."""
+	if not doc.from_encounter:
+		return []
+
+	fields = ["name", "from_encounter", "examination_detail"]
+	chain = frappe.get_all(
+		"Patient Encounter",
+		filters={"reference_encounter": doc.reference_encounter or doc.from_encounter},
+		fields=fields,
+	)
+	by_name = {encounter.name: encounter for encounter in chain}
+
+	encounters, seen = [], {doc.name}
+	name = doc.from_encounter
+	while name and name not in seen:
+		seen.add(name)
+		encounter = by_name.get(name) or frappe.db.get_value("Patient Encounter", name, fields, as_dict=True)
+		if not encounter:
+			break
+		encounters.append(encounter)
+		name = encounter.from_encounter
+
+	return encounters[::-1]
+
+
+def keep_saved_previous_details(doc, method):
+	"""Previous details are only shown, never saved: keep what is stored."""
+	saved = doc.get_doc_before_save()
+	for previous_table in PREVIOUS_TABLES.values():
+		doc.set(previous_table, saved.get(previous_table) if saved else [])
+
+	doc.hms_tz_previous_examination_detail = saved.hms_tz_previous_examination_detail if saved else ""
 
 
 def on_trash(doc, method):
@@ -517,48 +602,13 @@ def duplicate_encounter(encounter):
 		return
 	encounter_doc = frappe.copy_doc(doc)
 	encounter_dict = encounter_doc.as_dict()
-	child_tables = {
-		"drug_prescription": "previous_drug_prescription",
-		"lab_test_prescription": "previous_lab_prescription",
-		"procedure_prescription": "previous_procedure_prescription",
-		"radiology_procedure_prescription": "previous_radiology_procedure_prescription",
-		"therapies": "previous_therapy_plan_detail",
-	}
-
-	# Copy the examination detail from previous encounter before clearing it
-	clinical_notes = (
-		cstr(encounter_dict["hms_tz_previous_examination_detail"])
-		+ "\n"
-		+ cstr(encounter_dict["examination_detail"])
-	)
-
-	fields_to_clear = [
-		"name",
-		"owner",
-		"creation",
-		"modified",
-		"modified_by",
-		"docstatus",
-		"amended_from",
-		"amendment_date",
-		"parentfield",
-		"parenttype",
-		"sales_invoice",
-	]
-
-	for key, value in child_tables.items():
-		cur_table = encounter_dict.get(key)
-		if not cur_table:
-			continue
-		for row in cur_table:
-			new_row = row
-			for fieldname in fields_to_clear:
-				new_row[fieldname] = None
-			encounter_dict[value].append(new_row)
-		encounter_dict[key] = []
+	# earlier prescriptions and notes are derived from the chain on load (set_previous_details)
+	for table, previous_table in PREVIOUS_TABLES.items():
+		encounter_dict[table] = []
+		encounter_dict[previous_table] = []
 	encounter_dict["duplicated"] = 0
 	encounter_dict["examination_detail"] = ""
-	encounter_dict["hms_tz_previous_examination_detail"] = clinical_notes
+	encounter_dict["hms_tz_previous_examination_detail"] = ""
 
 	encounter_dict["encounter_type"] = "Ongoing"
 	if not encounter_dict.get("reference_encounter"):
