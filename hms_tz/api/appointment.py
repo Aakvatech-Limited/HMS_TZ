@@ -65,10 +65,12 @@ def create_appointment(appointment_data):
 		)
 
 	appointment_doc.insert(ignore_permissions=True)
+	# Reload so an unset duration (None) becomes the stored 0; set_only_once compares them on save.
+	appointment_doc.reload()
 	if appointment_doc.insurance_subscription and appointment_doc.authorization_number:
 		# make_next_doc creates the vital signs only on a save after insert, as the desk does.
 		appointment_doc.save(ignore_permissions=True)
-	appointment_doc.reload()
+		appointment_doc.reload()
 
 	return appointment_doc.as_dict()
 
