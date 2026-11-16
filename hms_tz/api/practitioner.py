@@ -60,6 +60,31 @@ def get_practioner_list(company, date=None):
 	}
 
 
+@frappe.whitelist()
+def search_practitioners(txt=""):
+	"""Active practitioners whose ID, name, department or MCT code contains the text, with NHIF details."""
+	pattern = f"%{txt}%"
+	return frappe.get_list(
+		"Healthcare Practitioner",
+		fields=[
+			"name as value",
+			"practitioner_name",
+			"department",
+			"nhif_physician_qualification",
+			"tz_mct_code",
+		],
+		filters={"status": "Active"},
+		or_filters=[
+			["name", "like", pattern],
+			["practitioner_name", "like", pattern],
+			["department", "like", pattern],
+			["tz_mct_code", "like", pattern],
+		],
+		order_by="practitioner_name asc",
+		limit=20,
+	)
+
+
 def get_practitioners(company):
 	"""Active practitioners of the company that the user may read, after user permissions."""
 	return frappe.get_list(
