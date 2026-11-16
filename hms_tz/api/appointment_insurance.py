@@ -22,6 +22,7 @@ SUBSCRIPTION_FIELDS = [
 	"national_id",
 	"mobile_number",
 	"company",
+	"gender",
 ]
 PATIENT_FIELDS = ["name", "patient_name", "sex", "dob", "mobile"]
 
@@ -57,11 +58,15 @@ def check_card(company, provider, card_no=None, national_id=None):
 
 
 @frappe.whitelist()
-def search_subscriptions(provider, txt=""):
-	"""Active subscriptions of the provider whose ID, patient, card no or mobile contains the text."""
+def search_subscriptions(provider="", txt="", patient=""):
+	"""Active subscriptions, of the provider and patient when given, matching ID, patient, card no or mobile."""
 	frappe.has_permission("Healthcare Insurance Subscription", "read", throw=True)
 	his = DocType("Healthcare Insurance Subscription")
-	query = active_subscriptions().where(provider_condition(his, provider)).limit(20)
+	query = active_subscriptions().limit(20)
+	if provider:
+		query = query.where(provider_condition(his, provider))
+	if patient:
+		query = query.where(his.patient == patient)
 	if txt:
 		pattern = f"%{txt}%"
 		query = query.where(
