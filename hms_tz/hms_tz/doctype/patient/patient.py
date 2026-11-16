@@ -241,7 +241,15 @@ def get_non_group_customer_group():
 	return leaf
 
 
-def create_customer(doc):
+def get_patient_customer(patient: str) -> str:
+	"""Return the patient's Customer, relinking or creating it when the link is empty or points to a deleted Customer."""
+	customer = frappe.db.get_value("Patient", patient, "customer")
+	if customer and frappe.db.exists("Customer", customer):
+		return customer
+	return create_customer(frappe.get_doc("Patient", patient))
+
+
+def create_customer(doc) -> str:
 	# Check if customer already exists
 	existing_customer = frappe.db.get_value(
 		"Customer",
@@ -249,13 +257,18 @@ def create_customer(doc):
 	)
 	if existing_customer:
 		frappe.db.set_value("Patient", doc.name, "customer", existing_customer)
-		return
+		return existing_customer
+
+	# ERPNext rejects group-type Customer Groups such as the root "All Customer Groups"
+	customer_group = doc.customer_group
+	if not customer_group or frappe.db.get_value("Customer Group", customer_group, "is_group"):
+		customer_group = get_non_group_customer_group()
 
 	customer = frappe.get_doc(
 		{
 			"doctype": "Customer",
 			"customer_name": doc.patient_name,
-			"customer_group": doc.customer_group or get_non_group_customer_group(),
+			"customer_group": customer_group,
 			"territory": doc.territory or frappe.db.get_single_value("Selling Settings", "territory"),
 			"customer_type": "Individual",
 			"default_currency": doc.default_currency,
@@ -266,6 +279,7 @@ def create_customer(doc):
 
 	frappe.db.set_value("Patient", doc.name, "customer", customer.name)
 	frappe.msgprint(_(f"Customer {customer.name} is created."), alert=True)
+	return customer.name
 
 
 def make_invoice(patient, company):
