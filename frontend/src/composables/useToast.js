@@ -1,16 +1,24 @@
 import { useToast as useVueToastification } from "vue-toastification";
 
-/** One line of plain text from a server message: tags and entities removed. */
-export const htmlToText = (html) => {
-  const spaced = String(html || "").replace(
+/** Plain text with line breaks kept: tags and entities removed. */
+export const toPlainText = (text) => {
+  const withBreaks = String(text ?? "").replace(
     /<br\s*\/?>|<\/(p|div|h\d|li)>/gi,
-    " "
+    "\n"
   );
-  const text =
-    new DOMParser().parseFromString(spaced, "text/html").body.textContent ||
-    "";
-  return text.replace(/\s+/g, " ").trim();
+  const plain =
+    new DOMParser().parseFromString(withBreaks, "text/html").body
+      .textContent || "";
+  return plain
+    .split("\n")
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .join("\n")
+    .trim();
 };
+
+/** One line of plain text from a server message. */
+export const htmlToText = (html) =>
+  toPlainText(html).replace(/\s+/g, " ").trim();
 
 /**
  * Messages of a failed frappe call, one per entry.
@@ -36,7 +44,9 @@ export const serverErrorText = (error) => {
 export const useToast = () => {
   const toast = useVueToastification();
 
-  const showToast = (message, type = "info", options = {}) => {
+  /** Every toast passes here, so server HTML never reaches the user. */
+  const showToast = (html, type = "info", options = {}) => {
+    const message = toPlainText(html);
     const defaultOptions = {
       timeout: options.timeout || 5000, // Default to 5 seconds for better readability
       position: options.position || "bottom-right",
@@ -144,50 +154,6 @@ export const useToast = () => {
     showError(serverErrorText(error), { timeout: 10000 });
   };
 
-  // Handle API errors specific to appointment operations
-  const handleApiError = (error) => {
-    console.error("API Error:", error); // For debugging
-
-    if (error.response) {
-      const status = error.response.status;
-      const message = error.response.data?.message || error.message;
-
-      switch (status) {
-        case 400:
-          showError(`Bad Request: ${message}`);
-          break;
-        case 401:
-          showError("Unauthorized. Please log in again.");
-          break;
-        case 403:
-          showError("You do not have permission to perform this action.");
-          break;
-        case 404:
-          showError("Resource not found.");
-          break;
-        case 409:
-          showError("Conflict: " + message);
-          break;
-        case 422:
-          showError("Validation Error: " + message);
-          break;
-        case 500:
-          showError("Server error. Please try again later.");
-          break;
-        default:
-          showError(message || "An error occurred.");
-      }
-    } else if (error.request) {
-      showError("Network error. Please check your connection");
-    } else if (error.messages && Array.isArray(error.messages)) {
-      showError(error.messages.join("\n"));
-    } else if (error.message) {
-      showError(error.message);
-    } else {
-      showError("An unexpected error occurred.");
-    }
-  };
-
   // Convenience object for easy access to notification methods
   const notifications = {
     success: notifySuccess,
@@ -203,13 +169,11 @@ export const useToast = () => {
     showWarning,
     showInfo,
     clear,
-    toast,
     notifySuccess,
     notifyError,
     notifyWarning,
     notifyInfo,
     handleResourceError,
-    handleApiError,
     notifications,
   };
 };
