@@ -22,8 +22,8 @@ export const checkCard = (company, provider, card_no, national_id) =>
     national_id,
   });
 
-export const searchSubscriptions = (provider, txt) =>
-  call(`${INSURANCE_API}.search_subscriptions`, { provider, txt });
+export const searchSubscriptions = (provider, txt, patient) =>
+  call(`${INSURANCE_API}.search_subscriptions`, { provider, txt, patient });
 
 export const getSubscription = (name) =>
   call(`${INSURANCE_API}.get_subscription`, { name });
