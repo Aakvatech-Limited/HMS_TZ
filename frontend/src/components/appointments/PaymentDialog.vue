@@ -1,10 +1,10 @@
 <template>
   <Dialog
-    :model-value="localShowDialog"
-    @update:model-value="updateDialogState"
+    :model-value="showDialog"
+    @update:model-value="emit('update:showDialog', $event)"
     :options="{
       title: 'Make Payment',
-      size: '2xl',
+      size: '4xl',
       icon: {
         name: 'dollar-sign',
         appearance: 'blue',
@@ -99,17 +99,17 @@
               <thead class="bg-gray-50">
                 <tr>
                   <th
-                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                   >
                     Payment Method
                   </th>
                   <th
-                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                   >
                     Amount (TZS)
                   </th>
                   <th
-                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                   >
                     Payment Reference
                   </th>
@@ -122,7 +122,7 @@
                   class="hover:bg-gray-50"
                 >
                   <!-- Payment Method -->
-                  <td class="px-6 py-4 whitespace-nowrap">
+                  <td class="px-4 py-4 whitespace-nowrap">
                     <div class="flex items-center">
                       <div class="flex-shrink-0">
                         <div
@@ -170,7 +170,7 @@
                   </td>
 
                   <!-- Amount Input -->
-                  <td class="px-6 py-4 whitespace-nowrap">
+                  <td class="px-4 py-4 whitespace-nowrap">
                     <div class="relative">
                       <input
                         v-model.number="payment.amount"
@@ -178,7 +178,7 @@
                         step="0.01"
                         min="0"
                         :max="totalAmountToPay"
-                        class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
+                        class="block w-full min-w-[12rem] px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-lg font-semibold"
                         placeholder="0.00"
                         :class="{
                           'border-red-300 ring-red-500':
@@ -196,7 +196,7 @@
                   </td>
 
                   <!-- Payment Reference -->
-                  <td class="px-6 py-4 whitespace-nowrap">
+                  <td class="px-4 py-4 whitespace-nowrap">
                     <div class="relative">
                       <input
                         v-model="payment.payment_reference"
@@ -342,7 +342,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, watch, ref, onMounted } from "vue";
+import { computed, reactive, watch, ref } from "vue";
 import { createResource } from "frappe-ui";
 import { useToast } from "@/composables/useToast";
 import FeatherIcon from "frappe-ui/src/components/FeatherIcon.vue";
@@ -366,10 +366,11 @@ const emit = defineEmits(["update:showDialog", "paymentCompleted"]);
 const { notifications } = useToast();
 
 // Reactive state
-const localShowDialog = ref(props.showDialog);
 const modeOfPayments = ref([]);
 const paymentEntries = ref([]);
-const totalAmountToPay = ref(0);
+const totalAmountToPay = computed(
+  () => Number.parseFloat(props.appointmentData?.paid_amount) || 0
+);
 const isLoadingModeOfPayments = ref(false);
 const isProcessingPayment = ref(false);
 const modeOfPaymentError = ref("");
@@ -415,14 +416,12 @@ const salesInvoiceResource = createResource({
   },
 });
 
-// Initialize payment entries based on mode of payments
 const initializePaymentEntries = () => {
   paymentEntries.value = modeOfPayments.value.map((mop) => ({
     mode_of_payment: mop.mode_of_payment,
     type: mop.type,
-    amount: 0,
-    payment_reference: "",
   }));
+  resetPayments();
 };
 
 // Fetch mode of payments
@@ -494,9 +493,12 @@ const validatePaymentEntry = (index) => {
   }
 };
 
+const clearErrors = () => {
+  for (const key of Object.keys(errors)) delete errors[key];
+};
+
 const validateAllPayments = () => {
-  // Clear all errors
-  Object.keys(errors).forEach((key) => delete errors[key]);
+  clearErrors();
 
   // Validate total amount (should be automatically set from appointment)
   if (!totalAmountToPay.value || totalAmountToPay.value <= 0) {
@@ -545,14 +547,8 @@ const canProcessPayment = computed(() => {
   );
 });
 
-// Dialog management
-const updateDialogState = (value) => {
-  localShowDialog.value = value;
-  emit("update:showDialog", value);
-};
-
 const closeDialog = () => {
-  updateDialogState(false);
+  emit("update:showDialog", false);
 };
 
 // Payment processing
@@ -579,58 +575,35 @@ const processPayment = () => {
 
   // Call the API to create
   salesInvoiceResource.submit({
-    name: props.appointmentData.name || props.appointmentData.id,
+    name: props.appointmentData.name,
     mops: paymentMethods,
   });
 };
 
-// Reset payments
+// Put the full amount on the first cash method so the cashier only confirms
 const resetPayments = () => {
-  paymentEntries.value.forEach((entry) => {
-    entry.amount = 0;
+  const cashEntry = paymentEntries.value.find((entry) =>
+    isCashPayment(entry.mode_of_payment)
+  );
+  for (const entry of paymentEntries.value) {
+    entry.amount = entry === cashEntry ? totalAmountToPay.value : 0;
     entry.payment_reference = "";
-  });
-  Object.keys(errors).forEach((key) => delete errors[key]);
+  }
+  clearErrors();
 };
 
-// Watch for dialog show/hide
 watch(
   () => props.showDialog,
-  (newValue) => {
-    localShowDialog.value = newValue;
-    if (newValue) {
-      // Set total amount from appointment data
-      totalAmountToPay.value =
-        parseFloat(props.appointmentData?.paid_amount || 0) || 0;
+  (isOpen) => {
+    if (!isOpen) return;
+    if (modeOfPayments.value.length) {
       resetPayments();
-      Object.keys(errors).forEach((key) => delete errors[key]);
-
-      // Fetch mode of payments when dialog opens
-      if (modeOfPayments.value.length === 0) {
-        fetchModeOfPayments();
-      }
+    } else {
+      fetchModeOfPayments();
     }
-  }
+  },
+  { immediate: true }
 );
-
-// Watch for changes in appointment data
-watch(
-  () => props.appointmentData?.paid_amount,
-  (newAmount) => {
-    totalAmountToPay.value = parseFloat(newAmount || 0) || 0;
-  }
-);
-
-// Initialize on mount
-onMounted(() => {
-  // Set initial total amount from appointment data
-  totalAmountToPay.value =
-    parseFloat(props.appointmentData?.paid_amount || 0) || 0;
-
-  if (props.showDialog) {
-    fetchModeOfPayments();
-  }
-});
 </script>
 
 <style scoped>
