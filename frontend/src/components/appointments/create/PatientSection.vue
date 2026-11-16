@@ -53,10 +53,11 @@
             :options="GENDERS"
             placeholder="Select"
           />
-          <DatePicker
+          <FormControl
             v-else-if="field.name === 'dob'"
             v-model="form.newPatient.dob"
-            placeholder="Date of birth"
+            type="date"
+            :max="today"
           />
           <FormControl
             v-else
@@ -94,6 +95,7 @@
 
 <script setup>
 import { computed } from "vue";
+import dayjs from "dayjs";
 import { TabButtons } from "frappe-ui";
 import Link from "@/components/controls/Link.vue";
 import FieldLabel from "./FieldLabel.vue";
@@ -110,6 +112,7 @@ const patientOptionDetails = (option) =>
     .filter(Boolean)
     .join(" · ");
 
+const today = dayjs().format("YYYY-MM-DD");
 const PATIENT_MODES = [
   { label: "Existing patient", value: "existing" },
   { label: "New patient", value: "new" },
