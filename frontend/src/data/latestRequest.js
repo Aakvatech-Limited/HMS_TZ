@@ -1,3 +1,5 @@
+import { serverErrorText } from "@/composables/useToast";
+
 /**
  * Run `fetcher` for a store and pass its rows to `apply`, unless a newer call
  * started meanwhile. The store owns `latestRequest`, `isFetching` and `loadError`.
@@ -14,7 +16,7 @@ export const fetchLatest = async (store, fetcher, apply) => {
   } catch (error) {
     if (!isLatest()) return;
     apply([]);
-    store.loadError = error.message || "Failed to load data";
+    store.loadError = serverErrorText(error);
   } finally {
     if (isLatest()) store.isFetching = false;
   }
