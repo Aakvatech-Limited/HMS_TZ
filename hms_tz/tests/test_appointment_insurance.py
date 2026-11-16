@@ -198,6 +198,14 @@ class TestAppointmentInsurance(FrappeTestCase):
 			[row.name for row in appointment_insurance.search_subscriptions(txt=JUBILEE_SUBSCRIPTION)],
 		)
 
+	def test_search_visit_types_hides_disabled_ones(self):
+		insert("Appointment Type", VISIT_TYPE, appointment_type=VISIT_TYPE)
+		insert("Appointment Type", f"{VISIT_TYPE} Old", appointment_type=f"{VISIT_TYPE} Old", disabled=1)
+
+		rows = appointment_api.search_visit_types("Insurance Visit")
+
+		self.assertEqual([row.value for row in rows], [VISIT_TYPE])
+
 	def test_search_patients_matches_id_name_mobile_and_card_no(self):
 		frappe.db.set_value("Patient", CARD_HOLDER, {"mobile": "_Test Mobile 7731", "card_no": "_TCARD7731"})
 		frappe.db.set_value("Patient", JUBILEE_HOLDER, "insurance_card_detail", "_TJUB7731, ")
