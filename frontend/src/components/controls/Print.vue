@@ -248,7 +248,8 @@ const handlePrint = async () => {
       encodeURIComponent(props.doctype) +
       "&name=" +
       encodeURIComponent(props.docname) +
-      "&trigger_print=0" +
+      "&trigger_print=" +
+      (props.autoTriggerPrint ? 1 : 0) +
       "&format=" +
       encodeURIComponent(print_format);
     // +
@@ -266,16 +267,6 @@ const handlePrint = async () => {
       emit("print-error", "Popup blocked");
       return;
     }
-
-    // Add load event listener like the working example
-    printWindow.addEventListener(
-      "load",
-      function () {
-        // Auto-print is commented out in the working example, so we keep it the same
-        // printWindow.print();
-      },
-      true
-    );
 
     emit("print-success", {
       doctype: props.doctype,
