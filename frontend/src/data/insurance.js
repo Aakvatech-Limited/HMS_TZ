@@ -9,6 +9,8 @@ export const PAYMENT_OPTIONS = [
   { label: "Other insurance", value: "Other" },
 ];
 
+export const SEARCH_PATIENTS_METHOD = `${INSURANCE_API}.search_patients`;
+
 export const getInsuranceApiSettings = (company) =>
   call(`${INSURANCE_API}.get_insurance_api_settings`, { company });
 

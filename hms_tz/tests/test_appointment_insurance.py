@@ -185,6 +185,23 @@ class TestAppointmentInsurance(FrappeTestCase):
 		self.assertEqual(names(appointment_insurance.search_subscriptions("NHIF", "JUB1")), [])
 		self.assertNotIn(NHIF_SUBSCRIPTION, names(appointment_insurance.search_subscriptions("Other")))
 
+	def test_search_patients_matches_id_name_mobile_and_card_no(self):
+		frappe.db.set_value("Patient", CARD_HOLDER, {"mobile": "_Test Mobile 7731", "card_no": "_TCARD7731"})
+		frappe.db.set_value("Patient", JUBILEE_HOLDER, "insurance_card_detail", "_TJUB7731, ")
+		frappe.db.set_value("Patient", NID_HOLDER, "status", "Disabled")
+		values = lambda txt: [row.value for row in appointment_insurance.search_patients(txt)]  # noqa: E731
+
+		for txt in (CARD_HOLDER, "Mobile 7731", "_TCARD7731"):
+			self.assertEqual(values(txt), [CARD_HOLDER])
+		self.assertEqual(values("_TJUB7731"), [JUBILEE_HOLDER])
+		self.assertEqual(values(NID_HOLDER), [])
+
+		row = appointment_insurance.search_patients("_TCARD7731")[0]
+		self.assertEqual(
+			(row.patient_name, row.sex, row.mobile, row.card_no),
+			("Card Holder", "Male", "_Test Mobile 7731", "_TCARD7731"),
+		)
+
 	@patch.object(patient_appointment, "manage_fee_validity", new=lambda appointment: None)
 	@patch.object(nhif_appointment, "get_insurance_amount", new=lambda *args, **kwargs: (0, 0))
 	@patch.object(
