@@ -1,5 +1,38 @@
 import { useToast as useVueToastification } from "vue-toastification";
 
+/** One line of plain text from a server message: tags and entities removed. */
+export const htmlToText = (html) => {
+  const spaced = String(html || "").replace(
+    /<br\s*\/?>|<\/(p|div|h\d|li)>/gi,
+    " "
+  );
+  const text =
+    new DOMParser().parseFromString(spaced, "text/html").body.textContent ||
+    "";
+  return text.replace(/\s+/g, " ").trim();
+};
+
+/**
+ * Messages of a failed frappe call, one per entry.
+ * Frappe sends the raised error last, so it is moved first; a MandatoryError keeps the field order.
+ */
+export const serverErrors = (error) => {
+  const messages = (error?.messages || []).map(htmlToText).filter(Boolean);
+  if (!messages.length) {
+    return [
+      htmlToText(error?.message) || "The request failed. Please try again.",
+    ];
+  }
+  if (error.exc_type !== "MandatoryError") messages.unshift(messages.pop());
+  return [...new Set(messages)];
+};
+
+export const serverErrorText = (error) => {
+  const errors = serverErrors(error);
+  if (errors.length === 1) return errors[0];
+  return errors.map((e) => `• ${e}`).join("\n");
+};
+
 export const useToast = () => {
   const toast = useVueToastification();
 
@@ -107,15 +140,8 @@ export const useToast = () => {
     processingRequest: () => showInfo("Processing your request..."),
   };
 
-  // Handle Frappe createResource errors (specific to appointment operations)
   const handleResourceError = (error) => {
-    if (error.messages && Array.isArray(error.messages)) {
-      showError(error.messages.join("\n"));
-    } else if (error.message) {
-      showError(error.message);
-    } else {
-      showError("An error occurred while processing your request.");
-    }
+    showError(serverErrorText(error), { timeout: 10000 });
   };
 
   // Handle API errors specific to appointment operations

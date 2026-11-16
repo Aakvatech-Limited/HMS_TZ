@@ -2,8 +2,12 @@ from unittest.mock import patch
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
+from frappe.utils import add_days, nowdate
 
+from hms_tz.api import appointment as appointment_api
 from hms_tz.api import appointment_insurance
+from hms_tz.hms_tz.doctype.patient_appointment import patient_appointment
+from hms_tz.nhif.api import patient_appointment as nhif_appointment
 from hms_tz.tests.utils import insert
 
 COMPANY = "_Test Insurance Clinic"
@@ -19,6 +23,9 @@ NID_HOLDER = "_Test NID Holder"
 JUBILEE_HOLDER = "_Test Jubilee Holder"
 NHIF_SUBSCRIPTION = "_Test NHIF HIS"
 JUBILEE_SUBSCRIPTION = "_Test Jubilee HIS"
+CONSULTATION_ITEM = "_Test Insurance Consultation"
+PRACTITIONER = "_Test Insurance Doctor"
+VISIT_TYPE = "_Test Insurance Visit"
 
 NHIF_CARD = {
 	"CardNo": "101",
@@ -177,6 +184,35 @@ class TestAppointmentInsurance(FrappeTestCase):
 		)
 		self.assertEqual(names(appointment_insurance.search_subscriptions("NHIF", "JUB1")), [])
 		self.assertNotIn(NHIF_SUBSCRIPTION, names(appointment_insurance.search_subscriptions("Other")))
+
+	@patch.object(patient_appointment, "manage_fee_validity", new=lambda appointment: None)
+	@patch.object(nhif_appointment, "get_insurance_amount", new=lambda *args, **kwargs: (0, 0))
+	@patch.object(
+		appointment_api, "get_consulting_charge_item", new=lambda *args, **kwargs: CONSULTATION_ITEM
+	)
+	def test_create_authorized_appointment_without_duration(self):
+		"""The dialog sends no duration; the save after insert must not see it as changed."""
+		insert("Item", CONSULTATION_ITEM, item_code=CONSULTATION_ITEM, item_name=CONSULTATION_ITEM)
+		insert("Healthcare Practitioner", PRACTITIONER, first_name="Test", practitioner_name="Test Doctor")
+		insert("Appointment Type", VISIT_TYPE, appointment_type=VISIT_TYPE)
+		frappe.db.set_value("Patient", CARD_HOLDER, "customer", "_Test Customer")
+
+		appointment = appointment_api.create_appointment(
+			{
+				"company": COMPANY,
+				"practitioner": PRACTITIONER,
+				"appointment_date": add_days(nowdate(), 1),
+				"appointment_time": "10:00:00",
+				"appointment_type": VISIT_TYPE,
+				"patient": CARD_HOLDER,
+				"payment_mode": "Insurance",
+				"insurance_subscription": NHIF_SUBSCRIPTION,
+				"authorization_number": "AUTH-1",
+			}
+		)
+
+		self.assertEqual(appointment["authorization_number"], "AUTH-1")
+		self.assertTrue(appointment["ref_vital_signs"])
 
 	def test_create_insurance_subscription_submits_it(self):
 		subscription = appointment_insurance.create_insurance_subscription(

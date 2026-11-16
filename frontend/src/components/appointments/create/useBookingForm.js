@@ -1,6 +1,6 @@
 import { computed, reactive, ref } from "vue";
 import dayjs from "dayjs";
-import { useToast } from "@/composables/useToast";
+import { serverErrorText, useToast } from "@/composables/useToast";
 import {
   authorizeJubileeAppointment,
   authorizeNhifPatient,
@@ -352,9 +352,10 @@ export function useBookingForm(initial) {
         setStatus("Requesting the Jubilee authorization...", 90);
         await authorizeJubileeAppointment(appointment.name).catch((error) => {
           showWarning(
-            `Appointment created, but Jubilee did not authorize it: ${
-              error.messages?.join(" ") || error.message
-            }`
+            `Appointment created, but Jubilee did not authorize it:\n${serverErrorText(
+              error
+            )}`,
+            { timeout: 10000 }
           );
         });
       }
