@@ -15,9 +15,21 @@
         <Link
           :value="form.patient"
           doctype="Patient"
-          placeholder="Search patient"
+          :search-method="SEARCH_PATIENTS_METHOD"
+          placeholder="Search by name, ID, mobile or card no"
           @change="(value) => emit('select-patient', value)"
-        />
+        >
+          <template #item-label="{ option }">
+            <div class="flex min-w-0 flex-col">
+              <span class="truncate font-medium text-gray-900">
+                {{ option.patient_name || option.value }}
+              </span>
+              <span class="truncate text-sm text-gray-600">
+                {{ patientOptionDetails(option) }}
+              </span>
+            </div>
+          </template>
+        </Link>
       </div>
       <div
         v-if="summary"
@@ -86,6 +98,17 @@ import { TabButtons } from "frappe-ui";
 import Link from "@/components/controls/Link.vue";
 import FieldLabel from "./FieldLabel.vue";
 import { patientSummary } from "./useBookingForm";
+import { SEARCH_PATIENTS_METHOD } from "@/data/insurance";
+
+const patientOptionDetails = (option) =>
+  [
+    option.value,
+    option.sex,
+    option.mobile && `Mob: ${option.mobile}`,
+    option.card_no && `Card: ${option.card_no}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
 const PATIENT_MODES = [
   { label: "Existing patient", value: "existing" },
