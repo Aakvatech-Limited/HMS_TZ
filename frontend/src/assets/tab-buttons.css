@@ -1,0 +1,18 @@
+/* Selected segment of frappe-ui TabButtons: outlined raised chip and check mark so it can't be missed. */
+[role="radiogroup"] [role="radio"][aria-checked="true"] {
+  @apply bg-surface-white font-semibold text-ink-gray-9 shadow-lg ring-1 ring-outline-gray-5;
+}
+
+[role="radiogroup"] [role="radio"][aria-checked="true"]::before {
+  content: "✓";
+  @apply font-bold leading-none;
+}
+
+[role="radiogroup"] [role="radio"][aria-checked="false"] {
+  @apply text-ink-gray-5;
+}
+
+[role="radiogroup"]
+  [role="radio"][aria-checked="false"]:not([aria-disabled]):hover {
+  @apply bg-surface-gray-3 text-ink-gray-8;
+}
