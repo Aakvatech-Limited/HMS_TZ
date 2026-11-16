@@ -749,7 +749,7 @@ const sections = computed(() => {
         field("department", "Department", "Link", {
           options: "Medical Department",
         }),
-        field("appointment_type", "Appointment Type", "Link", {
+        field("appointment_type", "Visit Type", "Link", {
           options: "Appointment Type",
           reqd: true,
         }),
