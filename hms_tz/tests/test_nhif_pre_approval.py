@@ -217,6 +217,14 @@ class TestNHIFPreApprovalBeds(FrappeTestCase):
 		row = frappe._dict(medical_code="ICD-10 Z22.0", parentfield="lab_test_prescription")
 		self.assertEqual(pre_approval.get_disease_row(row), {"diseaseCode": "Z22.0", "status": "Preliminary"})
 
+	def test_disease_code_drops_description_after_newline(self):
+		for medical_code, expected in [
+			("ICD-10 H52.2\n Astigmatism", "H52.2"),
+			("ICD-10 R69\n Unknown and unspecified causes of morbidity", "R69"),
+		]:
+			row = frappe._dict(medical_code=medical_code, parentfield="procedure_prescription")
+			self.assertEqual(pre_approval.get_disease_row(row), {"diseaseCode": expected, "status": "Final"})
+
 	def test_encounter_without_inpatient_record_has_no_beds(self):
 		services, _requested_rows, _diseases = pre_approval.get_services(
 			self.make_encounter(inpatient_record=None)
