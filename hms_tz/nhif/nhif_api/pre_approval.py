@@ -331,10 +331,11 @@ def is_preapproval_required(row):
 
 
 def get_disease_row(row):
-	medical_code = row.get("medical_code") or ""
+	medical_code = (row.get("medical_code") or "").replace("\n", " ")
+	code = medical_code[6:].strip().split(" ")[0]
 	preliminary_tables = ["lab_test_prescription", "radiology_procedure_prescription"]
 	status = "Preliminary" if row.parentfield in preliminary_tables else "Final"
-	return {"diseaseCode": get_disease_code(medical_code[6:].strip()), "status": status}
+	return {"diseaseCode": get_disease_code(code), "status": status}
 
 
 @request_cache
