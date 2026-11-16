@@ -303,6 +303,13 @@
             </div>
           </Transition>
         </Teleport>
+
+        <!-- Nested inside this Dialog so headlessui hands focus to it -->
+        <PaymentDialog
+          v-model:show-dialog="showPaymentDialog"
+          :appointment-data="appointment['Patient Appointment']"
+          @paymentCompleted="handlePaymentCompleted"
+        />
       </div>
     </template>
 
@@ -486,14 +493,6 @@
       </div>
     </template>
   </Dialog>
-
-  <!-- Payment Dialog -->
-  <PaymentDialog
-    :show-dialog="showPaymentDialog"
-    @update:show-dialog="showPaymentDialog = $event"
-    :appointment-data="appData"
-    @paymentCompleted="handlePaymentCompleted"
-  />
 </template>
 
 <script setup>
@@ -618,6 +617,7 @@ const canShowCancelButton = computed(() => {
 
 const emptyAppointment = () => ({
   "Patient Appointment": {
+    name: "",
     payment_mode: "",
     patient: "",
     patient_name: "",
