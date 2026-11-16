@@ -32,6 +32,7 @@ declare module 'vue' {
     RouterView: typeof import('vue-router')['RouterView']
     SlotCell: typeof import('./src/components/appointments/SlotCell.vue')['default']
     SlotFields: typeof import('./src/components/appointments/create/SlotFields.vue')['default']
+    SubscriptionSearch: typeof import('./src/components/appointments/create/SubscriptionSearch.vue')['default']
     SubscriptionSection: typeof import('./src/components/appointments/create/SubscriptionSection.vue')['default']
   }
 }

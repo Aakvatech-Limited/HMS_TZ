@@ -185,6 +185,19 @@ class TestAppointmentInsurance(FrappeTestCase):
 		self.assertEqual(names(appointment_insurance.search_subscriptions("NHIF", "JUB1")), [])
 		self.assertNotIn(NHIF_SUBSCRIPTION, names(appointment_insurance.search_subscriptions("Other")))
 
+	def test_search_subscriptions_filters_by_patient_without_provider(self):
+		rows = appointment_insurance.search_subscriptions(patient=CARD_HOLDER)
+
+		self.assertEqual([row.name for row in rows], [NHIF_SUBSCRIPTION])
+		self.assertEqual(
+			rows[0].gender,
+			frappe.db.get_value("Healthcare Insurance Subscription", NHIF_SUBSCRIPTION, "gender"),
+		)
+		self.assertIn(
+			JUBILEE_SUBSCRIPTION,
+			[row.name for row in appointment_insurance.search_subscriptions(txt=JUBILEE_SUBSCRIPTION)],
+		)
+
 	def test_search_patients_matches_id_name_mobile_and_card_no(self):
 		frappe.db.set_value("Patient", CARD_HOLDER, {"mobile": "_Test Mobile 7731", "card_no": "_TCARD7731"})
 		frappe.db.set_value("Patient", JUBILEE_HOLDER, "insurance_card_detail", "_TJUB7731, ")
