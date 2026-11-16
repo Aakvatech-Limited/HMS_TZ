@@ -58,15 +58,10 @@
 
       <div>
         <FieldLabel label="Or find an existing subscription" />
-        <Autocomplete
-          :options="subscriptionOptions"
-          :model-value="selectedOption"
-          :filterable="false"
-          placeholder="Search by patient name, mobile, card no or subscription ID"
-          @update:model-value="
-            (option) => emit('select-subscription', option?.value || '')
-          "
-          @update:query="searchSubscriptions"
+        <SubscriptionSearch
+          :provider="form.payment"
+          :selected="form.subscription"
+          @select="(name) => emit('select-subscription', name)"
         />
       </div>
     </template>
@@ -74,15 +69,11 @@
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import { TabButtons } from "frappe-ui";
-import { watchDebounced } from "@vueuse/core";
-import Autocomplete from "@/components/controls/Autocomplete.vue";
-import {
-  PAYMENT_OPTIONS,
-  searchSubscriptions as searchApi,
-} from "@/data/insurance";
+import { PAYMENT_OPTIONS } from "@/data/insurance";
 import FieldLabel from "./FieldLabel.vue";
+import SubscriptionSearch from "./SubscriptionSearch.vue";
 
 const props = defineProps({
   form: { type: Object, required: true },
@@ -91,45 +82,6 @@ const props = defineProps({
   checking: { type: Boolean, default: false },
 });
 const emit = defineEmits(["set-payment", "check-card", "select-subscription"]);
-
-const query = ref("");
-const subscriptions = ref([]);
-
-const searchSubscriptions = (text) => {
-  query.value = text || "";
-};
-
-watchDebounced(
-  () => [props.form.payment, query.value],
-  async () => {
-    if (!props.isInsurance) return;
-    subscriptions.value = await searchApi(props.form.payment, query.value);
-  },
-  { debounce: 300, immediate: true }
-);
-
-const subscriptionOptions = computed(() =>
-  subscriptions.value.map((subscription) => ({
-    label: `${subscription.name} · ${subscription.patient_name} · ${
-      subscription.coverage_plan_name ||
-      subscription.healthcare_insurance_coverage_plan
-    }`,
-    value: subscription.name,
-  }))
-);
-
-const selectedOption = computed(
-  () =>
-    subscriptionOptions.value.find(
-      (option) => option.value === props.form.subscription?.name
-    ) ||
-    (props.form.subscription
-      ? {
-          label: props.form.subscription.name,
-          value: props.form.subscription.name,
-        }
-      : null)
-);
 
 const cardNoSource = computed(() => {
   if (props.form.fromCard.patient && props.form.card)
