@@ -11,7 +11,7 @@ from frappe.realtime import get_doctype_room
 from frappe.utils import cint, date_diff, nowdate, nowtime
 from healthcare.healthcare.doctype.healthcare_settings.healthcare_settings import get_receivable_account
 
-from hms_tz.hms_tz.doctype.patient.patient import create_customer
+from hms_tz.hms_tz.doctype.patient.patient import get_patient_customer
 from hms_tz.hms_tz.doctype.patient_appointment.patient_appointment import get_appointment_item
 from hms_tz.nhif.api.healthcare_utils import get_discount_percent, get_item_rate, get_mop_amount
 
@@ -26,9 +26,7 @@ def before_insert(doc, method):
 			)
 		)
 
-	patient_doc = frappe.get_cached_doc("Patient", doc.patient)
-	if not patient_doc.customer:
-		create_customer(patient_doc)
+	get_patient_customer(doc.patient)
 
 
 def publish_grid_update(doc, method):
@@ -196,7 +194,7 @@ def invoice_appointment(name, mops=None):
 	):
 		sales_invoice = frappe.new_doc("Sales Invoice")
 		sales_invoice.patient = appointment_doc.patient
-		sales_invoice.customer = frappe.get_cached_value("Patient", appointment_doc.patient, "customer")
+		sales_invoice.customer = get_patient_customer(appointment_doc.patient)
 		sales_invoice.appointment = appointment_doc.name
 		sales_invoice.set_posting_time = 1
 		sales_invoice.posting_date = appointment_doc.appointment_date
