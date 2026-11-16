@@ -85,6 +85,11 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  // Whitelisted method taking txt and returning rows with a value key; extra keys reach the item-label slot.
+  searchMethod: {
+    type: String,
+    default: "frappe.desk.search.search_link",
+  },
 });
 
 const emit = defineEmits(["update:modelValue", "change"]);
@@ -124,8 +129,8 @@ watchDebounced(
 );
 
 const options = createResource({
-  url: "frappe.desk.search.search_link",
-  cache: [props.doctype, text.value, props.hideMe],
+  url: props.searchMethod,
+  cache: [props.searchMethod, props.doctype, text.value, props.hideMe],
   method: "POST",
   params: {
     txt: text.value,
@@ -135,6 +140,7 @@ const options = createResource({
   transform: (data) => {
     let allData = data.map((option) => {
       return {
+        ...option,
         label: option.value,
         value: option.value,
       };
