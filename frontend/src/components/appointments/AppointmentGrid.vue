@@ -215,7 +215,7 @@ import PractitionerCard from "./PractitionerCard.vue";
 import SlotCell from "./SlotCell.vue";
 import { APPOINTMENT_STATUSES } from "./appointmentStatus";
 import AppointmentDialog from "./AppointmentDialog.vue";
-import { useToast } from "@/composables/useToast";
+import { serverErrorText, useToast } from "@/composables/useToast";
 
 const appointmentStore = useAppointmentStore();
 const practitionerStore = usePractitionerStore();
@@ -427,7 +427,7 @@ const fetchUserCompanies = async () => {
       selectedCompany.value = default_company;
     }
   } catch (error) {
-    companyError.value = error.message || "Failed to load companies";
+    companyError.value = serverErrorText(error);
   }
 };
 
