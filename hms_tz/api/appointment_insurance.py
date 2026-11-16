@@ -90,6 +90,26 @@ def get_patient(name):
 
 
 @frappe.whitelist()
+def search_patients(txt=""):
+	"""Active patients whose ID, name, mobile or card no contains the text, with details to tell them apart."""
+	pattern = f"%{txt}%"
+	return frappe.get_list(
+		"Patient",
+		fields=["name as value", "patient_name", "sex", "mobile", "card_no"],
+		filters={"status": "Active"},
+		or_filters=[
+			["name", "like", pattern],
+			["patient_name", "like", pattern],
+			["mobile", "like", pattern],
+			["card_no", "like", pattern],
+			["insurance_card_detail", "like", pattern],
+		],
+		order_by="modified desc",
+		limit=20,
+	)
+
+
+@frappe.whitelist()
 def create_insurance_subscription(subscription_data):
 	"""Insert and submit a subscription; an appointment accepts only submitted ones."""
 	doc = frappe.new_doc("Healthcare Insurance Subscription")
