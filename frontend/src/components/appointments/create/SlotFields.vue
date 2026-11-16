@@ -24,16 +24,43 @@
       <Link
         :value="form.appointment_type"
         doctype="Appointment Type"
+        search-method="hms_tz.api.appointment.search_visit_types"
         placeholder="Visit type"
         @change="(value) => (form.appointment_type = value)"
       />
+    </div>
+    <div
+      v-if="visitTypeDescription"
+      class="col-span-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm italic text-blue-500"
+    >
+      {{ visitTypeDescription }}
     </div>
   </div>
 </template>
 
 <script setup>
+import { ref, watch } from "vue";
+import { call } from "frappe-ui";
 import Link from "@/components/controls/Link.vue";
 import FieldLabel from "./FieldLabel.vue";
 
-defineProps({ form: { type: Object, required: true } });
+const props = defineProps({ form: { type: Object, required: true } });
+
+const visitTypeDescription = ref("");
+
+watch(
+  () => props.form.appointment_type,
+  async (name) => {
+    visitTypeDescription.value = name
+      ? (
+          await call("frappe.client.get_value", {
+            doctype: "Appointment Type",
+            filters: name,
+            fieldname: "description",
+          })
+        )?.description || ""
+      : "";
+  },
+  { immediate: true }
+);
 </script>

@@ -33,6 +33,18 @@ def get_user_companies():
 
 
 @frappe.whitelist()
+def search_visit_types(txt=""):
+	"""Enabled Appointment Types whose name contains the text."""
+	return frappe.get_list(
+		"Appointment Type",
+		fields=["name as value"],
+		filters={"name": ["like", f"%{txt}%"], "disabled": 0},
+		order_by="name asc",
+		limit=20,
+	)
+
+
+@frappe.whitelist()
 def create_appointment(appointment_data):
 	"""
 	Create a new appointment with the provided data.
