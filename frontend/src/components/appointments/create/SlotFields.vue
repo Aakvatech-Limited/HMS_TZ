@@ -7,9 +7,21 @@
       <Link
         :value="form.practitioner"
         doctype="Healthcare Practitioner"
+        search-method="hms_tz.api.practitioner.search_practitioners"
         placeholder="Practitioner"
         @change="(value) => (form.practitioner = value)"
-      />
+      >
+        <template #item-label="{ option }">
+          <div class="flex w-72 max-w-[80vw] flex-col">
+            <span class="truncate font-medium text-gray-900">
+              {{ option.practitioner_name || option.value }}
+            </span>
+            <span class="truncate text-sm text-gray-600">
+              {{ practitionerDetails(option) }}
+            </span>
+          </div>
+        </template>
+      </Link>
     </div>
     <div>
       <FieldLabel label="Date" required />
@@ -45,6 +57,15 @@ import Link from "@/components/controls/Link.vue";
 import FieldLabel from "./FieldLabel.vue";
 
 const props = defineProps({ form: { type: Object, required: true } });
+
+const practitionerDetails = (option) =>
+  [
+    option.department,
+    option.nhif_physician_qualification,
+    option.tz_mct_code && `MCT: ${option.tz_mct_code}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
 const visitTypeDescription = ref("");
 
