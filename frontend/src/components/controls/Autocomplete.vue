@@ -18,7 +18,7 @@
               :class="inputClasses"
               @click="() => togglePopover()"
             >
-              <div class="flex items-center">
+              <div class="flex min-w-0 items-center">
                 <slot name="prefix" />
                 <span
                   class="overflow-hidden text-ellipsis whitespace-nowrap text-base leading-5"
@@ -26,13 +26,16 @@
                 >
                   {{ displayValue(selectedValue) }}
                 </span>
-                <span class="text-base leading-5 text-gray-500" v-else>
+                <span
+                  class="truncate text-base leading-5 text-gray-500"
+                  v-else
+                >
                   {{ placeholder || "" }}
                 </span>
               </div>
               <FeatherIcon
                 name="chevron-down"
-                class="h-4 w-4 text-gray-600"
+                class="h-4 w-4 flex-none text-gray-600"
                 aria-hidden="true"
               />
             </button>
