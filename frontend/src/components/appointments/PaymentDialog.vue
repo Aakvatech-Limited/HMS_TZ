@@ -344,7 +344,7 @@
 <script setup>
 import { computed, reactive, watch, ref } from "vue";
 import { createResource } from "frappe-ui";
-import { useToast } from "@/composables/useToast";
+import { serverErrorText, useToast } from "@/composables/useToast";
 import FeatherIcon from "frappe-ui/src/components/FeatherIcon.vue";
 
 // Props
@@ -388,8 +388,7 @@ const modeOfPaymentResource = createResource({
     modeOfPaymentError.value = "";
   },
   onError: (error) => {
-    modeOfPaymentError.value =
-      error.messages[0] || "Failed to load payment methods";
+    modeOfPaymentError.value = serverErrorText(error);
     isLoadingModeOfPayments.value = false;
     modeOfPayments.value = [];
   },
@@ -408,10 +407,7 @@ const salesInvoiceResource = createResource({
     isProcessingPayment.value = false;
   },
   onError: (error) => {
-    const errorMessage = error.messages
-      ? error.messages[0]
-      : "Failed to create invoice";
-    notifications.error.generic(errorMessage);
+    notifications.error.generic(serverErrorText(error));
     isProcessingPayment.value = false;
   },
 });
