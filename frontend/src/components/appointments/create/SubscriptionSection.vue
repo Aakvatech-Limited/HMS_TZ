@@ -24,12 +24,10 @@
     >
       <div>
         <FieldLabel label="Subscription" required />
-        <Link
-          :value="form.subscription?.name || ''"
-          doctype="Healthcare Insurance Subscription"
-          :filters="subscriptionFilters"
-          placeholder="Subscription"
-          @change="(value) => emit('select-subscription', value)"
+        <SubscriptionSearch
+          :patient="form.patient"
+          :selected="form.subscription"
+          @select="(name) => emit('select-subscription', name)"
         />
       </div>
       <div>
@@ -94,6 +92,7 @@ import { computed } from "vue";
 import { TabButtons } from "frappe-ui";
 import Link from "@/components/controls/Link.vue";
 import FieldLabel from "./FieldLabel.vue";
+import SubscriptionSearch from "./SubscriptionSearch.vue";
 
 const SUBSCRIPTION_MODES = [
   { label: "Use existing", value: "existing" },
@@ -102,12 +101,6 @@ const SUBSCRIPTION_MODES = [
 
 const props = defineProps({ form: { type: Object, required: true } });
 const emit = defineEmits(["select-subscription"]);
-
-const subscriptionFilters = computed(() => ({
-  docstatus: 1,
-  is_active: 1,
-  ...(props.form.patient ? { patient: props.form.patient } : {}),
-}));
 
 const planFilters = computed(() => ({
   is_active: 1,
