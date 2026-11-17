@@ -27,6 +27,7 @@ declare module 'vue' {
     PaymentSection: typeof import('./src/components/appointments/create/PaymentSection.vue')['default']
     PractitionerCard: typeof import('./src/components/appointments/PractitionerCard.vue')['default']
     Print: typeof import('./src/components/controls/Print.vue')['default']
+    ProviderReplyPanel: typeof import('./src/components/appointments/create/ProviderReplyPanel.vue')['default']
     RosterCell: typeof import('./src/components/roster/RosterCell.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
