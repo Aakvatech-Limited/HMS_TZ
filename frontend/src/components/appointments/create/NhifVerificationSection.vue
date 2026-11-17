@@ -14,11 +14,14 @@
         />
       </div>
       <div>
-        <FieldLabel label="Referral no" />
+        <FieldLabel
+          label="Referral no"
+          :required="Boolean(form.visitType.requires_referral_no)"
+        />
         <FormControl
           v-model="form.verification.referral_no"
           type="text"
-          placeholder="If the visit type needs it"
+          placeholder="Referral no"
         />
       </div>
       <div>
@@ -34,12 +37,15 @@
     <div>
       <FieldLabel
         label="Remarks"
-        :required="form.verification.method === 'NONE'"
+        :required="
+          form.verification.method === 'NONE' ||
+          Boolean(form.visitType.requires_remarks)
+        "
       />
       <FormControl
         v-model="form.verification.remarks"
         type="textarea"
-        placeholder="Required when method is None"
+        placeholder="Remarks"
       />
     </div>
 
