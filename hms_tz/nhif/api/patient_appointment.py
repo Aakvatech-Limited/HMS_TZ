@@ -675,12 +675,13 @@ def validate_insurance_subscription(doc):
 		)
 
 
-def calculate_patient_age(patient):
+def calculate_patient_age(patient, warn_if_no_dob=True):
 	dob = frappe.get_cached_value("Patient", patient, "dob")
 	if not dob:
-		frappe.msgprint(
-			"<h4 style='background-color: LightCoral'>Please update date of birth for this patient</h4>"
-		)
+		if warn_if_no_dob:
+			frappe.msgprint(
+				"<h4 style='background-color: LightCoral'>Please update date of birth for this patient</h4>"
+			)
 		return None
 	diff = date_diff(nowdate(), dob)
 	years = diff // 365

@@ -158,10 +158,16 @@ doc_events = {
 	"Patient Encounter": {
 		"onload": "hms_tz.nhif.api.patient_encounter.onload",
 		"before_print": "hms_tz.nhif.api.patient_encounter.before_print",
-		"before_validate": "hms_tz.nhif.api.patient_encounter.keep_saved_previous_details",
+		"before_validate": [
+			"hms_tz.nhif.api.patient_encounter.keep_saved_previous_details",
+			"hms_tz.nhif.api.patient_encounter.set_patient_age",
+		],
 		"before_update_after_submit": "hms_tz.nhif.api.patient_encounter.keep_saved_previous_details",
 		"before_submit": "hms_tz.nhif.api.patient_encounter.before_submit",
-		"before_save": "hms_tz.nhif.api.patient_encounter.on_submit_validation",
+		"before_save": [
+			"hms_tz.nhif.api.patient_encounter.set_new_encounter_values",
+			"hms_tz.nhif.api.patient_encounter.on_submit_validation",
+		],
 		"on_trash": "hms_tz.nhif.api.patient_encounter.on_trash",
 		"on_submit": [
 			"hms_tz.nhif.api.patient_encounter.on_submit",
