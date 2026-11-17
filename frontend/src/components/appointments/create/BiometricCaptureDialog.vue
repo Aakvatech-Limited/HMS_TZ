@@ -7,57 +7,110 @@
   >
     <template #body-content>
       <div v-if="method === 'FACIAL'" class="flex flex-col gap-3">
-        <div>
-          <FieldLabel label="Camera" />
-          <Select
-            :options="cameraOptions"
-            :model-value="selectedCamera"
-            @update:model-value="startCamera"
-          />
+        <div v-if="cameraError" class="flex flex-col items-center gap-3 py-6">
+          <FeatherIcon name="camera-off" class="h-8 w-8 text-red-500" />
+          <p class="text-center text-sm text-gray-800">{{ cameraError }}</p>
+          <Button variant="subtle" @click="openFacial">Try again</Button>
         </div>
-        <div class="mx-auto h-72 w-72 overflow-hidden rounded-lg bg-gray-100">
-          <video
-            v-show="!photo"
-            ref="video"
-            autoplay
-            playsinline
-            muted
-            class="h-full w-full object-cover"
-          ></video>
-          <img
-            v-if="photo"
-            :src="photo"
-            alt="Captured face"
-            class="h-full w-full object-cover"
-          />
-        </div>
-        <p v-if="cameraError" class="text-sm text-red-600">
-          {{ cameraError }}
-        </p>
-        <div class="flex justify-center gap-2">
-          <Button
-            v-if="!photo"
-            variant="subtle"
-            :disabled="!stream"
-            @click="capturePhoto"
+        <template v-else>
+          <div>
+            <FieldLabel label="Camera" />
+            <Select
+              :options="cameraOptions"
+              :model-value="selectedCamera"
+              @update:model-value="startCamera"
+            />
+          </div>
+          <div
+            class="relative mx-auto h-72 w-72 overflow-hidden rounded-lg bg-gray-100"
           >
-            Capture
+            <div
+              v-if="!stream && !photo"
+              class="absolute inset-0 flex items-center justify-center gap-2 text-sm text-gray-600"
+            >
+              <LoadingIndicator class="h-4 w-4" />
+              Starting the camera...
+            </div>
+            <video
+              v-show="!photo"
+              ref="video"
+              autoplay
+              playsinline
+              muted
+              class="h-full w-full object-cover"
+            ></video>
+            <img
+              v-if="photo"
+              :src="photo"
+              alt="Captured face"
+              class="h-full w-full object-cover"
+            />
+          </div>
+          <div class="flex justify-center gap-2">
+            <Button
+              v-if="!photo"
+              variant="subtle"
+              :disabled="!stream"
+              @click="capturePhoto"
+            >
+              Capture
+            </Button>
+            <Button v-else variant="subtle" @click="photo = ''">Retake</Button>
+          </div>
+        </template>
+      </div>
+
+      <div
+        v-else-if="scanner.searching.value"
+        class="flex items-center justify-center gap-2 py-10 text-sm text-gray-600"
+      >
+        <LoadingIndicator class="h-4 w-4" />
+        Looking for fingerprint readers...
+      </div>
+
+      <div
+        v-else-if="!deviceOptions.length"
+        class="flex flex-col gap-3 rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm"
+      >
+        <p class="font-semibold text-gray-900">No fingerprint reader found</p>
+        <p class="text-gray-700">
+          Connect the reader, or download and install the driver for your
+          reader:
+        </p>
+        <ul class="list-disc pl-6">
+          <li v-for="driver in FINGERPRINT_DRIVER_DOWNLOADS" :key="driver.url">
+            <a
+              :href="driver.url"
+              target="_blank"
+              rel="noopener"
+              class="font-medium text-blue-600 underline"
+              >{{ driver.label }}</a
+            >
+          </li>
+        </ul>
+        <p class="text-xs text-gray-600">
+          After installation, restart your browser and make sure the driver
+          service is running.
+        </p>
+        <div>
+          <Button variant="subtle" @click="openFingerprint">
+            <template #prefix>
+              <FeatherIcon name="refresh-cw" class="h-4 w-4" />
+            </template>
+            Search again
           </Button>
-          <Button v-else variant="subtle" @click="photo = ''">Retake</Button>
         </div>
       </div>
 
       <div v-else class="flex flex-col gap-3">
+        <p class="flex items-center gap-1 text-sm text-green-700">
+          <FeatherIcon name="check-circle" class="h-4 w-4" />
+          Reader connected
+        </p>
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <FieldLabel label="Device" />
-            <Select
-              :options="deviceOptions"
-              v-model="selectedDevice"
-              :placeholder="
-                deviceOptions.length ? 'Select device' : 'No reader found'
-              "
-            />
+            <Select :options="deviceOptions" v-model="selectedDevice" />
           </div>
           <div>
             <FieldLabel label="Finger" />
@@ -112,6 +165,7 @@ import {
   FINGER_CODES,
   useFingerprintScanner,
 } from "@/composables/useFingerprintScanner";
+import { FINGERPRINT_DRIVER_DOWNLOADS } from "@desk/fingerprint/drivers.js";
 import FieldLabel from "./FieldLabel.vue";
 
 const props = defineProps({
@@ -134,6 +188,16 @@ const selectedDevice = ref("");
 const finger = ref("");
 const fingerprintImage = ref("");
 const fingerprintData = ref("");
+
+const CAMERA_ERRORS = {
+  NotAllowedError:
+    "Camera access is blocked. Allow the camera for this site in the browser address bar, then click Try again.",
+  NotFoundError: "No camera found. Connect a camera, then click Try again.",
+  NotReadableError:
+    "Another application is using the camera. Close it, then click Try again.",
+  NotSupported:
+    "This browser cannot open the camera on this page. Use HTTPS or localhost.",
+};
 
 const title = computed(() =>
   props.method === "FACIAL"
@@ -172,8 +236,13 @@ const startCamera = async (deviceId) => {
       },
     });
     video.value.srcObject = stream.value;
+    cameras.value = await listCameras();
+    selectedCamera.value =
+      stream.value.getVideoTracks()[0]?.getSettings().deviceId || deviceId;
   } catch (error) {
-    cameraError.value = `Camera not available: ${error.message}`;
+    cameraError.value =
+      CAMERA_ERRORS[error.name] ||
+      `The camera did not start: ${error.message}`;
   }
 };
 
@@ -195,13 +264,27 @@ const capturePhoto = () => {
   photo.value = canvas.toDataURL("image/jpeg", 0.9);
 };
 
-const openFacial = async () => {
-  photo.value = "";
+// Browsers give camera labels only after access is allowed, so the list is read again once the camera starts.
+const listCameras = async () => {
   const devices = await navigator.mediaDevices
     .enumerateDevices()
     .catch(() => []);
-  cameras.value = devices.filter((device) => device.kind === "videoinput");
-  await startCamera(cameras.value[0]?.deviceId || "");
+  return devices.filter((device) => device.kind === "videoinput");
+};
+
+const openFacial = async () => {
+  photo.value = "";
+  cameraError.value = "";
+  if (!navigator.mediaDevices) {
+    cameraError.value = CAMERA_ERRORS.NotSupported;
+    return;
+  }
+  cameras.value = await listCameras();
+  if (!cameras.value.length) {
+    cameraError.value = CAMERA_ERRORS.NotFoundError;
+    return;
+  }
+  await startCamera(cameras.value[0].deviceId);
 };
 
 const openFingerprint = async () => {
