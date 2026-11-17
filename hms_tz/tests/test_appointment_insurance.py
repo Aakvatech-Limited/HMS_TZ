@@ -26,6 +26,8 @@ JUBILEE_SUBSCRIPTION = "_Test Jubilee HIS"
 CONSULTATION_ITEM = "_Test Insurance Consultation"
 PRACTITIONER = "_Test Insurance Doctor"
 VISIT_TYPE = "_Test Insurance Visit"
+NHIF_CARD_TYPE = "_Test NHIF Beneficiary Card"
+NIDA_CARD_TYPE = "_Test NIDA ID"
 
 NHIF_CARD = {
 	"CardNo": "101",
@@ -70,6 +72,17 @@ def insert_plan(name, insurance_company, scheme_id=None):
 	)
 
 
+def insert_card_type(name, card_type_id):
+	insert(
+		"Healthcare Card Verifier",
+		name,
+		card_type_name=name,
+		card_type_id=card_type_id,
+		verifier_id="NHIF",
+		verifier_name="NHIF",
+	)
+
+
 def insert_patient(name, **values):
 	insert(
 		"Patient",
@@ -107,6 +120,8 @@ class TestAppointmentInsurance(FrappeTestCase):
 		insert_company(COMPANY_WITHOUT_API, "_TIN", enable_nhif_api=0)
 		insert_plan(NHIF_PLAN, NHIF_COMPANY, scheme_id="SCH1")
 		insert_plan(JUBILEE_PLAN, JUBILEE_COMPANY)
+		insert_card_type(NHIF_CARD_TYPE, "NHIFCard")
+		insert_card_type(NIDA_CARD_TYPE, "NationalID")
 		insert_patient(CARD_HOLDER, insurance_card_detail="101, ", national_id="NID1")
 		insert_patient(NID_HOLDER, national_id="NID2")
 		insert_patient(JUBILEE_HOLDER, insurance_card_detail="JUB1, ")
@@ -128,7 +143,9 @@ class TestAppointmentInsurance(FrappeTestCase):
 
 	def test_check_card_matches_subscription_and_patient_by_card_no(self):
 		with patch.object(appointment_insurance, "get_card_details_by_card_no", return_value=NHIF_CARD):
-			result = appointment_insurance.check_card(COMPANY, "NHIF", card_no="101")
+			result = appointment_insurance.check_card(
+				COMPANY, "NHIF", card_no="101", card_type=NHIF_CARD_TYPE
+			)
 
 		self.assertEqual(result["patient"]["name"], CARD_HOLDER)
 		self.assertEqual(result["subscription"]["name"], NHIF_SUBSCRIPTION)
@@ -137,10 +154,20 @@ class TestAppointmentInsurance(FrappeTestCase):
 		self.assertEqual(result["card"]["dob"], "1990-01-01")
 		self.assertEqual(result["card"]["scheme_id"], "SCH1")
 
-	def test_check_card_by_national_id_finds_patient_without_subscription(self):
+	def test_check_card_with_nida_card_type_looks_up_the_national_id(self):
 		card = {**NHIF_CARD, "CardNo": "303", "CHNationalID": "NID2", "SchemeID": "SCH9"}
-		with patch.object(appointment_insurance, "get_card_details_by_national_id", return_value=card):
-			result = appointment_insurance.check_card(COMPANY, "NHIF", national_id="NID2")
+		with (
+			patch.object(appointment_insurance, "get_card_details_by_card_no") as by_card_no,
+			patch.object(
+				appointment_insurance, "get_card_details_by_national_id", return_value=card
+			) as by_national_id,
+		):
+			result = appointment_insurance.check_card(
+				COMPANY, "NHIF", card_no="NID2", card_type=NIDA_CARD_TYPE
+			)
+
+		by_card_no.assert_not_called()
+		self.assertEqual(by_national_id.call_args.args[1], "NID2")
 
 		self.assertEqual(result["patient"]["name"], NID_HOLDER)
 		self.assertIsNone(result["subscription"])
@@ -150,25 +177,35 @@ class TestAppointmentInsurance(FrappeTestCase):
 	def test_check_card_unknown_card_has_no_patient(self):
 		card = {**NHIF_CARD, "CardNo": "404", "CHNationalID": "NID4"}
 		with patch.object(appointment_insurance, "get_card_details_by_card_no", return_value=card):
-			result = appointment_insurance.check_card(COMPANY, "NHIF", card_no="404")
+			result = appointment_insurance.check_card(
+				COMPANY, "NHIF", card_no="404", card_type=NHIF_CARD_TYPE
+			)
 
 		self.assertIsNone(result["patient"])
 		self.assertIsNone(result["subscription"])
 
 	def test_check_card_needs_the_provider_api_enabled(self):
 		with self.assertRaisesRegex(frappe.ValidationError, "Enable NHIF API"):
-			appointment_insurance.check_card(COMPANY_WITHOUT_API, "NHIF", card_no="101")
+			appointment_insurance.check_card(
+				COMPANY_WITHOUT_API, "NHIF", card_no="101", card_type=NHIF_CARD_TYPE
+			)
 		with self.assertRaisesRegex(frappe.ValidationError, "Enable Jubilee API"):
 			appointment_insurance.check_card(COMPANY, "Jubilee", card_no="JUB1")
 		with self.assertRaisesRegex(frappe.ValidationError, "only available"):
 			appointment_insurance.check_card(COMPANY, "Other", card_no="1")
+
+	def test_check_card_needs_the_nhif_card_type_and_number(self):
+		with self.assertRaisesRegex(frappe.ValidationError, "Select the card type"):
+			appointment_insurance.check_card(COMPANY, "NHIF", card_no="101")
+		with self.assertRaisesRegex(frappe.ValidationError, "Enter the card no"):
+			appointment_insurance.check_card(COMPANY, "NHIF", card_type=NHIF_CARD_TYPE)
 
 	def test_check_card_rejects_a_failed_lookup(self):
 		with (
 			patch.object(appointment_insurance, "get_card_details_by_card_no", return_value="Error"),
 			self.assertRaisesRegex(frappe.ValidationError, "did not return"),
 		):
-			appointment_insurance.check_card(COMPANY, "NHIF", card_no="101")
+			appointment_insurance.check_card(COMPANY, "NHIF", card_no="101", card_type=NHIF_CARD_TYPE)
 
 	def test_search_subscriptions_filters_by_provider_and_text(self):
 		names = lambda rows: [row.name for row in rows]  # noqa: E731
@@ -269,3 +306,24 @@ class TestAppointmentInsurance(FrappeTestCase):
 			frappe.db.get_value("Healthcare Insurance Subscription", subscription["name"], "docstatus"), 1
 		)
 		self.assertEqual(appointment_insurance.find_subscription("303", "")["name"], subscription["name"])
+
+	def test_create_insurance_subscription_copies_the_card_type(self):
+		subscription = appointment_insurance.create_insurance_subscription(
+			{
+				"patient": NID_HOLDER,
+				"insurance_company": NHIF_COMPANY,
+				"healthcare_insurance_coverage_plan": NHIF_PLAN,
+				"coverage_plan_card_number": "303",
+				"company": COMPANY,
+				"card_type": NIDA_CARD_TYPE,
+			}
+		)
+
+		self.assertEqual(
+			frappe.db.get_value(
+				"Healthcare Insurance Subscription",
+				subscription["name"],
+				["verifier_id", "card_type_id", "card_type_name"],
+			),
+			("NHIF", "NationalID", NIDA_CARD_TYPE),
+		)
