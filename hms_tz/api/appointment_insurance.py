@@ -25,7 +25,7 @@ SUBSCRIPTION_FIELDS = [
 	"gender",
 ]
 PATIENT_FIELDS = ["name", "patient_name", "sex", "dob", "mobile"]
-NATIONAL_ID_CARD_TYPE = "NationalID"
+NATIONAL_ID_CARD_TYPE = "NIDA ID"
 
 
 @frappe.whitelist()
@@ -164,10 +164,7 @@ def fetch_nhif_card(company, card_no, card_type):
 	if not card_no:
 		frappe.throw(_("Enter the card no"))
 
-	is_national_id = (
-		frappe.get_cached_value("Healthcare Card Verifier", card_type, "card_type_id")
-		== NATIONAL_ID_CARD_TYPE
-	)
+	is_national_id = card_type == NATIONAL_ID_CARD_TYPE
 	lookup = get_card_details_by_national_id if is_national_id else get_card_details_by_card_no
 	data = lookup(company, card_no, "Patient Appointment", settings_doc=settings)
 	if not isinstance(data, dict):
