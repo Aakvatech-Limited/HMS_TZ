@@ -9,28 +9,28 @@
     />
 
     <template v-if="isInsurance">
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:items-end">
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-4 sm:items-end">
+        <div v-if="isNhif">
+          <FieldLabel label="Card type" required />
+          <Select
+            v-model="form.card_type"
+            :options="cardTypeOptions"
+            placeholder="Select"
+          />
+        </div>
         <div>
           <FieldLabel label="Card no" :from-card="cardNoSource" />
           <FormControl
             v-model="form.card_no"
             type="text"
-            placeholder="Card no"
-          />
-        </div>
-        <div v-if="form.payment === 'NHIF'">
-          <FieldLabel label="National ID" />
-          <FormControl
-            v-model="form.national_id"
-            type="text"
-            placeholder="20-digit NIDA number"
+            :placeholder="(isNhif && form.card_type) || 'Card no'"
           />
         </div>
         <Button
           v-if="canCheckCard"
           variant="subtle"
           :loading="checking"
-          :disabled="checking"
+          :disabled="checking || (isNhif && !form.card_type)"
           @click="emit('check-card')"
         >
           <template #prefix>
@@ -38,6 +38,15 @@
           </template>
           Check with {{ form.payment }}
         </Button>
+        <div :class="searchSpan">
+          <FieldLabel label="Or find an existing subscription" />
+          <SubscriptionSearch
+            :provider="form.payment"
+            :selected="form.subscription"
+            placeholder="Name, mobile, card no or ID"
+            @select="(name) => emit('select-subscription', name)"
+          />
+        </div>
       </div>
 
       <div
@@ -55,33 +64,38 @@
           <span>{{ form.cardStatus.text }}</span>
         </div>
       </div>
-
-      <div>
-        <FieldLabel label="Or find an existing subscription" />
-        <SubscriptionSearch
-          :provider="form.payment"
-          :selected="form.subscription"
-          @select="(name) => emit('select-subscription', name)"
-        />
-      </div>
     </template>
   </section>
 </template>
 
 <script setup>
-import { computed } from "vue";
-import { TabButtons } from "frappe-ui";
-import { PAYMENT_OPTIONS } from "@/data/insurance";
+import { computed, onMounted, ref } from "vue";
+import { Select, TabButtons } from "frappe-ui";
+import { getCardTypes, PAYMENT_OPTIONS } from "@/data/insurance";
 import FieldLabel from "./FieldLabel.vue";
 import SubscriptionSearch from "./SubscriptionSearch.vue";
 
 const props = defineProps({
   form: { type: Object, required: true },
   isInsurance: { type: Boolean, default: false },
+  isNhif: { type: Boolean, default: false },
   canCheckCard: { type: Boolean, default: false },
   checking: { type: Boolean, default: false },
 });
 const emit = defineEmits(["set-payment", "check-card", "select-subscription"]);
+
+const SEARCH_SPANS = ["", "sm:col-span-3", "sm:col-span-2", "sm:col-span-1"];
+
+const cardTypeOptions = ref([]);
+onMounted(async () => {
+  const names = await getCardTypes();
+  cardTypeOptions.value = names.map((name) => ({ label: name, value: name }));
+});
+
+// The search fills the row after card type, card no and the check button.
+const searchSpan = computed(
+  () => SEARCH_SPANS[1 + Number(props.isNhif) + Number(props.canCheckCard)]
+);
 
 const cardNoSource = computed(() => {
   if (props.form.fromCard.patient && props.form.card)
