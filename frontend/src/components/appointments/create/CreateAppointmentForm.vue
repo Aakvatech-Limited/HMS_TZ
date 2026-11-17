@@ -5,6 +5,7 @@
     <PaymentSection
       :form="form"
       :is-insurance="isInsurance"
+      :is-nhif="isNhif"
       :can-check-card="canCheckCard"
       :checking="busy"
       @set-payment="setPayment"
@@ -66,6 +67,7 @@ const {
   busy,
   status,
   isInsurance,
+  isNhif,
   canCheckCard,
   creates,
   canSubmit,

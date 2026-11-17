@@ -196,11 +196,7 @@ def create_nhif_subscription(doc):
 	sub_doc.hms_tz_scheme_id = doc.scheme_id
 
 	if doc.card_type:
-		verifier_doc = frappe.get_cached_doc("Healthcare Card Verifier", doc.card_type)
-
-		sub_doc.verifier_id = verifier_doc.verifier_id
-		sub_doc.card_type_id = verifier_doc.card_type_id
-		sub_doc.card_type_name = verifier_doc.card_type_name
+		set_card_type(sub_doc, doc.card_type)
 
 	frappe.flags.auto_his = True
 	sub_doc.save(ignore_permissions=True)
@@ -209,6 +205,14 @@ def create_nhif_subscription(doc):
 		_(f"<h3>AUTO</h3> Healthcare Insurance Subscription: {sub_doc.name} is created for {plan_row.name}")
 	)
 	frappe.flags.auto_his = False
+
+
+def set_card_type(subscription, card_type):
+	"""Copy the NHIF verifier and card type ids of a Healthcare Card Verifier to the subscription."""
+	verifier_doc = frappe.get_cached_doc("Healthcare Card Verifier", card_type)
+	subscription.verifier_id = verifier_doc.verifier_id
+	subscription.card_type_id = verifier_doc.card_type_id
+	subscription.card_type_name = verifier_doc.card_type_name
 
 
 def after_insert(doc, method):
