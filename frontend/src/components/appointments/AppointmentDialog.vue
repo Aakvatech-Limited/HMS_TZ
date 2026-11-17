@@ -4,7 +4,7 @@
     @update:model-value="updateDialogState"
     :options="{
       title: dialogTitle,
-      size: '2xl',
+      size: isCreateMode ? '4xl' : '2xl',
       icon: {
         name: 'book',
         appearance: 'black',
