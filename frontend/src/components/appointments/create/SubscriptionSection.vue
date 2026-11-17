@@ -25,6 +25,7 @@
       <div class="sm:col-span-2">
         <FieldLabel label="Subscription" required />
         <SubscriptionSearch
+          :provider="form.payment"
           :patient="form.patient"
           :selected="form.subscription"
           @select="(name) => emit('select-subscription', name)"
