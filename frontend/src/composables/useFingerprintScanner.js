@@ -21,6 +21,16 @@ export const FINGER_CODES = [
 const DIGITAL_PERSONA_SDK =
   "/assets/hms_tz/js/fingerprint/digitalPersona/modules/WebSdk/index.js";
 
+let digitalPersonaSdk = null;
+
+/** The DigitalPersona reader needs the WebSdk global before it starts. */
+const loadDigitalPersona = () => {
+  digitalPersonaSdk ||= loadDigitalPersonaSDK(DIGITAL_PERSONA_SDK).catch(
+    () => {}
+  );
+  return digitalPersonaSdk;
+};
+
 /** The desk drivers report errors through frappe.msgprint; give them one on this page. */
 const shimDeskGlobals = (onError) => {
   window.frappe = window.frappe || {};
@@ -31,6 +41,7 @@ const shimDeskGlobals = (onError) => {
 /** Reader devices from the same drivers the desk uses, in the desk's priority order. */
 export function useFingerprintScanner({ onError }) {
   const devices = ref([]);
+  const searching = ref(false);
   const scanning = ref(false);
   const drivers = {
     mfs500: new MFS500(),
@@ -63,23 +74,30 @@ export function useFingerprintScanner({ onError }) {
     onAcquisitionStarted: () => {},
   };
 
-  const enumerateDevices = async () => {
-    shimDeskGlobals((message) => onError(String(message)));
-    loadDigitalPersonaSDK(DIGITAL_PERSONA_SDK).catch(() => {});
-    for (const driver of Object.values(drivers)) {
-      driver.initializeEventHandlers(handlers);
-    }
+  const findDevices = async () => {
     for (const driver of [
       drivers.mfs500,
       drivers.mfs100,
       drivers.digitalpersona,
     ]) {
-      try {
-        devices.value = await driver.enumerateDevices();
-      } catch {
-        devices.value = [];
+      const found = await driver.enumerateDevices().catch(() => []);
+      if (found.length) return found;
+    }
+    return [];
+  };
+
+  const enumerateDevices = async () => {
+    searching.value = true;
+    devices.value = [];
+    shimDeskGlobals((message) => onError(String(message)));
+    try {
+      await loadDigitalPersona();
+      for (const driver of Object.values(drivers)) {
+        driver.initializeEventHandlers(handlers);
       }
-      if (devices.value.length) return devices.value;
+      devices.value = await findDevices();
+    } finally {
+      searching.value = false;
     }
     return devices.value;
   };
@@ -105,5 +123,5 @@ export function useFingerprintScanner({ onError }) {
     );
   };
 
-  return { devices, scanning, enumerateDevices, scan, destroy };
+  return { devices, searching, scanning, enumerateDevices, scan, destroy };
 }
