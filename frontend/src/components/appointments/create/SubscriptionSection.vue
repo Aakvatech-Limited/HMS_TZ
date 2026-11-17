@@ -20,9 +20,9 @@
 
     <div
       v-if="form.subscriptionMode === 'existing'"
-      class="grid grid-cols-1 gap-4 sm:grid-cols-3"
+      class="grid grid-cols-1 gap-4 sm:grid-cols-4"
     >
-      <div>
+      <div class="sm:col-span-2">
         <FieldLabel label="Subscription" required />
         <SubscriptionSearch
           :patient="form.patient"
@@ -48,7 +48,7 @@
       </div>
     </div>
 
-    <div v-else class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <div v-else class="grid grid-cols-1 gap-4 sm:grid-cols-4">
       <div>
         <FieldLabel label="Insurance company" required />
         <Link
