@@ -66,8 +66,8 @@ export function useBookingForm(initial) {
     appointment_time: initial.appointment_time,
     appointment_type: "",
     payment: "Cash",
+    card_type: "",
     card_no: "",
-    national_id: "",
     card: null,
     cardStatus: null,
     patientMode: "existing",
@@ -93,6 +93,7 @@ export function useBookingForm(initial) {
       (form.payment === "NHIF" && settings.value.enable_nhif_api) ||
       (form.payment === "Jubilee" && settings.value.enable_jubilee_api)
   );
+  const isNhif = computed(() => form.payment === "NHIF");
   const needsNhifAuthorization = computed(
     () => form.payment === "NHIF" && settings.value.enable_nhif_api
   );
@@ -107,7 +108,8 @@ export function useBookingForm(initial) {
   const canSubmit = computed(
     () =>
       !busy.value &&
-      (!needsNhifAuthorization.value || Boolean(form.authorization))
+      (!needsNhifAuthorization.value ||
+        Boolean(form.verification.authorization_number))
   );
 
   const loadSettings = async () => {
@@ -131,10 +133,16 @@ export function useBookingForm(initial) {
     }
   };
 
+  // Keeps a number typed in from the NHIF portal; drops one NHIF returned.
+  const clearAuthorization = () => {
+    if (form.authorization) form.verification.authorization_number = "";
+    form.authorization = null;
+  };
+
   const setPayment = (payment) => {
     form.payment = payment;
     form.cardStatus = null;
-    form.authorization = null;
+    clearAuthorization();
     form.subscription = null;
     form.subscriptionMode = "existing";
   };
@@ -150,10 +158,9 @@ export function useBookingForm(initial) {
   const applySubscription = async (subscription) => {
     form.subscription = subscription;
     form.subscriptionMode = "existing";
-    form.authorization = null;
+    clearAuthorization();
     if (!subscription) return;
     form.card_no = subscription.coverage_plan_card_number || form.card_no;
-    form.national_id = subscription.national_id || form.national_id;
     form.patientMode = "existing";
     await selectPatient(subscription.patient);
   };
@@ -187,9 +194,7 @@ export function useBookingForm(initial) {
 
   const applyCardResult = async (result) => {
     form.card = result.card;
-    form.card_no = result.card.card_no;
-    form.national_id = result.card.national_id;
-    form.authorization = null;
+    clearAuthorization();
     if (result.patient) {
       form.patientMode = "existing";
       form.patient = result.patient.name;
@@ -236,8 +241,12 @@ export function useBookingForm(initial) {
 
   const checkCard = () =>
     run(async () => {
-      if (!form.card_no && !form.national_id) {
-        showError("Enter the card no or the National ID");
+      if (isNhif.value && !form.card_type) {
+        showError("Select the card type");
+        return;
+      }
+      if (!form.card_no) {
+        showError("Enter the card no");
         return;
       }
       form.cardStatus = null;
@@ -245,7 +254,7 @@ export function useBookingForm(initial) {
         form.company,
         form.payment,
         form.card_no,
-        form.national_id
+        isNhif.value ? form.card_type : ""
       );
       await applyCardResult(result);
     });
@@ -255,8 +264,9 @@ export function useBookingForm(initial) {
     setStatus("Creating the patient record...", 25);
     const patient = await createPatient({
       ...form.newPatient,
-      card_no: isInsurance.value ? form.card_no : "",
-      national_id: isInsurance.value ? form.national_id : "",
+      card_no: isInsurance.value ? form.card?.card_no || form.card_no : "",
+      national_id: isInsurance.value ? form.card?.national_id || "" : "",
+      card_type: isNhif.value ? form.card_type : "",
     });
     form.patientMode = "existing";
     await selectPatient(patient.name);
@@ -271,6 +281,7 @@ export function useBookingForm(initial) {
       hms_tz_scheme_id: form.card?.scheme_id || "",
       hms_tz_scheme_name: form.card?.scheme_name || "",
       ...form.newSubscription,
+      card_type: isNhif.value ? form.card_type : "",
     });
     form.subscription = subscription;
     form.subscriptionMode = "existing";
@@ -293,8 +304,8 @@ export function useBookingForm(initial) {
         insurance_subscription: form.subscription.name,
         appointment_type: form.appointment_type,
         company: form.company,
-        card_no: form.card_no,
-        national_id: form.national_id,
+        card_no: form.subscription.coverage_plan_card_number || form.card_no,
+        national_id: form.subscription.national_id || "",
         fingerprint: biometric.Data,
         fpcode: biometric.fpCode,
         biometric_method: method,
@@ -310,8 +321,8 @@ export function useBookingForm(initial) {
         showError(data?.remarks || "NHIF did not authorize the patient");
         return;
       }
+      form.verification.authorization_number = data.authorizationNo;
       form.authorization = {
-        authorization_number: data.authorizationNo,
         coverage_plan_name: data.coveragePlanName,
         nhif_employer_name: data.employerName,
         fpcode: data.fpCode,
@@ -386,6 +397,7 @@ export function useBookingForm(initial) {
     } else if (!form.patient) {
       errors.push("Patient is required");
     }
+    if (isNhif.value && !form.card_type) errors.push("Card type is required");
     if (isInsurance.value) errors.push(...subscriptionErrors());
     if (
       forAuthorization &&
@@ -431,6 +443,7 @@ export function useBookingForm(initial) {
     busy,
     status,
     isInsurance,
+    isNhif,
     canCheckCard,
     needsNhifAuthorization,
     creates,
