@@ -72,15 +72,23 @@ const visitTypeDescription = ref("");
 watch(
   () => props.form.appointment_type,
   async (name) => {
-    visitTypeDescription.value = name
-      ? (
-          await call("frappe.client.get_value", {
-            doctype: "Appointment Type",
-            filters: name,
-            fieldname: "description",
-          })
-        )?.description || ""
-      : "";
+    const visitType = name
+      ? await call("frappe.client.get_value", {
+          doctype: "Appointment Type",
+          filters: name,
+          fieldname: [
+            "description",
+            "requires_remarks",
+            "requires_referral_no",
+          ],
+        })
+      : null;
+    if (name !== props.form.appointment_type) return;
+    visitTypeDescription.value = visitType?.description || "";
+    props.form.visitType = {
+      requires_remarks: visitType?.requires_remarks || 0,
+      requires_referral_no: visitType?.requires_referral_no || 0,
+    };
   },
   { immediate: true }
 );
