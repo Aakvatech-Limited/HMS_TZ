@@ -4,9 +4,11 @@ import frappe
 from frappe import _
 from frappe.query_builder import Criterion, DocType
 
+from hms_tz.api.provider_reply import provider_call
 from hms_tz.jubilee.api.api import get_authorization_number, get_member_card_detials
 from hms_tz.nhif.api.patient import check_card_number, check_national_id, set_card_type
 from hms_tz.nhif.nhif_api.verification import (
+	authorize_patient,
 	get_card_details_by_card_no,
 	get_card_details_by_national_id,
 )
@@ -48,7 +50,8 @@ def get_insurance_api_settings(company):
 def check_card(company, provider, card_no=None, card_type=None):
 	"""Look the card up with the provider and match it to records already in HMS."""
 	frappe.has_permission("Patient Appointment", "create", throw=True)
-	card = fetch_card(company, provider, card_no, card_type)
+	with provider_call(provider):
+		card = fetch_card(company, provider, card_no, card_type)
 	subscription = find_subscription(card["card_no"], card["national_id"])
 	patient = subscription["patient"] if subscription else find_patient(card["card_no"], card["national_id"])
 	return {
@@ -145,6 +148,42 @@ def authorize_jubilee_appointment(appointment):
 	doc.authorization_number = data["AuthorizationNo"]
 	doc.save(ignore_permissions=True)
 	return doc.authorization_number
+
+
+@frappe.whitelist()
+def authorize_nhif_patient(
+	insurance_subscription,
+	appointment_type,
+	company,
+	card_no,
+	national_id,
+	fingerprint,
+	fpcode,
+	biometric_method,
+	practitioner,
+	referral_no="",
+	remarks="",
+):
+	"""NHIF authorization for the appointments page; a reply without an authorization no raises NHIF's reply."""
+	frappe.has_permission("Patient Appointment", "create", throw=True)
+	with provider_call("NHIF"):
+		data = authorize_patient(
+			insurance_subscription=insurance_subscription,
+			appointment_type=appointment_type,
+			company=company,
+			card_no=card_no,
+			national_id=national_id,
+			fingerprint=fingerprint,
+			fpcode=fpcode,
+			biometric_method=biometric_method,
+			practitioner=practitioner,
+			referral_no=referral_no,
+			remarks=remarks,
+		)
+		# NHIF may give an authorization no without ACCEPTED and ask the patient to visit its office.
+		if not isinstance(data, dict) or not data.get("authorizationNo"):
+			frappe.throw(_("NHIF did not authorize the patient"))
+	return data
 
 
 def fetch_card(company, provider, card_no, card_type):
