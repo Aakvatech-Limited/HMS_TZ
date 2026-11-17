@@ -5,7 +5,7 @@ from frappe import _
 from frappe.query_builder import Criterion, DocType
 
 from hms_tz.jubilee.api.api import get_authorization_number, get_member_card_detials
-from hms_tz.nhif.api.patient import check_card_number, check_national_id
+from hms_tz.nhif.api.patient import check_card_number, check_national_id, set_card_type
 from hms_tz.nhif.nhif_api.verification import (
 	get_card_details_by_card_no,
 	get_card_details_by_national_id,
@@ -25,6 +25,7 @@ SUBSCRIPTION_FIELDS = [
 	"gender",
 ]
 PATIENT_FIELDS = ["name", "patient_name", "sex", "dob", "mobile"]
+NATIONAL_ID_CARD_TYPE = "NationalID"
 
 
 @frappe.whitelist()
@@ -43,10 +44,10 @@ def get_insurance_api_settings(company):
 
 
 @frappe.whitelist()
-def check_card(company, provider, card_no=None, national_id=None):
+def check_card(company, provider, card_no=None, card_type=None):
 	"""Look the card up with the provider and match it to records already in HMS."""
 	frappe.has_permission("Patient Appointment", "create", throw=True)
-	card = fetch_card(company, provider, card_no, national_id)
+	card = fetch_card(company, provider, card_no, card_type)
 	subscription = find_subscription(card["card_no"], card["national_id"])
 	patient = subscription["patient"] if subscription else find_patient(card["card_no"], card["national_id"])
 	return {
@@ -117,8 +118,11 @@ def search_patients(txt=""):
 @frappe.whitelist()
 def create_insurance_subscription(subscription_data):
 	"""Insert and submit a subscription; an appointment accepts only submitted ones."""
+	card_type = subscription_data.pop("card_type", None)
 	doc = frappe.new_doc("Healthcare Insurance Subscription")
 	doc.update(subscription_data)
+	if card_type:
+		set_card_type(doc, card_type)
 	doc.check_permission("create")
 	doc.insert(ignore_permissions=True)
 	doc.submit()
@@ -142,33 +146,37 @@ def authorize_jubilee_appointment(appointment):
 	return doc.authorization_number
 
 
-def fetch_card(company, provider, card_no, national_id):
+def fetch_card(company, provider, card_no, card_type):
 	if provider == "NHIF":
-		return fetch_nhif_card(company, card_no, national_id)
+		return fetch_nhif_card(company, card_no, card_type)
 	if provider == "Jubilee":
 		return fetch_jubilee_card(company, card_no)
 	frappe.throw(_("Card check is only available for NHIF and Jubilee"))
 
 
-def fetch_nhif_card(company, card_no, national_id):
+def fetch_nhif_card(company, card_no, card_type):
+	"""A NIDA card type looks the number up as a National ID, any other type as a card no."""
 	settings = frappe.get_cached_doc("HMS TZ Setting", company)
 	if not settings.enable_nhif_api:
 		frappe.throw(_("Enable NHIF API in HMS TZ Setting for {0}").format(company))
-	if card_no:
-		data = get_card_details_by_card_no(company, card_no, "Patient Appointment", settings_doc=settings)
-	elif national_id:
-		data = get_card_details_by_national_id(
-			company, national_id, "Patient Appointment", settings_doc=settings
-		)
-	else:
-		frappe.throw(_("Enter the card no or the National ID"))
+	if not card_type:
+		frappe.throw(_("Select the card type"))
+	if not card_no:
+		frappe.throw(_("Enter the card no"))
+
+	is_national_id = (
+		frappe.get_cached_value("Healthcare Card Verifier", card_type, "card_type_id")
+		== NATIONAL_ID_CARD_TYPE
+	)
+	lookup = get_card_details_by_national_id if is_national_id else get_card_details_by_card_no
+	data = lookup(company, card_no, "Patient Appointment", settings_doc=settings)
 	if not isinstance(data, dict):
 		frappe.throw(_("NHIF did not return the card details"))
 
 	return {
 		"provider": "NHIF",
-		"card_no": data.get("CardNo") or card_no or "",
-		"national_id": data.get("CHNationalID") or national_id or "",
+		"card_no": data.get("CardNo") or ("" if is_national_id else card_no),
+		"national_id": data.get("CHNationalID") or (card_no if is_national_id else ""),
 		"first_name": data.get("FirstName") or "",
 		"middle_name": data.get("MiddleName") or "",
 		"last_name": data.get("LastName") or "",
