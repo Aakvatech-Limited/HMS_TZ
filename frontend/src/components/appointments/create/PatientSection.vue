@@ -5,8 +5,11 @@
       <TabButtons :buttons="PATIENT_MODES" v-model="form.patientMode" />
     </div>
 
-    <template v-if="form.patientMode === 'existing'">
-      <div>
+    <div
+      v-if="form.patientMode === 'existing'"
+      class="grid grid-cols-1 gap-4 sm:grid-cols-4 sm:items-end"
+    >
+      <div class="sm:col-span-2">
         <FieldLabel
           label="Patient"
           required
@@ -33,14 +36,14 @@
       </div>
       <div
         v-if="summary"
-        class="rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm text-gray-600"
+        class="rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm text-gray-600 sm:col-span-2"
       >
         {{ summary }}
       </div>
-    </template>
+    </div>
 
     <template v-else>
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-4">
         <div v-for="field in PATIENT_FIELDS" :key="field.name">
           <FieldLabel
             :label="field.label"
@@ -66,8 +69,6 @@
             :placeholder="field.placeholder || field.label"
           />
         </div>
-      </div>
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div v-for="field in visibleLinkFields" :key="field.name">
           <FieldLabel :label="field.label" :required="field.required" />
           <Link
@@ -82,7 +83,7 @@
         <summary class="cursor-pointer font-medium">
           Next of kin (optional)
         </summary>
-        <div class="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div class="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-4">
           <div v-for="field in NEXT_OF_KIN_FIELDS" :key="field.name">
             <FieldLabel :label="field.label" />
             <FormControl v-model="form.newPatient[field.name]" type="text" />
