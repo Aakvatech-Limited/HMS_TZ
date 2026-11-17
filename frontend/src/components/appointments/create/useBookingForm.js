@@ -68,6 +68,7 @@ export function useBookingForm(initial) {
     appointment_date: initial.appointment_date,
     appointment_time: initial.appointment_time,
     appointment_type: "",
+    visitType: { requires_remarks: 0, requires_referral_no: 0 },
     payment: "Cash",
     card_type: "",
     card_no: "",
@@ -414,15 +415,21 @@ export function useBookingForm(initial) {
     }
     if (isNhif.value && !form.card_type) errors.push("Card type is required");
     if (isInsurance.value) errors.push(...subscriptionErrors());
-    if (
-      forAuthorization &&
-      form.verification.method === "NONE" &&
-      !form.verification.remarks
-    ) {
+    if (isNhif.value) errors.push(...nhifVerificationErrors(forAuthorization));
+    return errors;
+  };
+
+  const nhifVerificationErrors = (forAuthorization) => {
+    const { referral_no, remarks, method } = form.verification;
+    const errors = [];
+    if (form.visitType.requires_referral_no && !referral_no)
+      errors.push("Referral no is required for this visit type");
+    if (form.visitType.requires_remarks && !remarks)
+      errors.push("Remarks are required for this visit type");
+    else if (forAuthorization && method === "NONE" && !remarks)
       errors.push(
         "Remarks are required when the patient is not verified by biometrics"
       );
-    }
     return errors;
   };
 
