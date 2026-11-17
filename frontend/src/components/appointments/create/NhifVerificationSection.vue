@@ -43,15 +43,12 @@
       />
     </div>
 
-    <div
-      v-if="apiEnabled && !form.verification.authorization_number"
-      class="flex justify-end"
-    >
+    <div v-if="apiEnabled" class="flex justify-end">
       <Button
         variant="solid"
         :loading="authorizing"
-        :disabled="authorizing"
-        title="Saves a new patient and subscription first, then captures the fingerprint or face and gets the authorization no from NHIF. Create appointment stays disabled until it is filled."
+        :disabled="authorizing || !canAuthorize"
+        title="Needs the visit type, the patient and the subscription, and an empty authorization no. Saves a new patient and subscription first, then captures the fingerprint or face and gets the authorization no from NHIF. Create appointment stays disabled until it is filled."
         @click="emit('authorize')"
       >
         <template #prefix>
@@ -77,6 +74,7 @@ defineProps({
   form: { type: Object, required: true },
   apiEnabled: { type: Boolean, default: false },
   authorizing: { type: Boolean, default: false },
+  canAuthorize: { type: Boolean, default: false },
 });
 const emit = defineEmits(["authorize"]);
 </script>
