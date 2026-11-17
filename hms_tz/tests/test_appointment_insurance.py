@@ -27,7 +27,7 @@ CONSULTATION_ITEM = "_Test Insurance Consultation"
 PRACTITIONER = "_Test Insurance Doctor"
 VISIT_TYPE = "_Test Insurance Visit"
 NHIF_CARD_TYPE = "_Test NHIF Beneficiary Card"
-NIDA_CARD_TYPE = "_Test NIDA ID"
+NIDA_CARD_TYPE = appointment_insurance.NATIONAL_ID_CARD_TYPE
 
 NHIF_CARD = {
 	"CardNo": "101",
