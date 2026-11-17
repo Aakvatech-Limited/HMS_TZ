@@ -273,7 +273,7 @@
 
                   <!-- Loading Title -->
                   <h3 class="text-xl font-semibold text-gray-900 mb-2">
-                    Creating Appointment
+                    {{ loadingTitle }}
                   </h3>
 
                   <!-- Dynamic Status Message -->
@@ -560,6 +560,7 @@ const { notifications, handleResourceError, showError } = useToast();
 const localShowDialog = ref(props.showDialog);
 const isCreating = ref(false);
 const statusMessage = ref("");
+const loadingTitle = ref("Creating Appointment");
 const error = ref("");
 const loadingProgress = ref(0);
 const justCreated = ref(false);
@@ -1153,8 +1154,9 @@ const handleSubmit = async () => {
 
 const createForm = ref(null);
 
-const onProgress = ({ busy, message, percent }) => {
+const onProgress = ({ busy, title, message, percent }) => {
   isCreating.value = busy;
+  loadingTitle.value = title;
   statusMessage.value = message;
   loadingProgress.value = percent;
 };
@@ -1182,6 +1184,7 @@ async function update_appointment() {
   loadingProgress.value = 0;
 
   try {
+    loadingTitle.value = "Updating Appointment";
     statusMessage.value = "Updating appointment...";
     loadingProgress.value = 50;
 
