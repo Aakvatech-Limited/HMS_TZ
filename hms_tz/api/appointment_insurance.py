@@ -23,6 +23,7 @@ SUBSCRIPTION_FIELDS = [
 	"mobile_number",
 	"company",
 	"gender",
+	"card_type_name",
 ]
 PATIENT_FIELDS = ["name", "patient_name", "sex", "dob", "mobile"]
 NATIONAL_ID_CARD_TYPE = "NIDA ID"

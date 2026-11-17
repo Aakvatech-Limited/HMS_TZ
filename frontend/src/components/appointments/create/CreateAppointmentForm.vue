@@ -26,6 +26,7 @@
       :form="form"
       :api-enabled="settings.enable_nhif_api"
       :authorizing="busy"
+      :can-authorize="canAuthorize"
       @authorize="authorize"
     />
     <JubileeAuthorizationSection
@@ -70,6 +71,7 @@ const {
   isNhif,
   canCheckCard,
   creates,
+  canAuthorize,
   canSubmit,
   loadSettings,
   setPayment,
