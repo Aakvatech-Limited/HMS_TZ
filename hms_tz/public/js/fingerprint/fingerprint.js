@@ -1,5 +1,6 @@
 import { loadDigitalPersonaSDK } from "./../utils";
 import { DigitalPersona } from "./digitalPersona/digitalpersona.js";
+import { FINGERPRINT_DRIVER_DOWNLOADS } from "./drivers.js";
 import { MFS100 } from "./mantra/mfs100.js";
 import { MFS500 } from "./mantra/mfs500.js";
 
@@ -320,18 +321,12 @@ export class Fingerprint {
               </div>
               <div style="padding: 0 10px;">
                 <ul style="margin: 10px 0; padding-left: 40px;">
-                  <li style="margin: 5px 0;">
-                    <a href="https://drive.google.com/drive/folders/10Bl-rD0dj-NhsE4DwDCoAb21U_hSSDf4?usp=drive_link" target="_blank"
-                    style='color: blue; font-weight: bold;'>Download DigitalPersona Driver</a>
-                  </li>
-                  <li style="margin: 5px 0;">
-                    <a href="https://drive.google.com/drive/folders/1FSDt1e2dLTJaQHmVU7WuOZmWwwM5zy37?usp=drive_link" target="_blank"
-                    style='color: blue; font-weight: bold;'>Download Mantra MFS100 Driver & Client</a>
-                  </li>
-                  <li style="margin: 5px 0;">
-                    <a href="https://drive.google.com/drive/folders/163DCRd3tkYwIQQHT8tPXMgXWFCVUTGZ-?usp=drive_link" target="_blank"
-                    style='color: blue; font-weight: bold;'>Download Mantra MFS500 Driver(v1.4) & MorFinAuthClient</a>
-                  </li>
+                  ${FINGERPRINT_DRIVER_DOWNLOADS.map(
+                    ({ label, url }) => `<li style="margin: 5px 0;">
+                    <a href="${url}" target="_blank"
+                    style='color: blue; font-weight: bold;'>${label}</a>
+                  </li>`
+                  ).join("")}
                 </ul>
               </div>
               <div style="padding: 0 15px 15px; font-size: 12px; color: #666;">

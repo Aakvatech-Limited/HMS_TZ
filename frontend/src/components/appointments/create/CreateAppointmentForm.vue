@@ -1,5 +1,11 @@
 <template>
   <div class="flex flex-col gap-6">
+    <ProviderReplyPanel
+      v-if="providerReply"
+      :reply="providerReply"
+      @close="providerReply = null"
+    />
+
     <SlotFields :form="form" />
 
     <PaymentSection
@@ -50,6 +56,7 @@ import JubileeAuthorizationSection from "./JubileeAuthorizationSection.vue";
 import NhifVerificationSection from "./NhifVerificationSection.vue";
 import PatientSection from "./PatientSection.vue";
 import PaymentSection from "./PaymentSection.vue";
+import ProviderReplyPanel from "./ProviderReplyPanel.vue";
 import SlotFields from "./SlotFields.vue";
 import SubscriptionSection from "./SubscriptionSection.vue";
 import { useBookingForm } from "./useBookingForm";
@@ -66,6 +73,7 @@ const {
   form,
   settings,
   busy,
+  providerReply,
   status,
   isInsurance,
   isNhif,
@@ -88,6 +96,7 @@ const {
 });
 
 const showCapture = ref(false);
+const authorizing = ref(false);
 let resolveCapture = null;
 
 const captureBiometric = () =>
@@ -101,15 +110,27 @@ const onCaptured = (result) => {
   resolveCapture = null;
 };
 
-const authorize = () => authorizeNhif(captureBiometric);
+const authorize = async () => {
+  authorizing.value = true;
+  try {
+    await authorizeNhif(captureBiometric);
+  } finally {
+    authorizing.value = false;
+  }
+};
 
 const submit = async () => {
   const appointment = await book();
   if (appointment) emit("created", appointment, form.payment);
 };
 
-watch([busy, status], () =>
-  emit("progress", { busy: busy.value, ...status.value })
+// The progress overlay would cover the capture dialog, so it waits until the capture is done.
+watch([busy, status, showCapture], () =>
+  emit("progress", {
+    busy: busy.value && !showCapture.value,
+    title: authorizing.value ? "Authorizing Patient" : "Creating Appointment",
+    ...status.value,
+  })
 );
 
 onMounted(loadSettings);

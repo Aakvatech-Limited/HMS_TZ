@@ -1,4 +1,5 @@
-from unittest.mock import patch
+import json
+from unittest.mock import Mock, patch
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
@@ -6,8 +7,10 @@ from frappe.utils import add_days, nowdate
 
 from hms_tz.api import appointment as appointment_api
 from hms_tz.api import appointment_insurance
+from hms_tz.api.provider_reply import ProviderReplyError
 from hms_tz.hms_tz.doctype.patient_appointment import patient_appointment
 from hms_tz.nhif.api import patient_appointment as nhif_appointment
+from hms_tz.nhif.nhif_api import verification
 from hms_tz.tests.utils import insert
 
 COMPANY = "_Test Insurance Clinic"
@@ -28,6 +31,17 @@ PRACTITIONER = "_Test Insurance Doctor"
 VISIT_TYPE = "_Test Insurance Visit"
 NHIF_CARD_TYPE = "_Test NHIF Beneficiary Card"
 NIDA_CARD_TYPE = appointment_insurance.NATIONAL_ID_CARD_TYPE
+HMS_TZ_SETTING = "hms_tz.hms_tz.doctype.hms_tz_setting.hms_tz_setting.HMSTZSetting"
+AUTHORIZE_ARGS = {
+	"appointment_type": VISIT_TYPE,
+	"company": COMPANY,
+	"card_no": "101",
+	"national_id": "NID1",
+	"fingerprint": "face-jpeg",
+	"fpcode": "FACE",
+	"biometric_method": "FACIAL",
+	"practitioner": PRACTITIONER,
+}
 
 NHIF_CARD = {
 	"CardNo": "101",
@@ -206,6 +220,88 @@ class TestAppointmentInsurance(FrappeTestCase):
 			self.assertRaisesRegex(frappe.ValidationError, "did not return"),
 		):
 			appointment_insurance.check_card(COMPANY, "NHIF", card_no="101", card_type=NHIF_CARD_TYPE)
+
+	def call_nhif(self, function, reply_status, reply_text, **kwargs):
+		"""Calls `function` against a mocked NHIF reply; returns the ProviderReplyError payload."""
+		nhif_reply = Mock(status_code=reply_status, text=reply_text)
+		frappe.local.message_log = []
+		with (
+			patch.object(verification.requests, "request", return_value=nhif_reply),
+			patch(f"{HMS_TZ_SETTING}.get_nhif_token", return_value="token"),
+			patch.object(frappe.db, "commit"),
+			self.assertRaises(ProviderReplyError) as raised,
+		):
+			function(**kwargs)
+		# The page gets the report once, as the raised error.
+		self.assertEqual(len(frappe.local.message_log), 1)
+		return json.loads(str(raised.exception))
+
+	def test_authorize_nhif_patient_raises_the_nhif_api_error(self):
+		reply_text = '{"title": "Bad Request", "status": 400, "message": "Use a test card.", "traceId": "T1"}'
+		reply = self.call_nhif(
+			appointment_insurance.authorize_nhif_patient,
+			400,
+			reply_text,
+			**{**AUTHORIZE_ARGS, "insurance_subscription": NHIF_SUBSCRIPTION},
+		)
+
+		self.assertEqual(reply["title"], "NHIF API Error")
+		self.assertIn("Failed to AuthorizePatient", reply["message"])
+		self.assertIn("Status Code: 400", reply["message"])
+		self.assertIn("NHIF Response: <b>Use a test card.", reply["message"])
+
+	def test_authorize_nhif_patient_raises_a_rejected_reply(self):
+		reply_text = '{"authorizationStatus": "REJECTED", "remarks": "Card is inactive"}'
+		reply = self.call_nhif(
+			appointment_insurance.authorize_nhif_patient,
+			200,
+			reply_text,
+			**{**AUTHORIZE_ARGS, "insurance_subscription": NHIF_SUBSCRIPTION},
+		)
+
+		self.assertEqual(reply, {"title": "REJECTED", "message": "Card is inactive"})
+
+	def test_authorize_nhif_patient_keeps_an_authorization_no_without_accepted(self):
+		pending = {"authorizationStatus": "PENDING", "authorizationNo": "A2", "remarks": "Visit NHIF office"}
+		with patch.object(appointment_insurance, "authorize_patient", return_value=pending):
+			result = appointment_insurance.authorize_nhif_patient(
+				**{**AUTHORIZE_ARGS, "insurance_subscription": NHIF_SUBSCRIPTION}
+			)
+
+		self.assertEqual(result, pending)
+
+	def test_check_card_raises_the_nhif_api_error(self):
+		reply = self.call_nhif(
+			appointment_insurance.check_card,
+			404,
+			'{"reasonPhrase": "Card not found"}',
+			company=COMPANY,
+			provider="NHIF",
+			card_no="999",
+			card_type=NHIF_CARD_TYPE,
+		)
+
+		self.assertEqual(reply["title"], "NHIF API Error")
+		self.assertIn("Failed to Fetch card details", reply["message"])
+		self.assertIn("Status Code: 404", reply["message"])
+		self.assertIn("NHIF Response: <b>Card not found", reply["message"])
+
+	def test_local_validation_is_not_a_provider_reply(self):
+		with self.assertRaises(frappe.ValidationError) as raised:
+			appointment_insurance.check_card(
+				COMPANY_WITHOUT_API, "NHIF", card_no="101", card_type=NHIF_CARD_TYPE
+			)
+		self.assertNotIsInstance(raised.exception, ProviderReplyError)
+
+	def test_authorize_nhif_patient_returns_the_authorization(self):
+		accepted = {"authorizationStatus": "ACCEPTED", "authorizationNo": "A1"}
+		with patch.object(appointment_insurance, "authorize_patient", return_value=accepted) as authorize:
+			result = appointment_insurance.authorize_nhif_patient(
+				**{**AUTHORIZE_ARGS, "insurance_subscription": NHIF_SUBSCRIPTION}
+			)
+
+		self.assertEqual(result, accepted)
+		self.assertEqual(authorize.call_args.kwargs["biometric_method"], "FACIAL")
 
 	def test_search_subscriptions_filters_by_provider_and_text(self):
 		names = lambda rows: [row.name for row in rows]  # noqa: E731

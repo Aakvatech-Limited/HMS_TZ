@@ -59,6 +59,7 @@ export function useBookingForm(initial) {
   const { showError, showWarning, handleResourceError } = useToast();
   const settings = ref({ enable_nhif_api: false, enable_jubilee_api: false });
   const busy = ref(false);
+  const providerReply = ref(null);
   const status = ref({ message: "", percent: 0 });
 
   const form = reactive({
@@ -131,10 +132,15 @@ export function useBookingForm(initial) {
 
   const run = async (work) => {
     busy.value = true;
+    providerReply.value = null;
     try {
       return await work();
     } catch (error) {
-      handleResourceError(error);
+      if (error.exc_type === "ProviderReplyError") {
+        providerReply.value = JSON.parse(error.messages[0]);
+      } else {
+        handleResourceError(error);
+      }
       return null;
     } finally {
       busy.value = false;
@@ -324,15 +330,13 @@ export function useBookingForm(initial) {
         referral_no: form.verification.referral_no,
         remarks: form.verification.remarks,
       });
-      if (
-        !data ||
-        data === "Error" ||
-        data.authorizationStatus !== "ACCEPTED"
-      ) {
-        showError(data?.remarks || "NHIF did not authorize the patient");
-        return;
-      }
       form.verification.authorization_number = data.authorizationNo;
+      if (data.authorizationStatus !== "ACCEPTED") {
+        providerReply.value = {
+          title: data.authorizationStatus,
+          message: data.remarks,
+        };
+      }
       form.authorization = {
         coverage_plan_name: data.coveragePlanName,
         nhif_employer_name: data.employerName,
@@ -452,6 +456,7 @@ export function useBookingForm(initial) {
     form,
     settings,
     busy,
+    providerReply,
     status,
     isInsurance,
     isNhif,
