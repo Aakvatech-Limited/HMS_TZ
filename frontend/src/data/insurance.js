@@ -14,13 +14,16 @@ export const SEARCH_PATIENTS_METHOD = `${INSURANCE_API}.search_patients`;
 export const getInsuranceApiSettings = (company) =>
   call(`${INSURANCE_API}.get_insurance_api_settings`, { company });
 
-export const checkCard = (company, provider, card_no, national_id) =>
+export const checkCard = (company, provider, card_no, card_type) =>
   call(`${INSURANCE_API}.check_card`, {
     company,
     provider,
     card_no,
-    national_id,
+    card_type,
   });
+
+export const getCardTypes = () =>
+  call("hms_tz.nhif.api.patient.get_card_verifier");
 
 export const searchSubscriptions = (provider, txt, patient) =>
   call(`${INSURANCE_API}.search_subscriptions`, { provider, txt, patient });
