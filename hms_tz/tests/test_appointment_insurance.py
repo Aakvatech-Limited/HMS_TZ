@@ -222,6 +222,17 @@ class TestAppointmentInsurance(FrappeTestCase):
 		self.assertEqual(names(appointment_insurance.search_subscriptions("NHIF", "JUB1")), [])
 		self.assertNotIn(NHIF_SUBSCRIPTION, names(appointment_insurance.search_subscriptions("Other")))
 
+	def test_search_subscriptions_filters_by_provider_and_patient(self):
+		names = lambda provider, patient: [  # noqa: E731
+			row.name for row in appointment_insurance.search_subscriptions(provider, patient=patient)
+		]
+
+		self.assertEqual(names("NHIF", CARD_HOLDER), [NHIF_SUBSCRIPTION])
+		self.assertEqual(names("Jubilee", CARD_HOLDER), [])
+		self.assertEqual(names("Jubilee", JUBILEE_HOLDER), [JUBILEE_SUBSCRIPTION])
+		self.assertEqual(names("NHIF", JUBILEE_HOLDER), [])
+		self.assertEqual(names("Other", JUBILEE_HOLDER), [])
+
 	def test_search_subscriptions_filters_by_patient_without_provider(self):
 		rows = appointment_insurance.search_subscriptions(patient=CARD_HOLDER)
 
@@ -327,3 +338,4 @@ class TestAppointmentInsurance(FrappeTestCase):
 			),
 			("NHIF", "NationalID", NIDA_CARD_TYPE),
 		)
+		self.assertEqual(subscription["card_type_name"], NIDA_CARD_TYPE)

@@ -46,6 +46,8 @@ const emptySubscription = () => ({
   national_id: "",
 });
 
+const DEFAULT_NHIF_CARD_TYPE = "NHIF Beneficiary Card";
+
 export const patientSummary = (patient) => {
   if (!patient) return "";
   const age = patient.dob ? `${dayjs().diff(patient.dob, "year")} years` : "";
@@ -105,6 +107,13 @@ export function useBookingForm(initial) {
     docs.push("Appointment");
     return `Creates: ${docs.join(" → ")}`;
   });
+  const canAuthorize = computed(
+    () =>
+      Boolean(form.appointment_type) &&
+      (form.patientMode !== "existing" || Boolean(form.patient)) &&
+      (form.subscriptionMode !== "existing" || Boolean(form.subscription)) &&
+      !form.verification.authorization_number
+  );
   const canSubmit = computed(
     () =>
       !busy.value &&
@@ -161,6 +170,8 @@ export function useBookingForm(initial) {
     clearAuthorization();
     if (!subscription) return;
     form.card_no = subscription.coverage_plan_card_number || form.card_no;
+    if (isNhif.value)
+      form.card_type = subscription.card_type_name || DEFAULT_NHIF_CARD_TYPE;
     form.patientMode = "existing";
     await selectPatient(subscription.patient);
   };
@@ -447,6 +458,7 @@ export function useBookingForm(initial) {
     canCheckCard,
     needsNhifAuthorization,
     creates,
+    canAuthorize,
     canSubmit,
     loadSettings,
     setPayment,
