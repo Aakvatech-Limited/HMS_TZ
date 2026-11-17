@@ -42,6 +42,7 @@
           <FieldLabel label="Or find an existing subscription" />
           <SubscriptionSearch
             :provider="form.payment"
+            :patient="form.patient"
             :selected="form.subscription"
             placeholder="Name, mobile, card no or ID"
             @select="(name) => emit('select-subscription', name)"
