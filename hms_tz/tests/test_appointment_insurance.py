@@ -10,6 +10,7 @@ from hms_tz.api import appointment as appointment_api
 from hms_tz.api import appointment_insurance
 from hms_tz.api.provider_reply import ProviderReplyError
 from hms_tz.hms_tz.doctype.patient_appointment import patient_appointment
+from hms_tz.jubilee.api.api import create_jubilee_benefits
 from hms_tz.nhif.api import patient_appointment as nhif_appointment
 from hms_tz.nhif.nhif_api import verification
 from hms_tz.tests.utils import insert
@@ -615,4 +616,44 @@ class TestAuthorizeSavedAppointment(FrappeTestCase):
 			self.assertEqual(appointment_insurance.authorize_jubilee_appointment(appointment), "J1")
 		self.assertEqual(
 			frappe.db.get_value("Patient Appointment", appointment, "authorization_number"), "J1"
+		)
+
+	def test_jubilee_patient_authorization_returns_the_number(self):
+		reply = {"AuthorizationNo": "J2", "Status": "OK", "Description": "Authorized"}
+		with patch.object(appointment_insurance, "get_authorization_number", return_value=reply) as authorize:
+			result = appointment_insurance.authorize_jubilee_patient(COMPANY, "JUB1", JUBILEE_SUBSCRIPTION)
+
+		self.assertEqual(result, {"authorization_number": "J2", "status": "OK", "description": "Authorized"})
+		authorize.assert_called_once_with(COMPANY, "JUB1", None, JUBILEE_SUBSCRIPTION)
+
+	def test_jubilee_patient_authorization_without_a_number_fails(self):
+		with (
+			patch.object(
+				appointment_insurance, "get_authorization_number", return_value={"Status": "Failed"}
+			),
+			self.assertRaisesRegex(frappe.ValidationError, "Jubilee did not authorize the patient"),
+		):
+			appointment_insurance.authorize_jubilee_patient(COMPANY, "JUB1", JUBILEE_SUBSCRIPTION)
+
+	def test_benefits_of_an_authorization_before_create_join_the_appointment(self):
+		benefit = {"BenefitCode": "OUT", "BenefitName": "Outpatient", "BenefitBalance": "1000"}
+		for authorization_no in ("J3", "J4"):
+			create_jubilee_benefits(
+				"JUB1", {"AuthorizationNo": authorization_no, "Benefits": [benefit]}, None, COMPANY
+			)
+		appointment = self.insert_appointment(
+			"_Test Auth Jubilee Benefits", subscription=JUBILEE_SUBSCRIPTION, authorization_number="J3"
+		)
+
+		appointment_insurance.link_jubilee_benefits(frappe.get_doc("Patient Appointment", appointment))
+
+		linked = frappe.get_all(
+			"Jubilee Benefit",
+			filters={"authorization_no": ("in", ["J3", "J4"])},
+			fields=["authorization_no", "appointment", "patient"],
+			order_by="authorization_no",
+		)
+		self.assertEqual(
+			[tuple(row.values()) for row in linked],
+			[("J3", appointment, CARD_HOLDER), ("J4", None, None)],
 		)
