@@ -400,7 +400,7 @@
               :disabled="isCreating || !createForm?.canSubmit"
               @click="createForm.submit()"
             >
-              Create appointment
+              Create
             </Button>
           </template>
 

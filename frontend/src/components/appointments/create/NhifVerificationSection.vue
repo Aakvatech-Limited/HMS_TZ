@@ -59,7 +59,7 @@
         <template #prefix>
           <FeatherIcon name="shield" class="h-4 w-4" />
         </template>
-        Authorize patient
+        Authorize
       </Button>
     </div>
   </section>
