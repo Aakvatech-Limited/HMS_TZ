@@ -2,6 +2,7 @@ import json
 from unittest.mock import Mock, patch
 
 import frappe
+from frappe.model.document import Document
 from frappe.tests.utils import FrappeTestCase
 from frappe.utils import add_days, nowdate
 
@@ -435,3 +436,145 @@ class TestAppointmentInsurance(FrappeTestCase):
 			("NHIF", "NationalID", NIDA_CARD_TYPE),
 		)
 		self.assertEqual(subscription["card_type_name"], NIDA_CARD_TYPE)
+
+
+def save_without_validation(doc, *args, **kwargs):
+	doc.db_update()
+
+
+@patch.object(Document, "save", new=save_without_validation)
+class TestAuthorizeSavedAppointment(FrappeTestCase):
+	def setUp(self):
+		TestAppointmentInsurance.setUp(self)
+
+	def tearDown(self):
+		frappe.db.rollback()
+
+	def insert_appointment(self, name, company=COMPANY, subscription=NHIF_SUBSCRIPTION, **values):
+		insurance_company = {NHIF_SUBSCRIPTION: NHIF_COMPANY, JUBILEE_SUBSCRIPTION: JUBILEE_COMPANY}
+		insert(
+			"Patient Appointment",
+			name,
+			company=company,
+			patient=CARD_HOLDER,
+			practitioner=PRACTITIONER,
+			appointment_type=VISIT_TYPE,
+			insurance_subscription=subscription,
+			insurance_company=insurance_company.get(subscription, ""),
+			coverage_plan_card_number="101",
+			appointment_time="10:00:00",
+			**{"status": "Open", **values},
+		)
+		return name
+
+	def update_with_number(self, appointment, authorization_number, **values):
+		return appointment_api.update_appointment(
+			appointment, PRACTITIONER, "10:00:00", VISIT_TYPE, authorization_number, **values
+		)
+
+	def test_update_saves_a_number_copied_from_the_portal_even_with_the_api_enabled(self):
+		appointment = self.insert_appointment("_Test Auth Portal")
+
+		self.assertTrue(self.update_with_number(appointment, " AUTH-9 ", referral_no="R-1", remarks="Portal"))
+		self.assertEqual(
+			frappe.db.get_value(
+				"Patient Appointment", appointment, ["authorization_number", "referral_no", "remarks"]
+			),
+			("AUTH-9", "R-1", "Portal"),
+		)
+
+	def test_update_without_a_number_leaves_the_authorization_alone(self):
+		appointment = self.insert_appointment("_Test Auth Blank", remarks="Kept")
+
+		self.assertFalse(self.update_with_number(appointment, "  ", remarks="Changed"))
+		self.assertEqual(
+			frappe.db.get_value("Patient Appointment", appointment, ["authorization_number", "remarks"]),
+			(None, "Kept"),
+		)
+
+	def test_only_open_insurance_appointments_without_a_number_can_be_authorized(self):
+		cases = {
+			"not an insurance appointment": self.insert_appointment("_Test Auth Cash", subscription=""),
+			"already authorized": self.insert_appointment("_Test Auth Done", authorization_number="A0"),
+			"is cancelled": self.insert_appointment("_Test Auth Cancelled", status="Cancelled"),
+		}
+		for message, appointment in cases.items():
+			with self.subTest(message):
+				with self.assertRaisesRegex(frappe.ValidationError, message):
+					self.update_with_number(appointment, "AUTH-9")
+				with self.assertRaisesRegex(frappe.ValidationError, message):
+					appointment_insurance.authorize_jubilee_appointment(appointment)
+
+	def test_nhif_number_is_stored_when_the_status_is_not_accepted(self):
+		appointment = self.insert_appointment("_Test Auth NHIF Pending")
+		pending = {"authorizationStatus": "PENDING", "authorizationNo": "A2", "remarks": "Visit NHIF office"}
+		with patch.object(appointment_insurance, "authorize_patient", return_value=pending):
+			result = appointment_insurance.authorize_nhif_appointment(
+				appointment, "image", "R1", "FINGERPRINT"
+			)
+
+		self.assertEqual(result["authorization_status"], "PENDING")
+		self.assertEqual(
+			frappe.db.get_value("Patient Appointment", appointment, "authorization_number"), "A2"
+		)
+
+	def test_nhif_authorization_is_stored_on_the_appointment(self):
+		appointment = self.insert_appointment("_Test Auth NHIF")
+		reply = {
+			"authorizationStatus": "ACCEPTED",
+			"authorizationNo": "A1",
+			"remarks": "Successful",
+			"coveragePlanName": NHIF_PLAN,
+			"employerName": "Employer",
+			"fpCode": "R1",
+			"ReferenceNo": "POC1",
+			"serviceYear": "3",
+		}
+		with patch.object(appointment_insurance, "authorize_patient", return_value=reply) as authorize:
+			result = appointment_insurance.authorize_nhif_appointment(
+				appointment, "image", "R1", "fingerprint", referral_no="R-1", remarks="Walk in"
+			)
+
+		self.assertEqual(
+			result,
+			{"authorization_number": "A1", "authorization_status": "ACCEPTED", "remarks": "Successful"},
+		)
+		self.assertEqual(authorize.call_args.kwargs["ref_docname"], appointment)
+		self.assertEqual(authorize.call_args.kwargs["card_no"], "101")
+		self.assertEqual(
+			frappe.db.get_value(
+				"Patient Appointment",
+				appointment,
+				[
+					"authorization_number",
+					"poc_reference_no",
+					"years_of_insurance",
+					"biometric_method",
+					"require_fingerprint",
+					"referral_no",
+				],
+			),
+			("A1", "POC1", 3, "FINGERPRINT", 1, "R-1"),
+		)
+
+	def test_nhif_authorization_without_biometrics_needs_remarks(self):
+		appointment = self.insert_appointment("_Test Auth NHIF None")
+
+		with (
+			patch.object(appointment_insurance, "authorize_patient") as authorize,
+			self.assertRaisesRegex(frappe.ValidationError, "Remarks are required"),
+		):
+			appointment_insurance.authorize_nhif_appointment(appointment, "", "", "NONE")
+		authorize.assert_not_called()
+
+	def test_jubilee_authorization_is_stored_on_the_appointment(self):
+		frappe.db.set_value("Healthcare Insurance Subscription", JUBILEE_SUBSCRIPTION, "patient", CARD_HOLDER)
+		appointment = self.insert_appointment("_Test Auth Jubilee", subscription=JUBILEE_SUBSCRIPTION)
+
+		with patch.object(
+			appointment_insurance, "get_authorization_number", return_value={"AuthorizationNo": "J1"}
+		):
+			self.assertEqual(appointment_insurance.authorize_jubilee_appointment(appointment), "J1")
+		self.assertEqual(
+			frappe.db.get_value("Patient Appointment", appointment, "authorization_number"), "J1"
+		)
