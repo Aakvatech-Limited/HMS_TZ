@@ -10,6 +10,7 @@ declare module 'vue' {
   export interface GlobalComponents {
     AppointmentCard: typeof import('./src/components/appointments/AppointmentCard.vue')['default']
     AppointmentDialog: typeof import('./src/components/appointments/AppointmentDialog.vue')['default']
+    AppointmentFilters: typeof import('./src/components/appointments/AppointmentFilters.vue')['default']
     AppointmentGrid: typeof import('./src/components/appointments/AppointmentGrid.vue')['default']
     AuthorizeAppointmentSection: typeof import('./src/components/appointments/AuthorizeAppointmentSection.vue')['default']
     Autocomplete: typeof import('./src/components/controls/Autocomplete.vue')['default']

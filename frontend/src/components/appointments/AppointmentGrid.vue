@@ -44,6 +44,7 @@
                 <FeatherIcon name="search" class="h-4 w-4 text-gray-600" />
               </template>
             </TextInput>
+            <AppointmentFilters />
             <Button
               icon-left="refresh-cw"
               label="Refresh"
@@ -109,10 +110,7 @@
         aria-label="Appointments by time slot and practitioner"
         class="appointment-grid"
         :style="{
-          '--columns': Math.max(
-            practitionerStore.filteredPractitioners.length,
-            1
-          ),
+          '--columns': Math.max(practitioners.length, 1),
         }"
         @keydown="onGridKeydown"
         @focusin="onCellFocus"
@@ -122,17 +120,19 @@
             <span class="text-sm font-semibold text-gray-600">Time Slots</span>
           </div>
           <div
-            v-if="practitionerStore.filteredPractitioners.length === 0"
+            v-if="practitioners.length === 0"
             class="header-cell empty-header"
           >
             <span class="text-gray-500 text-sm">{{
               practitionerStore.isFetching
                 ? "Loading practitioners..."
+                : appointmentStore.hasFilters
+                ? "No appointments match the filters"
                 : "No practitioners found"
             }}</span>
           </div>
           <div
-            v-for="practitioner in practitionerStore.filteredPractitioners"
+            v-for="practitioner in practitioners"
             :key="practitioner.name"
             role="columnheader"
             class="header-cell"
@@ -142,7 +142,7 @@
         </div>
 
         <div
-          v-for="(slot, row) in dateStore.timeSlots"
+          v-for="(slot, row) in slots"
           :key="slot.time"
           role="row"
           class="contents"
@@ -158,9 +158,7 @@
             }}</span>
           </div>
           <SlotCell
-            v-for="(
-              practitioner, column
-            ) in practitionerStore.filteredPractitioners"
+            v-for="(practitioner, column) in practitioners"
             :key="`${slot.time}-${practitioner.name}`"
             :time-slot="slot"
             :practitioner="practitioner"
@@ -215,6 +213,8 @@ import PractitionerCard from "./PractitionerCard.vue";
 import SlotCell from "./SlotCell.vue";
 import { APPOINTMENT_STATUSES } from "./appointmentStatus";
 import AppointmentDialog from "./AppointmentDialog.vue";
+import AppointmentFilters from "./AppointmentFilters.vue";
+import { getMatchedGrid } from "@/data/appointmentFilters";
 import { serverErrorText, useToast } from "@/composables/useToast";
 
 const appointmentStore = useAppointmentStore();
@@ -251,6 +251,22 @@ const activeCell = ref({ row: 0, column: 0 });
 
 const now = useNow({ interval: 60_000 });
 const nowTime = computed(() => now.value.getTime());
+
+// While an appointment filter is on, only rows and columns holding a match are shown, so results need no scrolling.
+const shownGrid = computed(() =>
+  appointmentStore.hasFilters
+    ? getMatchedGrid(
+        dateStore.timeSlots,
+        practitionerStore.filteredPractitioners,
+        appointmentStore.appointmentsBySlot
+      )
+    : {
+        slots: dateStore.timeSlots,
+        practitioners: practitionerStore.filteredPractitioners,
+      }
+);
+const slots = computed(() => shownGrid.value.slots);
+const practitioners = computed(() => shownGrid.value.practitioners);
 
 const isLoadingDay = computed(
   () => practitionerStore.isFetching || appointmentStore.isFetching
@@ -291,21 +307,24 @@ watch(
   () => scrollToCurrentSlot()
 );
 
+// Filtered results start at the top left; clearing returns to the current time.
+watch(
+  () => appointmentStore.hasFilters,
+  (hasFilters) =>
+    hasFilters
+      ? scroller.value?.scrollTo({ top: 0, left: 0 })
+      : scrollToCurrentSlot()
+);
+
 // Watch for search query changes
 watch(searchQuery, (newQuery) => {
   practitionerStore.setSearchQuery(newQuery);
 });
 
-// Keep one cell reachable by Tab when the practitioner list shrinks.
-watch(
-  () => practitionerStore.filteredPractitioners,
-  () => {
-    activeCell.value = clampCell(
-      activeCell.value.row,
-      activeCell.value.column
-    );
-  }
-);
+// Keep one cell reachable by Tab when the rows or columns shrink.
+watch([slots, practitioners], () => {
+  activeCell.value = clampCell(activeCell.value.row, activeCell.value.column);
+});
 
 const scrollPractitioners = (direction) => {
   const column = scroller.value?.querySelector(".header-cell");
@@ -314,15 +333,15 @@ const scrollPractitioners = (direction) => {
 
 // A computed changes only at slot boundaries, so the minute tick does not re-render every cell.
 const firstFutureSlotIndex = computed(() => {
-  const index = dateStore.timeSlots.findIndex(
+  const index = slots.value.findIndex(
     (slot) => slot.timestamp >= nowTime.value
   );
-  return index < 0 ? dateStore.timeSlots.length : index;
+  return index < 0 ? slots.value.length : index;
 });
 
 const currentSlotIndex = computed(() => {
   const slotLength = dateStore.slotDuration * 60_000;
-  return dateStore.timeSlots.findIndex(
+  return slots.value.findIndex(
     (slot) =>
       nowTime.value >= slot.timestamp &&
       nowTime.value < slot.timestamp + slotLength
@@ -354,7 +373,7 @@ const keyTargets = {
   PageUp: ({ row, column }) => [row - slotsPerHour.value, column],
   PageDown: ({ row, column }) => [row + slotsPerHour.value, column],
   Home: ({ row }) => [row, 0],
-  End: ({ row }) => [row, practitionerStore.filteredPractitioners.length - 1],
+  End: ({ row }) => [row, practitioners.value.length - 1],
   t: jumpToNow,
   T: jumpToNow,
 };
@@ -369,8 +388,8 @@ const onGridKeydown = (event) => {
 };
 
 const clampCell = (row, column) => {
-  const lastRow = dateStore.timeSlots.length - 1;
-  const lastColumn = practitionerStore.filteredPractitioners.length - 1;
+  const lastRow = slots.value.length - 1;
+  const lastColumn = practitioners.value.length - 1;
   return {
     row: clamp(row, 0, Math.max(lastRow, 0)),
     column: clamp(column, 0, Math.max(lastColumn, 0)),
