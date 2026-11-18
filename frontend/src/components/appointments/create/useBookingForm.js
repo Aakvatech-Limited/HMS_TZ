@@ -1,8 +1,7 @@
 import { computed, reactive, ref } from "vue";
 import dayjs from "dayjs";
-import { serverErrorText, useToast } from "@/composables/useToast";
+import { useToast } from "@/composables/useToast";
 import {
-  authorizeJubileeAppointment,
   authorizeJubileePatient,
   authorizeNhifPatient,
   checkCard as checkCardApi,
@@ -57,7 +56,7 @@ export const patientSummary = (patient) => {
 
 /** State and server calls of the New Appointment form. */
 export function useBookingForm(initial) {
-  const { showError, showWarning, handleResourceError } = useToast();
+  const { showError, handleResourceError } = useToast();
   const settings = ref({ enable_nhif_api: false, enable_jubilee_api: false });
   const busy = ref(false);
   const providerReply = ref(null);
@@ -99,9 +98,6 @@ export function useBookingForm(initial) {
       (form.payment === "Jubilee" && settings.value.enable_jubilee_api)
   );
   const isNhif = computed(() => form.payment === "NHIF");
-  const needsNhifAuthorization = computed(
-    () => form.payment === "NHIF" && settings.value.enable_nhif_api
-  );
   const creates = computed(() => {
     const docs = [];
     if (form.patientMode === "new") docs.push("Patient");
@@ -124,12 +120,8 @@ export function useBookingForm(initial) {
   const canAuthorizeJubilee = computed(
     () => canAuthorize.value && Boolean(jubileeCardNo())
   );
-  const canSubmit = computed(
-    () =>
-      !busy.value &&
-      (!needsNhifAuthorization.value ||
-        Boolean(form.verification.authorization_number))
-  );
+  // Authorization is a separate step; an insurance appointment can be authorized later from Edit.
+  const canSubmit = computed(() => !busy.value);
 
   const loadSettings = async () => {
     settings.value = await getInsuranceApiSettings(form.company);
@@ -422,23 +414,7 @@ export function useBookingForm(initial) {
       await ensurePatient();
       await ensureSubscription();
       setStatus("Creating the appointment...", 75);
-      const appointment = await createAppointment(appointmentPayload());
-      if (
-        form.payment === "Jubilee" &&
-        settings.value.enable_jubilee_api &&
-        !form.verification.authorization_number
-      ) {
-        setStatus("Requesting the Jubilee authorization...", 90);
-        await authorizeJubileeAppointment(appointment.name).catch((error) => {
-          showWarning(
-            `Appointment created, but Jubilee did not authorize it:\n${serverErrorText(
-              error
-            )}`,
-            { timeout: 10000 }
-          );
-        });
-      }
-      return appointment;
+      return await createAppointment(appointmentPayload());
     });
 
   const validationErrors = ({ forAuthorization }) => {
@@ -520,7 +496,6 @@ export function useBookingForm(initial) {
     isInsurance,
     isNhif,
     canCheckCard,
-    needsNhifAuthorization,
     creates,
     canAuthorize,
     canAuthorizeJubilee,
