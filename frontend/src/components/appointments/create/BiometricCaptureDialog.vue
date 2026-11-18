@@ -143,7 +143,11 @@
     <template #actions>
       <div class="flex justify-end gap-2">
         <Button variant="subtle" @click="cancel">Cancel</Button>
-        <Button variant="solid" :disabled="!captured" @click="confirm"
+        <Button
+          v-if="method === 'FACIAL'"
+          variant="solid"
+          :disabled="!captured"
+          @click="confirm"
           >Use capture</Button
         >
       </div>
@@ -239,10 +243,12 @@ const openFingerprint = async () => {
   result.value = null;
   finger.value = "";
   scanner = new FingerprintScanner({
+    // A scan goes straight on to the NHIF call, like the desk dialog
     onSample: ({ result: sample, image }) => {
       scanning.value = false;
       result.value = sample;
       fingerprintImage.value = image;
+      confirm();
     },
     onError: (message) => {
       scanning.value = false;
