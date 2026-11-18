@@ -141,13 +141,42 @@ def authorize_jubilee_appointment(appointment):
 	card_no = frappe.db.get_value(
 		"Healthcare Insurance Subscription", doc.insurance_subscription, "coverage_plan_card_number"
 	)
-	data = get_authorization_number(doc.company, card_no, doc.name, doc.insurance_subscription)
+	with provider_call("Jubilee"):
+		data = get_authorization_number(doc.company, card_no, doc.name, doc.insurance_subscription)
 	if not data or not data.get("AuthorizationNo"):
 		return None
 
 	doc.authorization_number = data["AuthorizationNo"]
 	doc.save(ignore_permissions=True)
 	return doc.authorization_number
+
+
+@frappe.whitelist()
+def authorize_jubilee_patient(company, card_no, insurance_subscription):
+	"""Jubilee authorization for the appointments page, before the appointment exists."""
+	frappe.has_permission("Patient Appointment", "create", throw=True)
+	with provider_call("Jubilee"):
+		data = get_authorization_number(company, card_no, None, insurance_subscription)
+		if not data or not data.get("AuthorizationNo"):
+			frappe.throw(_("Jubilee did not authorize the patient"))
+	return {
+		"authorization_number": data["AuthorizationNo"],
+		"status": data.get("Status"),
+		"description": data.get("Description"),
+	}
+
+
+def link_jubilee_benefits(appointment):
+	"""Benefits Jubilee returned for the authorization no before the appointment existed now belong to it."""
+	benefit = DocType("Jubilee Benefit")
+	(
+		frappe.qb.update(benefit)
+		.set(benefit.appointment, appointment.name)
+		.set(benefit.patient, appointment.patient)
+		.where(benefit.authorization_no == appointment.authorization_number)
+		.where(benefit.appointment.isnull() | (benefit.appointment == ""))
+		.run()
+	)
 
 
 @frappe.whitelist()
