@@ -25,6 +25,7 @@ declare module 'vue' {
     OTRosterCell: typeof import('./src/components/roster/OTRosterCell.vue')['default']
     PatientSection: typeof import('./src/components/appointments/create/PatientSection.vue')['default']
     PaymentDialog: typeof import('./src/components/appointments/PaymentDialog.vue')['default']
+    PaymentModeStrip: typeof import('./src/components/appointments/PaymentModeStrip.vue')['default']
     PaymentSection: typeof import('./src/components/appointments/create/PaymentSection.vue')['default']
     PractitionerCard: typeof import('./src/components/appointments/PractitionerCard.vue')['default']
     Print: typeof import('./src/components/controls/Print.vue')['default']
