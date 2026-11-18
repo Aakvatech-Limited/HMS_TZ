@@ -14,6 +14,7 @@
       v-model="data[section.doctype][field.name]"
       :disabled="true"
       variant="outline"
+      :class="field.highlight && 'rounded ring-2 ring-orange-400 shadow-md'"
     />
     <Select
       v-else-if="field.type === 'Select'"
