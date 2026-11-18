@@ -185,8 +185,8 @@
                 Edit Mode: You can modify selected fields
               </p>
               <p class="text-xs text-blue-600 mt-1">
-                Only practitioner and appointment time can be edited, and the
-                authorization of an insurance appointment that has none.
+                Only practitioner, appointment time and, for insurance, the
+                authorization no, referral no and remarks can be edited.
               </p>
             </div>
           </div>
@@ -368,9 +368,7 @@
         <div class="flex gap-2">
           <template v-if="isViewMode">
             <Button
-              v-if="
-                appointment['Patient Appointment']['status'] !== 'cancelled'
-              "
+              v-if="!isReadOnlyStatus"
               variant="subtle"
               size="lg"
               theme="gray"
@@ -570,7 +568,7 @@ const emit = defineEmits([
 
 const appointmentStore = useAppointmentStore();
 const dateStore = useDateStore();
-const { notifications, handleResourceError, showError } = useToast();
+const { notifications, handleResourceError, showError, showInfo } = useToast();
 
 // Local dialog state for v-model approach
 const localShowDialog = ref(props.showDialog);
@@ -703,16 +701,44 @@ const isNhif = computed(
     isInsurance.value &&
     appointment["Patient Appointment"]["insurance_company"]?.includes("NHIF")
 );
+// Edit mode keeps the number saved when it opened, so typing in the field does not swap in the authorization section.
+const authorizationNumberAtEdit = ref("");
+watch(
+  () => props.mode,
+  (mode) => {
+    if (mode === "edit") {
+      authorizationNumberAtEdit.value =
+        appointment["Patient Appointment"]["authorization_number"] || "";
+    }
+  },
+  { immediate: true }
+);
 const isUnauthorized = computed(() => {
   const doc = appointment["Patient Appointment"];
+  const authorizationNumber =
+    props.mode === "edit"
+      ? authorizationNumberAtEdit.value
+      : doc.authorization_number;
   return (
     isInsurance.value &&
-    !doc.authorization_number &&
+    !authorizationNumber &&
     doc.status?.toLowerCase() !== "cancelled"
   );
 });
 
-const EDITABLE_FIELDS = ["practitioner", "appointment_time"];
+const isReadOnlyStatus = computed(() =>
+  ["closed", "cancelled"].includes(
+    appointment["Patient Appointment"]["status"]?.toLowerCase()
+  )
+);
+
+const EDITABLE_FIELDS = [
+  "practitioner",
+  "appointment_time",
+  "authorization_number",
+  "referral_no",
+  "remarks",
+];
 
 const field = (name, label, type, extra = {}) => ({
   name,
@@ -734,7 +760,7 @@ const sections = computed(() => {
         field("insurance_company", "Insurance Company", "Data"),
         field("coverage_plan_name", "Coverage Plan", "Data"),
         field("coverage_plan_card_number", "Card No", "Data"),
-        // In edit mode the authorization section below owns this field.
+        // In edit mode the authorization section below owns these fields.
         ...(props.mode === "edit" && isUnauthorized.value
           ? []
           : [
@@ -744,9 +770,13 @@ const sections = computed(() => {
                   ? "Not authorized"
                   : "Authorization No",
               }),
+              field("referral_no", "Referral No", "Data"),
             ]),
         field("billing_item", "Billing Item", "Link", { options: "Item" }),
         field("paid_amount", "Billing Amount", "Currency"),
+        ...(props.mode === "edit" && isUnauthorized.value
+          ? []
+          : [field("remarks", "Remarks", "Small Text")]),
       ]
     : [
         field("mode_of_payment", "Mode of Payment", "Data"),
@@ -1145,11 +1175,15 @@ const update_appointment_doc = createResource({
       practitioner: appointment["Patient Appointment"]["practitioner"],
       appointment_time: appointment["Patient Appointment"]["appointment_time"],
       appointment_type: appointment["Patient Appointment"]["appointment_type"],
-      ...manualAuthorization(),
+      ...authorizationValues(),
     };
   },
   onSuccess: async (data) => {
-    notifications.success.appointmentUpdated();
+    if (data) {
+      notifications.success.appointmentUpdated();
+    } else {
+      showInfo("No changes to save");
+    }
 
     // Reset loading state
     isCreating.value = false;
@@ -1194,12 +1228,17 @@ const handleSubmit = async () => {
 const createForm = ref(null);
 const authorizeSection = ref(null);
 
-// An authorization no copied from the provider portal is saved by Update.
-const manualAuthorization = () => {
+// The authorization section owns these values while the appointment is unauthorized.
+const authorizationValues = () => {
   const verification = authorizeSection.value?.verification;
-  if (!verification?.authorization_number) return {};
-  const { authorization_number, referral_no, remarks } = verification;
-  return { authorization_number, referral_no, remarks };
+  const source = verification || appointment["Patient Appointment"];
+  const { authorization_number, referral_no, remarks } = source;
+  return {
+    authorization_number,
+    referral_no,
+    remarks,
+    biometric_method: verification?.method,
+  };
 };
 
 const onAuthorized = async () => {

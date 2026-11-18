@@ -4,7 +4,6 @@ from frappe.core.doctype.user_permission.user_permission import get_user_permiss
 from frappe.query_builder import DocType
 from frappe.utils import get_datetime, get_time, getdate, now_datetime
 
-from hms_tz.api.appointment_insurance import validate_can_authorize
 from hms_tz.nhif.api.patient_appointment import (
 	add_cancel_comment,
 	get_cash_amount,
@@ -97,45 +96,54 @@ def update_appointment(
 	authorization_number=None,
 	referral_no=None,
 	remarks=None,
+	biometric_method=None,
 ):
-	"""Update an existing appointment; an authorization no copied from the provider portal comes with its referral no and remarks."""
-
-	has_changed = False
+	"""Save the changed values of an open or scheduled appointment; a blank authorization no keeps the saved one."""
 	appointment_doc = frappe.get_doc("Patient Appointment", appointment_id)
 	appointment_doc.check_permission("write")
-	if appointment_doc.practitioner != practitioner:
+	validate_editable(appointment_doc)
+
+	values = {
+		"practitioner": practitioner,
+		"appointment_type": appointment_type,
+		"authorization_number": (authorization_number or "").strip() or None,
+		"referral_no": referral_no,
+		"remarks": remarks,
+		"biometric_method": biometric_method,
+	}
+	changes = {
+		fieldname: value
+		for fieldname, value in values.items()
+		if value is not None and value != (appointment_doc.get(fieldname) or "")
+	}
+	if "practitioner" in changes:
 		validate_practitioner_level(
 			appointment_doc.practitioner, practitioner, appointment_doc.inpatient_record
 		)
-
-		has_changed = True
-		appointment_doc.practitioner = practitioner
+	if "authorization_number" in changes and not appointment_doc.insurance_subscription:
+		frappe.throw(_("Appointment {0} is not an insurance appointment").format(appointment_doc.name))
 
 	new_appointment_time = get_time(appointment_time)
 	if get_time(appointment_doc.appointment_time) != new_appointment_time:
 		validate_not_in_past(appointment_doc.appointment_date, new_appointment_time)
-		has_changed = True
-		appointment_doc.appointment_time = new_appointment_time
+		changes["appointment_time"] = new_appointment_time
 
-	if appointment_doc.appointment_type != appointment_type:
-		has_changed = True
-		appointment_doc.appointment_type = appointment_type
+	if not changes:
+		return False
 
-	authorization_number = (authorization_number or "").strip()
-	if authorization_number:
-		validate_can_authorize(appointment_doc)
-		has_changed = True
-		appointment_doc.update(
-			{"authorization_number": authorization_number, "referral_no": referral_no, "remarks": remarks}
+	appointment_doc.update(changes)
+	appointment_doc.save(ignore_permissions=True)
+	return True
+
+
+def validate_editable(appointment_doc):
+	"""Closed and cancelled appointments are read only."""
+	if appointment_doc.status in ("Closed", "Cancelled"):
+		frappe.throw(
+			_("Appointment {0} is {1} and cannot be edited").format(
+				appointment_doc.name, appointment_doc.status
+			)
 		)
-
-	if has_changed:
-		appointment_doc.save(ignore_permissions=True)
-		appointment_doc.reload()
-
-		return True
-
-	return False
 
 
 @frappe.whitelist()
