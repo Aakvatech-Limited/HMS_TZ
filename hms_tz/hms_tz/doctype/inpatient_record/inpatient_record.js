@@ -421,42 +421,10 @@ let nhif_admit_patient = async (
   check_in,
   biometric_method
 ) => {
-  let biometricData;
-
-  if (biometric_method === "FACIAL") {
-    biometricData = await new FacialRecognition({ label: "Admit" });
-    if (!biometricData) {
-      frappe.msgprint(__("Face capture failed. Please try again."));
-      dialog.enable_primary_action();
-      return;
-    }
-  } else if (biometric_method === "FINGERPRINT") {
-    biometricData = await new Fingerprint({ label: "Admit" });
-    if (!biometricData) {
-      frappe.msgprint(__("Fingerprint capture failed. Please try again."));
-      dialog.enable_primary_action();
-      return;
-    }
-  } else {
-    const confirmed = await new Promise((resolve) => {
-      frappe.confirm(
-        __(`
-          <div style="border-left: 4px solid #ffc107; background-color: #fff3cd; padding: 15px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1); margin: 10px;">
-            <p class="text-center"><i>Biometric Method: <b>${biometric_method}</b> is only used when Patient is not able to take fingerprint or face.</i></p>
-          </div>
-          <br>
-          <p class="text-center"><i>Are you sure you want to continue?</i></p>`),
-        () => resolve(true),
-        () => resolve(false)
-      );
-    });
-
-    if (!confirmed) {
-      dialog.enable_primary_action();
-      return;
-    }
-
-    biometricData = { Data: "", fpCode: "" };
+  const biometricData = await captureBiometric(biometric_method, "Admit");
+  if (!biometricData) {
+    dialog.enable_primary_action();
+    return;
   }
 
   dialog.hide();
@@ -883,40 +851,8 @@ let nhif_transfer_patient = async (
   leave_from,
   biometric_method
 ) => {
-  let biometricData;
-
-  if (biometric_method === "FACIAL") {
-    biometricData = await new FacialRecognition({ label: "Transfer" });
-    if (!biometricData) {
-      frappe.msgprint(__("Face capture failed. Please try again."));
-      return;
-    }
-  } else if (biometric_method === "FINGERPRINT") {
-    biometricData = await new Fingerprint({ label: "Transfer" });
-    if (!biometricData) {
-      frappe.msgprint(__("Fingerprint capture failed. Please try again."));
-      return;
-    }
-  } else {
-    const confirmed = await new Promise((resolve) => {
-      frappe.confirm(
-        __(`
-          <div style="border-left: 4px solid #ffc107; background-color: #fff3cd; padding: 15px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1); margin: 10px;">
-            <p class="text-center"><i>Biometric Method: <b>${biometric_method}</b> is only used when Patient is not able to take fingerprint or face.</i></p>
-          </div>
-          <br>
-          <p class="text-center"><i>Are you sure you want to continue?</i></p>`),
-        () => resolve(true),
-        () => resolve(false)
-      );
-    });
-
-    if (!confirmed) {
-      return;
-    }
-
-    biometricData = { Data: "", fpCode: "" };
-  }
+  const biometricData = await captureBiometric(biometric_method, "Transfer");
+  if (!biometricData) return;
 
   dialog.hide();
 
