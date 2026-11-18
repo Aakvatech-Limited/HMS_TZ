@@ -34,16 +34,8 @@
             </div>
           </div>
 
-          <div class="flex items-center space-x-3">
-            <TextInput
-              placeholder="Search practitioners..."
-              class="w-64 text-black"
-              v-model="searchQuery"
-            >
-              <template #prefix>
-                <FeatherIcon name="search" class="h-4 w-4 text-gray-600" />
-              </template>
-            </TextInput>
+          <div class="flex items-center gap-8">
+            <DeskSearchBar />
             <AppointmentFilters />
             <Button
               icon-left="refresh-cw"
@@ -53,15 +45,17 @@
             />
             <div
               v-if="canScrollLeft || canScrollRight"
-              class="flex items-center space-x-1"
+              class="ml-4 flex items-center gap-4"
             >
               <Button
+                size="lg"
                 icon="arrow-left"
                 label="Scroll practitioners left"
                 :disabled="!canScrollLeft"
                 @click="scrollPractitioners(-1)"
               />
               <Button
+                size="lg"
                 icon="arrow-right"
                 label="Scroll practitioners right"
                 :disabled="!canScrollRight"
@@ -214,6 +208,7 @@ import SlotCell from "./SlotCell.vue";
 import { APPOINTMENT_STATUSES } from "./appointmentStatus";
 import AppointmentDialog from "./AppointmentDialog.vue";
 import AppointmentFilters from "./AppointmentFilters.vue";
+import DeskSearchBar from "@/components/DeskSearchBar.vue";
 import { getMatchedGrid } from "@/data/appointmentFilters";
 import { serverErrorText, useToast } from "@/composables/useToast";
 
@@ -227,7 +222,6 @@ const scroller = ref(null);
 const grid = ref(null);
 
 // State
-const searchQuery = ref("");
 const selectedCompany = ref("");
 const selectedDate = computed({
   get: () => dateStore.selectedDate,
@@ -315,11 +309,6 @@ watch(
       ? scroller.value?.scrollTo({ top: 0, left: 0 })
       : scrollToCurrentSlot()
 );
-
-// Watch for search query changes
-watch(searchQuery, (newQuery) => {
-  practitionerStore.setSearchQuery(newQuery);
-});
 
 // Keep one cell reachable by Tab when the rows or columns shrink.
 watch([slots, practitioners], () => {
