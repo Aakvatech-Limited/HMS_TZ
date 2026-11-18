@@ -55,7 +55,7 @@
           <template #prefix>
             <FeatherIcon name="shield" class="h-4 w-4" />
           </template>
-          Authorize with Jubilee
+          Authorize
         </Button>
       </div>
     </section>
