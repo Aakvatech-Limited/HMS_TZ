@@ -2,6 +2,12 @@ import { defineStore } from "pinia";
 import { call, createResource } from "frappe-ui";
 import dayjs from "dayjs";
 import { useToast } from "../composables/useToast";
+import {
+  EMPTY_APPOINTMENT_FILTERS,
+  countActiveFilters,
+  getPaymentOption,
+  matchesAppointment,
+} from "./appointmentFilters";
 import { getSlotTime, useDateStore } from "./date";
 import { fetchLatest } from "./latestRequest";
 import { usePractitionerStore } from "./practitioner";
@@ -38,6 +44,7 @@ const APPOINTMENT_FIELDS = [
   "require_facial_recognation",
   "biometric_method",
   "fpcode",
+  "follow_up",
 ];
 
 const toAppointment = (appointment) => ({
@@ -57,6 +64,10 @@ const toAppointment = (appointment) => ({
   company: appointment.company,
   insurance_company: appointment.insurance_company || "Cash",
   insurance_subscription: appointment.insurance_subscription,
+  payment: getPaymentOption(
+    Boolean(appointment.insurance_subscription),
+    appointment.insurance_company ?? ""
+  ),
   coverage_plan_card_number: appointment.coverage_plan_card_number,
   billing_item: appointment.billing_item,
   paid_amount: appointment.paid_amount || 0,
@@ -75,6 +86,7 @@ const toAppointment = (appointment) => ({
   require_facial_recognation: appointment.require_facial_recognation,
   biometric_method: appointment.biometric_method,
   fpcode: appointment.fpcode,
+  follow_up: appointment.follow_up,
 });
 
 export const useAppointmentStore = defineStore("appointments", {
@@ -85,16 +97,20 @@ export const useAppointmentStore = defineStore("appointments", {
     isFetching: false,
     loadError: null,
     latestRequest: 0,
+    filters: { ...EMPTY_APPOINTMENT_FILTERS },
     userRoles: [],
     rolesLoading: false,
   }),
 
   getters: {
-    /** Slot time to practitioner to appointments, with each time floored to its slot. */
+    hasFilters: (state) => countActiveFilters(state.filters) > 0,
+
+    /** Slot time to practitioner to the filtered appointments, with each time floored to its slot. */
     appointmentsBySlot: (state) => {
       const { slotDuration } = useDateStore();
       const bySlot = new Map();
       for (const appointment of state.appointments) {
+        if (!matchesAppointment(appointment, state.filters)) continue;
         const slotTime = getSlotTime(
           appointment.appointment_time,
           slotDuration
@@ -119,6 +135,10 @@ export const useAppointmentStore = defineStore("appointments", {
   },
 
   actions: {
+    clearFilters() {
+      this.filters = { ...EMPTY_APPOINTMENT_FILTERS };
+    },
+
     /** Load practitioners and appointments for one company and date. */
     async loadDay(company, date) {
       await Promise.all([
