@@ -4,6 +4,7 @@ from frappe.core.doctype.user_permission.user_permission import get_user_permiss
 from frappe.query_builder import DocType
 from frappe.utils import get_datetime, get_time, getdate, now_datetime
 
+from hms_tz.api.appointment_insurance import link_jubilee_benefits
 from hms_tz.nhif.api.patient_appointment import (
 	add_cancel_comment,
 	get_cash_amount,
@@ -80,6 +81,7 @@ def create_appointment(appointment_data):
 	# Reload so an unset duration (None) becomes the stored 0; set_only_once compares them on save.
 	appointment_doc.reload()
 	if appointment_doc.insurance_subscription and appointment_doc.authorization_number:
+		link_jubilee_benefits(appointment_doc)
 		# make_next_doc creates the vital signs only on a save after insert, as the desk does.
 		appointment_doc.save(ignore_permissions=True)
 		appointment_doc.reload()
