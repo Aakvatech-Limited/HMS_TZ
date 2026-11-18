@@ -4,6 +4,7 @@ from frappe.core.doctype.user_permission.user_permission import get_user_permiss
 from frappe.query_builder import DocType
 from frappe.utils import get_datetime, get_time, getdate, now_datetime
 
+from hms_tz.api.appointment_insurance import validate_can_authorize
 from hms_tz.nhif.api.patient_appointment import (
 	add_cancel_comment,
 	get_cash_amount,
@@ -88,10 +89,16 @@ def create_appointment(appointment_data):
 
 
 @frappe.whitelist()
-def update_appointment(appointment_id, practitioner, appointment_time, appointment_type):
-	"""
-	Update an existing appointment with the provided data.
-	"""
+def update_appointment(
+	appointment_id,
+	practitioner,
+	appointment_time,
+	appointment_type,
+	authorization_number=None,
+	referral_no=None,
+	remarks=None,
+):
+	"""Update an existing appointment; an authorization no copied from the provider portal comes with its referral no and remarks."""
 
 	has_changed = False
 	appointment_doc = frappe.get_doc("Patient Appointment", appointment_id)
@@ -113,6 +120,14 @@ def update_appointment(appointment_id, practitioner, appointment_time, appointme
 	if appointment_doc.appointment_type != appointment_type:
 		has_changed = True
 		appointment_doc.appointment_type = appointment_type
+
+	authorization_number = (authorization_number or "").strip()
+	if authorization_number:
+		validate_can_authorize(appointment_doc)
+		has_changed = True
+		appointment_doc.update(
+			{"authorization_number": authorization_number, "referral_no": referral_no, "remarks": remarks}
+		)
 
 	if has_changed:
 		appointment_doc.save(ignore_permissions=True)
