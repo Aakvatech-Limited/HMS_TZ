@@ -107,15 +107,15 @@
       <div v-else class="flex flex-col gap-3">
         <p class="flex items-center gap-1 text-sm text-green-700">
           <FeatherIcon name="check-circle" class="h-4 w-4" />
-          Reader connected
+          Device Connected
         </p>
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <FieldLabel label="Device" />
+            <FieldLabel label="Select Device" />
             <Select :options="deviceOptions" v-model="selectedDevice" />
           </div>
           <div>
-            <FieldLabel label="Finger" />
+            <FieldLabel label="Select Finger to Scan" />
             <Select
               :options="FINGER_CODES"
               v-model="finger"
