@@ -3,6 +3,7 @@
 import frappe
 from frappe import _
 from frappe.query_builder import Criterion, DocType
+from frappe.utils import cint
 
 from hms_tz.api.provider_reply import provider_call
 from hms_tz.jubilee.api.api import get_authorization_number, get_member_card_detials
@@ -136,8 +137,7 @@ def create_insurance_subscription(subscription_data):
 @frappe.whitelist()
 def authorize_jubilee_appointment(appointment):
 	"""Request the Jubilee authorization no for a saved appointment and store it on it."""
-	doc = frappe.get_doc("Patient Appointment", appointment)
-	doc.check_permission("write")
+	doc = get_appointment_to_authorize(appointment)
 	card_no = frappe.db.get_value(
 		"Healthcare Insurance Subscription", doc.insurance_subscription, "coverage_plan_card_number"
 	)
@@ -163,6 +163,7 @@ def authorize_nhif_patient(
 	practitioner,
 	referral_no="",
 	remarks="",
+	ref_docname=None,
 ):
 	"""NHIF authorization for the appointments page; a reply without an authorization no raises NHIF's reply."""
 	frappe.has_permission("Patient Appointment", "create", throw=True)
@@ -179,11 +180,77 @@ def authorize_nhif_patient(
 			practitioner=practitioner,
 			referral_no=referral_no,
 			remarks=remarks,
+			ref_docname=ref_docname,
 		)
 		# NHIF may give an authorization no without ACCEPTED and ask the patient to visit its office.
 		if not isinstance(data, dict) or not data.get("authorizationNo"):
 			frappe.throw(_("NHIF did not authorize the patient"))
 	return data
+
+
+@frappe.whitelist()
+def authorize_nhif_appointment(
+	appointment, fingerprint, fpcode, biometric_method, referral_no="", remarks=""
+):
+	"""NHIF authorization of a saved appointment; stores the reply on it as the desk Get Authorization Number does."""
+	doc = get_appointment_to_authorize(appointment)
+	method = biometric_method.upper()
+	if method == "NONE" and not remarks:
+		frappe.throw(_("Remarks are required when the patient is not verified by biometrics"))
+
+	data = authorize_nhif_patient(
+		insurance_subscription=doc.insurance_subscription,
+		appointment_type=doc.appointment_type,
+		company=doc.company,
+		card_no=doc.coverage_plan_card_number or "",
+		national_id=doc.national_id or "",
+		fingerprint=fingerprint,
+		fpcode=fpcode,
+		biometric_method=method,
+		practitioner=doc.practitioner,
+		referral_no=referral_no,
+		remarks=remarks,
+		ref_docname=doc.name,
+	)
+	doc.update(
+		{
+			"authorization_number": data["authorizationNo"],
+			"coverage_plan_name": data.get("coveragePlanName"),
+			"nhif_employer_name": data.get("employerName"),
+			"fpcode": data.get("fpCode"),
+			"poc_reference_no": data.get("ReferenceNo"),
+			"years_of_insurance": cint(data.get("serviceYear")),
+			"biometric_method": method,
+			"require_fingerprint": cint(method == "FINGERPRINT"),
+			"require_facial_recognation": cint(method == "FACIAL"),
+			"referral_no": referral_no,
+			"remarks": remarks,
+		}
+	)
+	doc.save(ignore_permissions=True)
+	return {
+		"authorization_number": doc.authorization_number,
+		"authorization_status": data.get("authorizationStatus"),
+		"remarks": data.get("remarks"),
+	}
+
+
+def get_appointment_to_authorize(appointment):
+	"""The appointment, if the user may write it and it still needs an authorization no."""
+	doc = frappe.get_doc("Patient Appointment", appointment)
+	doc.check_permission("write")
+	validate_can_authorize(doc)
+	return doc
+
+
+def validate_can_authorize(doc):
+	"""Only an insurance appointment that is not cancelled and has no authorization no yet."""
+	if doc.status == "Cancelled":
+		frappe.throw(_("Appointment {0} is cancelled").format(doc.name))
+	if not doc.insurance_subscription:
+		frappe.throw(_("Appointment {0} is not an insurance appointment").format(doc.name))
+	if doc.authorization_number:
+		frappe.throw(_("Appointment {0} is already authorized").format(doc.name))
 
 
 def fetch_card(company, provider, card_no, card_type):
