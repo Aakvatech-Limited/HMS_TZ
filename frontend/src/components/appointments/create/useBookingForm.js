@@ -3,6 +3,7 @@ import dayjs from "dayjs";
 import { serverErrorText, useToast } from "@/composables/useToast";
 import {
   authorizeJubileeAppointment,
+  authorizeJubileePatient,
   authorizeNhifPatient,
   checkCard as checkCardApi,
   createAppointment,
@@ -115,6 +116,13 @@ export function useBookingForm(initial) {
       (form.patientMode !== "existing" || Boolean(form.patient)) &&
       (form.subscriptionMode !== "existing" || Boolean(form.subscription)) &&
       !form.verification.authorization_number
+  );
+  const jubileeCardNo = () =>
+    (form.subscriptionMode === "new"
+      ? form.newSubscription.coverage_plan_card_number
+      : form.subscription?.coverage_plan_card_number) || form.card_no;
+  const canAuthorizeJubilee = computed(
+    () => canAuthorize.value && Boolean(jubileeCardNo())
   );
   const canSubmit = computed(
     () =>
@@ -231,7 +239,7 @@ export function useBookingForm(initial) {
     form.cardStatus = cardStatusFor(result);
   };
 
-  const cardStatusFor = (result) => {
+  const cardStatusFor = (result, inHms = "found in HMS") => {
     const holder = result.card.full_name || form.payment;
     if (result.subscription) {
       return {
@@ -240,7 +248,7 @@ export function useBookingForm(initial) {
         text: `${
           result.subscription.coverage_plan_name ||
           result.subscription.healthcare_insurance_coverage_plan
-        } · Patient and subscription found in HMS and loaded below`,
+        } · Patient and subscription ${inHms} and loaded below`,
       };
     }
     if (result.patient) {
@@ -277,6 +285,20 @@ export function useBookingForm(initial) {
       await applyCardResult(result);
     });
 
+  // The banner from the card check describes records still to create; this updates it once they are saved.
+  const refreshCardStatus = () => {
+    if (!form.cardStatus || !form.card) return;
+    form.cardStatus = cardStatusFor(
+      {
+        card: form.card,
+        patient: form.patientDetails,
+        subscription:
+          form.subscriptionMode === "existing" ? form.subscription : null,
+      },
+      "saved in HMS"
+    );
+  };
+
   const ensurePatient = async () => {
     if (form.patientMode !== "new") return;
     setStatus("Creating the patient record...", 25);
@@ -288,6 +310,7 @@ export function useBookingForm(initial) {
     });
     form.patientMode = "existing";
     await selectPatient(patient.name);
+    refreshCardStatus();
   };
 
   const ensureSubscription = async () => {
@@ -303,6 +326,7 @@ export function useBookingForm(initial) {
     });
     form.subscription = subscription;
     form.subscriptionMode = "existing";
+    refreshCardStatus();
   };
 
   const authorizeNhif = (captureBiometric) =>
@@ -350,6 +374,30 @@ export function useBookingForm(initial) {
       };
     });
 
+  const authorizeJubilee = () =>
+    run(async () => {
+      const errors = validationErrors({ forAuthorization: true });
+      if (errors.length) return showErrors(errors);
+      const card_no = jubileeCardNo();
+      await ensurePatient();
+      await ensureSubscription();
+      setStatus("Authorizing with Jubilee...", 75);
+      const data = await authorizeJubileePatient({
+        company: form.company,
+        card_no,
+        insurance_subscription: form.subscription.name,
+      });
+      form.verification.authorization_number = data.authorization_number;
+      // Marks the number as returned, so a change of payment, card or subscription drops it.
+      form.authorization = {};
+      if (!String(data.status || "").includes("OK")) {
+        providerReply.value = {
+          title: data.status,
+          message: data.description,
+        };
+      }
+    });
+
   const appointmentPayload = () => ({
     company: form.company,
     practitioner: form.practitioner,
@@ -375,7 +423,11 @@ export function useBookingForm(initial) {
       await ensureSubscription();
       setStatus("Creating the appointment...", 75);
       const appointment = await createAppointment(appointmentPayload());
-      if (form.payment === "Jubilee" && settings.value.enable_jubilee_api) {
+      if (
+        form.payment === "Jubilee" &&
+        settings.value.enable_jubilee_api &&
+        !form.verification.authorization_number
+      ) {
         setStatus("Requesting the Jubilee authorization...", 90);
         await authorizeJubileeAppointment(appointment.name).catch((error) => {
           showWarning(
@@ -471,6 +523,7 @@ export function useBookingForm(initial) {
     needsNhifAuthorization,
     creates,
     canAuthorize,
+    canAuthorizeJubilee,
     canSubmit,
     loadSettings,
     setPayment,
@@ -479,6 +532,7 @@ export function useBookingForm(initial) {
     applySubscription,
     checkCard,
     authorizeNhif,
+    authorizeJubilee,
     book,
   };
 }
