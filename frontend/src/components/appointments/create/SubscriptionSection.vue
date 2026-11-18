@@ -55,6 +55,7 @@
         <Link
           :value="form.newSubscription.insurance_company"
           doctype="Healthcare Insurance Company"
+          :filters="companyFilters"
           placeholder="Insurance company"
           @change="(value) => (form.newSubscription.insurance_company = value)"
         />
@@ -103,12 +104,37 @@ const SUBSCRIPTION_MODES = [
 const props = defineProps({ form: { type: Object, required: true } });
 const emit = defineEmits(["select-subscription"]);
 
-const planFilters = computed(() => ({
-  is_active: 1,
-  ...(props.form.newSubscription.insurance_company
-    ? { insurance_company: props.form.newSubscription.insurance_company }
-    : {}),
-}));
+// Same split as provider_condition in api/appointment_insurance.py.
+const PROVIDER_FILTERS = {
+  Jubilee: [["like", "%Jubilee%"]],
+  Other: [
+    ["not like", "%NHIF%"],
+    ["not like", "%Jubilee%"],
+  ],
+};
+
+const providerFilters = (doctype, field) =>
+  (PROVIDER_FILTERS[props.form.payment] || []).map(([operator, value]) => [
+    doctype,
+    field,
+    operator,
+    value,
+  ]);
+
+const companyFilters = computed(() =>
+  providerFilters("Healthcare Insurance Company", "name")
+);
+
+const planFilters = computed(() => {
+  const plan = "Healthcare Insurance Coverage Plan";
+  const company = props.form.newSubscription.insurance_company;
+  return [
+    [plan, "is_active", "=", 1],
+    ...(company
+      ? [[plan, "insurance_company", "=", company]]
+      : providerFilters(plan, "insurance_company")),
+  ];
+});
 </script>
 
 <style scoped>
