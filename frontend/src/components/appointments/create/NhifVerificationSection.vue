@@ -54,7 +54,6 @@
         variant="solid"
         :loading="authorizing"
         :disabled="authorizing || !canAuthorize"
-        title="Needs the visit type, the patient and the subscription, and an empty authorization no. Saves a new patient and subscription first, then captures the fingerprint or face and gets the authorization no from NHIF. Create appointment stays disabled until it is filled."
         @click="emit('authorize')"
       >
         <template #prefix>
