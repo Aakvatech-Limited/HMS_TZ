@@ -50,3 +50,6 @@ export const createAppointment = (appointment_data) =>
 
 export const authorizeJubileeAppointment = (appointment) =>
   call(`${INSURANCE_API}.authorize_jubilee_appointment`, { appointment });
+
+export const authorizeNhifAppointment = (args) =>
+  call(`${INSURANCE_API}.authorize_nhif_appointment`, args);
