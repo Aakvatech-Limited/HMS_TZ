@@ -4,7 +4,7 @@
     @update:model-value="updateDialogState"
     :options="{
       title: dialogTitle,
-      size: isCreateMode ? '4xl' : '2xl',
+      size: '4xl',
       icon: {
         name: 'book',
         appearance: 'black',
@@ -185,7 +185,8 @@
                 Edit Mode: You can modify selected fields
               </p>
               <p class="text-xs text-blue-600 mt-1">
-                Only practitioner, and appointment time can be edited.
+                Only practitioner and appointment time can be edited, and the
+                authorization of an insurance appointment that has none.
               </p>
             </div>
           </div>
@@ -210,11 +211,25 @@
               @progress="onProgress"
               @created="onCreated"
             />
-            <FieldMap
-              v-else-if="sections"
-              :sections="sections"
-              :data="appointment"
-            />
+            <template v-else-if="sections">
+              <div
+                v-if="isViewMode && isUnauthorized"
+                class="mb-5 flex items-center gap-2 rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm text-orange-800"
+              >
+                <FeatherIcon name="alert-triangle" class="h-4 w-4 shrink-0" />
+                The patient is not authorized. Click Edit to authorize or to
+                enter the authorization no.
+              </div>
+              <FieldMap :sections="sections" :data="appointment" />
+              <AuthorizeAppointmentSection
+                v-if="props.mode === 'edit' && isUnauthorized"
+                ref="authorizeSection"
+                :key="appointment['Patient Appointment'].name"
+                class="mt-5"
+                :appointment="appointment['Patient Appointment']"
+                @authorized="onAuthorized"
+              />
+            </template>
 
             <!-- Local Dialog Content Overlay -->
             <Transition name="loading-fade">
@@ -512,6 +527,7 @@ import { useToast } from "@/composables/useToast";
 import FieldMap from "@/components/controls/FieldMap.vue";
 import CreateAppointmentForm from "@/components/appointments/create/CreateAppointmentForm.vue";
 import PaymentDialog from "@/components/appointments/PaymentDialog.vue";
+import AuthorizeAppointmentSection from "@/components/appointments/AuthorizeAppointmentSection.vue";
 import Print from "@/components/controls/Print.vue";
 import dayjs from "dayjs";
 
@@ -629,12 +645,15 @@ const emptyAppointment = () => ({
     appointment_date: "",
     appointment_time: "",
     follow_up: false,
+    apply_fasttrack_charge: false,
     has_no_consultation_charges: false,
     billing_item: "",
     paid_amount: "",
     referral_no: "",
     remarks: "",
     insurance_subscription: "",
+    insurance_company: "",
+    coverage_plan_name: "",
     coverage_plan_card_number: "",
     national_id: "",
     authorization_number: "",
@@ -676,6 +695,23 @@ const emptyAppointment = () => ({
 
 const appointment = reactive(emptyAppointment());
 
+const isInsurance = computed(
+  () => appointment["Patient Appointment"]["payment_mode"] === "Insurance"
+);
+const isNhif = computed(
+  () =>
+    isInsurance.value &&
+    appointment["Patient Appointment"]["insurance_company"]?.includes("NHIF")
+);
+const isUnauthorized = computed(() => {
+  const doc = appointment["Patient Appointment"];
+  return (
+    isInsurance.value &&
+    !doc.authorization_number &&
+    doc.status?.toLowerCase() !== "cancelled"
+  );
+});
+
 const EDITABLE_FIELDS = ["practitioner", "appointment_time"];
 
 const field = (name, label, type, extra = {}) => ({
@@ -693,11 +729,30 @@ const sections = computed(() => {
       ...item,
       read_only: isViewMode.value || !EDITABLE_FIELDS.includes(item.name),
     }));
-  const revenueFields = [
-    field("mode_of_payment", "Mode of Payment", "Data"),
-    field("billing_item", "Billing Item", "Link", { options: "Item" }),
-    field("paid_amount", "Paid Amount", "Currency"),
-  ];
+  const revenueFields = isInsurance.value
+    ? [
+        field("insurance_company", "Insurance Company", "Data"),
+        field("coverage_plan_name", "Coverage Plan", "Data"),
+        field("coverage_plan_card_number", "Card No", "Data"),
+        // In edit mode the authorization section below owns this field.
+        ...(props.mode === "edit" && isUnauthorized.value
+          ? []
+          : [
+              field("authorization_number", "Authorization No", "Data", {
+                highlight: isUnauthorized.value,
+                placeholder: isUnauthorized.value
+                  ? "Not authorized"
+                  : "Authorization No",
+              }),
+            ]),
+        field("billing_item", "Billing Item", "Link", { options: "Item" }),
+        field("paid_amount", "Billing Amount", "Currency"),
+      ]
+    : [
+        field("mode_of_payment", "Mode of Payment", "Data"),
+        field("billing_item", "Billing Item", "Link", { options: "Item" }),
+        field("paid_amount", "Paid Amount", "Currency"),
+      ];
   if (appointment["Patient Appointment"]["ref_sales_invoice"]) {
     revenueFields.push(field("ref_sales_invoice", "Sales Invoice", "Data"));
   }
@@ -724,13 +779,16 @@ const sections = computed(() => {
       doctype: "Patient Appointment",
       fields: readOnly([
         field("follow_up", "Follow Up", "Check"),
+        ...(isNhif.value
+          ? [field("apply_fasttrack_charge", "Fast Track", "Check")]
+          : []),
         field(
           "has_no_consultation_charges",
           "Has No Consultation Charges",
           "Check"
         ),
       ]),
-      columns: 2,
+      columns: isNhif.value ? 3 : 2,
       hideLabel: true,
     },
     {
@@ -1003,31 +1061,11 @@ const loadAppointmentData = (appointmentData) => {
     }
   }
 
-  // Auto-fill payment mode for view/edit mode based on insurance subscription
-  if (props.mode === "view" || props.mode === "edit") {
-    // Check multiple ways an appointment might have insurance
-    const hasInsurance =
-      appointment["Patient Appointment"]["insurance_subscription"] ||
-      appointment["Healthcare Insurance Subscription"]["insurance_company"];
-
-    appointment["Patient Appointment"]["payment_mode"] = hasInsurance
-      ? "Insurance"
-      : "Cash";
-
-    // If we don't have a payment_mode value already, try to determine it from the original data
-    if (
-      !appointment["Patient Appointment"]["payment_mode"] &&
-      appointmentData
-    ) {
-      const originalPaymentMode =
-        appointmentData["Patient Appointment"]?.payment_mode ||
-        appointmentData.payment_mode;
-      if (originalPaymentMode) {
-        appointment["Patient Appointment"]["payment_mode"] =
-          originalPaymentMode;
-      }
-    }
-  }
+  appointment["Patient Appointment"]["payment_mode"] = appointment[
+    "Patient Appointment"
+  ]["insurance_subscription"]
+    ? "Insurance"
+    : "Cash";
 
   // Reset loading states
   isCreating.value = false;
@@ -1107,6 +1145,7 @@ const update_appointment_doc = createResource({
       practitioner: appointment["Patient Appointment"]["practitioner"],
       appointment_time: appointment["Patient Appointment"]["appointment_time"],
       appointment_type: appointment["Patient Appointment"]["appointment_type"],
+      ...manualAuthorization(),
     };
   },
   onSuccess: async (data) => {
@@ -1153,6 +1192,20 @@ const handleSubmit = async () => {
 };
 
 const createForm = ref(null);
+const authorizeSection = ref(null);
+
+// An authorization no copied from the provider portal is saved by Update.
+const manualAuthorization = () => {
+  const verification = authorizeSection.value?.verification;
+  if (!verification?.authorization_number) return {};
+  const { authorization_number, referral_no, remarks } = verification;
+  return { authorization_number, referral_no, remarks };
+};
+
+const onAuthorized = async () => {
+  await fetchLatestAppointmentData(appointment["Patient Appointment"].name);
+  backToViewMode();
+};
 
 const onProgress = ({ busy, title, message, percent }) => {
   isCreating.value = busy;
