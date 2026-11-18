@@ -78,7 +78,7 @@ const props = defineProps({
     default: "",
   },
   filters: {
-    type: Object,
+    type: [Object, Array],
     default: {},
   },
   hideMe: {
@@ -128,9 +128,19 @@ watchDebounced(
   { debounce: 300, immediate: true }
 );
 
+// Changed filters, such as a picked insurance company, must refresh the options.
+const filtersKey = computed(() => JSON.stringify(props.filters));
+watch(filtersKey, () => reload(text.value));
+
 const options = createResource({
   url: props.searchMethod,
-  cache: [props.searchMethod, props.doctype, text.value, props.hideMe],
+  cache: [
+    props.searchMethod,
+    props.doctype,
+    text.value,
+    props.hideMe,
+    filtersKey.value,
+  ],
   method: "POST",
   params: {
     txt: text.value,
@@ -159,7 +169,8 @@ function reload(val) {
   if (
     options.data?.length &&
     val === options.params?.txt &&
-    props.doctype === options.params?.doctype
+    props.doctype === options.params?.doctype &&
+    filtersKey.value === JSON.stringify(options.params?.filters)
   )
     return;
 
