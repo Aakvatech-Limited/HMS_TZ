@@ -483,14 +483,54 @@ class TestAuthorizeSavedAppointment(FrappeTestCase):
 			("AUTH-9", "R-1", "Portal"),
 		)
 
-	def test_update_without_a_number_leaves_the_authorization_alone(self):
-		appointment = self.insert_appointment("_Test Auth Blank", remarks="Kept")
-
-		self.assertFalse(self.update_with_number(appointment, "  ", remarks="Changed"))
-		self.assertEqual(
-			frappe.db.get_value("Patient Appointment", appointment, ["authorization_number", "remarks"]),
-			(None, "Kept"),
+	def test_update_without_a_number_keeps_the_number_and_saves_the_other_values(self):
+		appointment = self.insert_appointment(
+			"_Test Auth Blank",
+			authorization_number="A0",
+			referral_no="R-0",
+			remarks="Old",
+			biometric_method="FINGERPRINT",
 		)
+
+		self.assertTrue(
+			self.update_with_number(
+				appointment, "  ", referral_no="R-1", remarks="New", biometric_method="NONE"
+			)
+		)
+		self.assertEqual(
+			frappe.db.get_value(
+				"Patient Appointment",
+				appointment,
+				["authorization_number", "referral_no", "remarks", "biometric_method"],
+			),
+			("A0", "R-1", "New", "NONE"),
+		)
+
+	def test_update_corrects_a_saved_number(self):
+		appointment = self.insert_appointment("_Test Auth Fix", authorization_number="A0")
+
+		self.assertTrue(self.update_with_number(appointment, "A1"))
+		self.assertEqual(
+			frappe.db.get_value("Patient Appointment", appointment, "authorization_number"), "A1"
+		)
+
+	def test_update_without_changes_returns_false(self):
+		appointment = self.insert_appointment("_Test Auth Same", referral_no="R-0")
+
+		self.assertFalse(self.update_with_number(appointment, None, referral_no="R-0", remarks=""))
+
+	def test_update_rejects_closed_cancelled_and_cash_appointments(self):
+		cases = {
+			"is Closed and cannot be edited": self.insert_appointment("_Test Auth Closed", status="Closed"),
+			"is Cancelled and cannot be edited": self.insert_appointment(
+				"_Test Auth Cancelled", status="Cancelled"
+			),
+			"not an insurance appointment": self.insert_appointment("_Test Auth Cash", subscription=""),
+		}
+		for message, appointment in cases.items():
+			with self.subTest(message):
+				with self.assertRaisesRegex(frappe.ValidationError, message):
+					self.update_with_number(appointment, "AUTH-9")
 
 	def test_only_open_insurance_appointments_without_a_number_can_be_authorized(self):
 		cases = {
@@ -500,8 +540,6 @@ class TestAuthorizeSavedAppointment(FrappeTestCase):
 		}
 		for message, appointment in cases.items():
 			with self.subTest(message):
-				with self.assertRaisesRegex(frappe.ValidationError, message):
-					self.update_with_number(appointment, "AUTH-9")
 				with self.assertRaisesRegex(frappe.ValidationError, message):
 					appointment_insurance.authorize_jubilee_appointment(appointment)
 
