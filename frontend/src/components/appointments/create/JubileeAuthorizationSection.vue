@@ -15,19 +15,19 @@
 
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-end">
       <div>
-        <FieldLabel label="Authorization no" />
-        <FormControl
-          v-model="form.verification.authorization_number"
-          type="text"
-          placeholder="Authorization no"
-        />
-      </div>
-      <div>
         <FieldLabel label="Referral no" />
         <FormControl
           v-model="form.verification.referral_no"
           type="text"
           placeholder="If referred"
+        />
+      </div>
+      <div>
+        <FieldLabel label="Authorization no" />
+        <FormControl
+          v-model="form.verification.authorization_number"
+          type="text"
+          placeholder="Authorization no"
         />
       </div>
     </div>
@@ -46,7 +46,7 @@
         <template #prefix>
           <FeatherIcon name="shield" class="h-4 w-4" />
         </template>
-        Authorize patient
+        Authorize
       </Button>
     </div>
   </section>
