@@ -16,14 +16,7 @@
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-end">
       <div>
         <FieldLabel label="Authorization no" />
-        <div
-          v-if="apiEnabled"
-          class="min-h-[28px] rounded border border-gray-200 bg-white px-2 py-1 text-sm text-gray-500"
-        >
-          Requested from Jubilee on create
-        </div>
         <FormControl
-          v-else
           v-model="form.verification.authorization_number"
           type="text"
           placeholder="Authorization no"
@@ -42,6 +35,21 @@
       <FieldLabel label="Remarks" />
       <FormControl v-model="form.verification.remarks" type="textarea" />
     </div>
+
+    <div v-if="apiEnabled && canAuthorize" class="flex justify-end">
+      <Button
+        variant="solid"
+        :loading="authorizing"
+        :disabled="authorizing"
+        title="Saves a new patient and subscription first, then gets the authorization no for the card from Jubilee. An empty authorization no is requested when the appointment is created."
+        @click="emit('authorize')"
+      >
+        <template #prefix>
+          <FeatherIcon name="shield" class="h-4 w-4" />
+        </template>
+        Authorize patient
+      </Button>
+    </div>
   </section>
 </template>
 
@@ -51,5 +59,8 @@ import FieldLabel from "./FieldLabel.vue";
 defineProps({
   form: { type: Object, required: true },
   apiEnabled: { type: Boolean, default: false },
+  authorizing: { type: Boolean, default: false },
+  canAuthorize: { type: Boolean, default: false },
 });
+const emit = defineEmits(["authorize"]);
 </script>
