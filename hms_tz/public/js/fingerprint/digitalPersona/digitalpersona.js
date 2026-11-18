@@ -20,6 +20,7 @@ export class DigitalPersona {
     this.onAcquisitionStarted = null;
     this.onCommunicationFailed = null;
     this.onReaderError = null;
+    this.onError = null;
   }
 
   initializeEventHandlers(callbacks) {
@@ -30,6 +31,7 @@ export class DigitalPersona {
     this.onAcquisitionStarted = callbacks.onAcquisitionStarted;
     this.onCommunicationFailed = callbacks.onCommunicationFailed;
     this.onReaderError = callbacks.onReaderError;
+    this.onError = callbacks.onError;
 
     // Initialize the reader now that we have callbacks
     this.initializeReader();
@@ -51,7 +53,7 @@ export class DigitalPersona {
 
   handleSamplesAcquired = async (event) => {
     if (this.qualityReported !== QualityCode.Good) {
-      frappe.msgprint(__("Fingerprint quality is poor. Please try again."));
+      this.onError?.(__("Fingerprint quality is poor. Please try again."));
       return;
     }
 
@@ -64,7 +66,7 @@ export class DigitalPersona {
       }
     } catch (error) {
       console.error("DigitalPersona SampleAcquired Error:", error);
-      frappe.msgprint(__("Fingerprint scan failed. Please try again."));
+      this.onError?.(__("Fingerprint scan failed. Please try again."));
     }
   };
 

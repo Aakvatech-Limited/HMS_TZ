@@ -2100,50 +2100,14 @@ var login_to_nhif = (frm) => {
             size: "small",
             primary_action_label: __("Next"),
             primary_action: async () => {
-              let biometricData;
               let values = dialog.get_values();
               dialog.hide();
 
-              if (values.biometric_method === "FACIAL") {
-                biometricData = await new FacialRecognition({
-                  label: "Login To NHIF",
-                });
-                if (!biometricData) {
-                  frappe.msgprint(
-                    __("Face capture failed. Please try again.")
-                  );
-                  return;
-                }
-              } else if (values.biometric_method === "FINGERPRINT") {
-                biometricData = await new Fingerprint({
-                  label: "Login To NHIF",
-                });
-                if (!biometricData) {
-                  frappe.msgprint(
-                    __("Fingerprint capture failed. Please try again.")
-                  );
-                  return;
-                }
-              } else {
-                const confirmed = await new Promise((resolve) => {
-                  frappe.confirm(
-                    __(`
-                      <div style="border-left: 4px solid #ffc107; background-color: #fff3cd; padding: 15px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1); margin: 10px;">
-                      <p class="text-center"><i>Biometric Method: <b>${values.biometric_method}</b> is only used when Patient is not able to take fingerprint or face.</i></p>
-                      </div>
-                      <br>
-                      <p class="text-center"><i>Are you sure you want to continue?</i></p>`),
-                    () => resolve(true),
-                    () => resolve(false)
-                  );
-                });
-
-                if (!confirmed) {
-                  return;
-                }
-
-                biometricData = { Data: "", fpCode: "" };
-              }
+              const biometricData = await captureBiometric(
+                values.biometric_method,
+                "Login To NHIF"
+              );
+              if (!biometricData) return;
 
               frappe.call({
                 method: "hms_tz.nhif.nhif_api.attendance.login_practitioner",
@@ -2391,50 +2355,14 @@ var confirm_poc_btn = (frm) => {
             size: "small",
             primary_action_label: __("Next"),
             primary_action: async () => {
-              let biometricData;
               let values = dialog.get_values();
               dialog.hide();
 
-              if (values.biometric_method === "FACIAL") {
-                biometricData = await new FacialRecognition({
-                  label: "Confirm POC",
-                });
-                if (!biometricData) {
-                  frappe.msgprint(
-                    __("Face capture failed. Please try again.")
-                  );
-                  return;
-                }
-              } else if (values.biometric_method === "FINGERPRINT") {
-                biometricData = await new Fingerprint({
-                  label: "Confirm POC",
-                });
-                if (!biometricData) {
-                  frappe.msgprint(
-                    __("Fingerprint capture failed. Please try again.")
-                  );
-                  return;
-                }
-              } else {
-                const confirmed = await new Promise((resolve) => {
-                  frappe.confirm(
-                    __(`
-                      <div style="border-left: 4px solid #ffc107; background-color: #fff3cd; padding: 15px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1); margin: 10px;">
-                      <p class="text-center"><i>Biometric Method: <b>${values.biometric_method}</b> is only used when Patient is not able to take fingerprint or face.</i></p>
-                      </div>
-                      <br>
-                      <p class="text-center"><i>Are you sure you want to continue?</i></p>`),
-                    () => resolve(true),
-                    () => resolve(false)
-                  );
-                });
-
-                if (!confirmed) {
-                  return;
-                }
-
-                biometricData = { Data: "", fpCode: "" };
-              }
+              const biometricData = await captureBiometric(
+                values.biometric_method,
+                "Confirm POC"
+              );
+              if (!biometricData) return;
 
               frappe.call({
                 method:

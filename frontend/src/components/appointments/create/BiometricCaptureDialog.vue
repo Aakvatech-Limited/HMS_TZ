@@ -25,7 +25,7 @@
             class="relative mx-auto h-72 w-72 overflow-hidden rounded-lg bg-gray-100"
           >
             <div
-              v-if="!stream && !photo"
+              v-if="!cameraReady && !photo"
               class="absolute inset-0 flex items-center justify-center gap-2 text-sm text-gray-600"
             >
               <LoadingIndicator class="h-4 w-4" />
@@ -50,18 +50,20 @@
             <Button
               v-if="!photo"
               variant="subtle"
-              :disabled="!stream"
+              :disabled="!cameraReady"
               @click="capturePhoto"
             >
               Capture
             </Button>
-            <Button v-else variant="subtle" @click="photo = ''">Retake</Button>
+            <Button v-else variant="subtle" @click="retakePhoto"
+              >Retake</Button
+            >
           </div>
         </template>
       </div>
 
       <div
-        v-else-if="scanner.searching.value"
+        v-else-if="searching"
         class="flex items-center justify-center gap-2 py-10 text-sm text-gray-600"
       >
         <LoadingIndicator class="h-4 w-4" />
@@ -69,7 +71,7 @@
       </div>
 
       <div
-        v-else-if="!deviceOptions.length"
+        v-else-if="!devices.length"
         class="flex flex-col gap-3 rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm"
       >
         <p class="font-semibold text-gray-900">No fingerprint reader found</p>
@@ -130,20 +132,11 @@
             alt="Fingerprint"
             class="h-full w-full"
           />
-          <span v-else-if="scanner.scanning.value"
-            >Place the finger on the reader</span
-          >
-          <span v-else>No scan yet</span>
+          <span v-else-if="scanning">Place the finger on the reader</span>
+          <span v-else>Select a finger to start the scan</span>
         </div>
-        <div class="flex justify-center">
-          <Button
-            variant="subtle"
-            :loading="scanner.scanning.value"
-            :disabled="!selectedDevice || !finger || scanner.scanning.value"
-            @click="scan"
-          >
-            Scan
-          </Button>
+        <div v-if="finger && !scanning" class="flex justify-center">
+          <Button variant="subtle" @click="scan">Scan again</Button>
         </div>
       </div>
     </template>
@@ -159,13 +152,14 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useToast } from "@/composables/useToast";
+import { FaceCamera } from "@desk/facial/camera.js";
+import { FINGERPRINT_DRIVER_DOWNLOADS } from "@desk/fingerprint/drivers.js";
 import {
   FINGER_CODES,
-  useFingerprintScanner,
-} from "@/composables/useFingerprintScanner";
-import { FINGERPRINT_DRIVER_DOWNLOADS } from "@desk/fingerprint/drivers.js";
+  FingerprintScanner,
+} from "@desk/fingerprint/scanner.js";
 import FieldLabel from "./FieldLabel.vue";
 
 const props = defineProps({
@@ -175,29 +169,24 @@ const props = defineProps({
 const emit = defineEmits(["update:show", "captured"]);
 
 const { showError } = useToast();
-const scanner = useFingerprintScanner({ onError: showError });
 
 const video = ref(null);
-const stream = ref(null);
 const cameras = ref([]);
 const selectedCamera = ref("");
+const cameraReady = ref(false);
 const cameraError = ref("");
 const photo = ref("");
 
+const devices = ref([]);
+const searching = ref(false);
+const scanning = ref(false);
 const selectedDevice = ref("");
 const finger = ref("");
 const fingerprintImage = ref("");
-const fingerprintData = ref("");
+const result = ref(null);
 
-const CAMERA_ERRORS = {
-  NotAllowedError:
-    "Camera access is blocked. Allow the camera for this site in the browser address bar, then click Try again.",
-  NotFoundError: "No camera found. Connect a camera, then click Try again.",
-  NotReadableError:
-    "Another application is using the camera. Close it, then click Try again.",
-  NotSupported:
-    "This browser cannot open the camera on this page. Use HTTPS or localhost.",
-};
+let camera = null;
+let scanner = null;
 
 const title = computed(() =>
   props.method === "FACIAL"
@@ -205,127 +194,109 @@ const title = computed(() =>
     : "Scan the patient's fingerprint"
 );
 const cameraOptions = computed(() =>
-  cameras.value.map((camera, index) => ({
-    label: camera.label || `Camera ${index + 1}`,
-    value: camera.deviceId,
+  cameras.value.map((item, index) => ({
+    label: item.label || `Camera ${index + 1}`,
+    value: item.deviceId,
   }))
 );
 const deviceOptions = computed(() =>
-  scanner.devices.value.map((device) => ({
-    label: device.name,
-    value: device.name,
-  }))
+  devices.value.map((device) => ({ label: device.name, value: device.name }))
 );
-const captured = computed(() =>
-  props.method === "FACIAL"
-    ? Boolean(photo.value)
-    : Boolean(fingerprintData.value)
-);
+const captured = computed(() => Boolean(result.value));
 
-const startCamera = async (deviceId) => {
-  stopCamera();
-  selectedCamera.value = deviceId;
+const openFacial = async () => {
+  closeDevices();
+  photo.value = "";
+  result.value = null;
   cameraError.value = "";
-  try {
-    stream.value = await navigator.mediaDevices.getUserMedia({
-      video: {
-        deviceId: deviceId ? { exact: deviceId } : undefined,
-        width: { ideal: 720 },
-        height: { ideal: 720 },
-        facingMode: "user",
-      },
-    });
-    video.value.srcObject = stream.value;
-    cameras.value = await listCameras();
-    selectedCamera.value =
-      stream.value.getVideoTracks()[0]?.getSettings().deviceId || deviceId;
-  } catch (error) {
-    cameraError.value =
-      CAMERA_ERRORS[error.name] ||
-      `The camera did not start: ${error.message}`;
-  }
+  camera = new FaceCamera({
+    onError: (message) => (cameraError.value = message),
+  });
+  // The video element renders with the dialog body, after show turns true
+  await nextTick();
+  cameras.value = await camera.open(video.value);
+  cameraReady.value = Boolean(camera.stream);
+  selectedCamera.value = camera.deviceId;
 };
 
-const stopCamera = () => {
-  for (const track of stream.value?.getTracks() || []) track.stop();
-  stream.value = null;
+const startCamera = async (deviceId) => {
+  cameraReady.value = await camera.start(video.value, deviceId);
+  selectedCamera.value = camera.deviceId;
 };
 
 const capturePhoto = () => {
-  const size = Math.min(video.value.videoWidth, video.value.videoHeight);
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const x = (video.value.videoWidth - size) / 2;
-  const y = (video.value.videoHeight - size) / 2;
-  canvas
-    .getContext("2d")
-    .drawImage(video.value, x, y, size, size, 0, 0, size, size);
-  photo.value = canvas.toDataURL("image/jpeg", 0.9);
+  const capture = camera.capture(video.value);
+  photo.value = capture.image;
+  result.value = capture.result;
 };
 
-// Browsers give camera labels only after access is allowed, so the list is read again once the camera starts.
-const listCameras = async () => {
-  const devices = await navigator.mediaDevices
-    .enumerateDevices()
-    .catch(() => []);
-  return devices.filter((device) => device.kind === "videoinput");
-};
-
-const openFacial = async () => {
+const retakePhoto = () => {
   photo.value = "";
-  cameraError.value = "";
-  if (!navigator.mediaDevices) {
-    cameraError.value = CAMERA_ERRORS.NotSupported;
-    return;
-  }
-  cameras.value = await listCameras();
-  if (!cameras.value.length) {
-    cameraError.value = CAMERA_ERRORS.NotFoundError;
-    return;
-  }
-  await startCamera(cameras.value[0].deviceId);
+  result.value = null;
 };
 
 const openFingerprint = async () => {
+  closeDevices();
   fingerprintImage.value = "";
-  fingerprintData.value = "";
+  result.value = null;
   finger.value = "";
-  await scanner.enumerateDevices();
-  selectedDevice.value = scanner.devices.value[0]?.name || "";
+  scanner = new FingerprintScanner({
+    onSample: ({ result: sample, image }) => {
+      scanning.value = false;
+      result.value = sample;
+      fingerprintImage.value = image;
+    },
+    onError: (message) => {
+      scanning.value = false;
+      showError(message);
+    },
+  });
+  searching.value = true;
+  try {
+    devices.value = await scanner.findDevices();
+  } finally {
+    searching.value = false;
+  }
+  selectedDevice.value = devices.value[0]?.name || "";
 };
 
 const scan = () => {
-  const device = scanner.devices.value.find(
+  const device = devices.value.find(
     (item) => item.name === selectedDevice.value
   );
+  if (!device || !finger.value) return;
   fingerprintImage.value = "";
-  fingerprintData.value = "";
-  scanner.scan(device, ({ data, image }) => {
-    fingerprintData.value = data;
-    fingerprintImage.value = image;
-  });
+  result.value = null;
+  scanning.value = true;
+  scanner.scan(device, finger.value);
 };
 
-const close = async () => {
-  stopCamera();
-  await scanner.destroy();
+const closeDevices = () => {
+  camera?.stop();
+  cameraReady.value = false;
+  scanner?.destroy();
+  scanner = null;
+  scanning.value = false;
+};
+
+const close = () => {
+  closeDevices();
   emit("update:show", false);
 };
 
-const cancel = async () => {
-  await close();
+const cancel = () => {
+  close();
   emit("captured", null);
 };
 
-const confirm = async () => {
-  const result =
-    props.method === "FACIAL"
-      ? { Data: photo.value.split(",")[1], fpCode: "FACE" }
-      : { Data: fingerprintData.value, fpCode: finger.value };
-  await close();
-  emit("captured", result);
+const confirm = () => {
+  const capture = result.value;
+  close();
+  emit("captured", capture);
 };
+
+watch(selectedDevice, () => (finger.value = ""));
+watch(finger, (value) => value && scan());
 
 watch(
   () => props.show,
@@ -336,8 +307,5 @@ watch(
   }
 );
 
-onBeforeUnmount(() => {
-  stopCamera();
-  scanner.destroy();
-});
+onBeforeUnmount(closeDevices);
 </script>
