@@ -70,52 +70,52 @@
         Looking for fingerprint readers...
       </div>
 
-      <div
-        v-else-if="!devices.length"
-        class="flex flex-col gap-3 rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm"
-      >
-        <p class="font-semibold text-gray-900">No fingerprint reader found</p>
-        <p class="text-gray-700">
-          Connect the reader, or download and install the driver for your
-          reader:
-        </p>
-        <ul class="list-disc pl-6">
-          <li v-for="driver in FINGERPRINT_DRIVER_DOWNLOADS" :key="driver.url">
+      <div v-else-if="!devices.length" class="text-sm text-gray-800">
+        <!-- Same wording and look as the desk Fingerprint dialog -->
+        <div class="p-1 leading-relaxed">
+          <strong>No Device Connected.</strong><br />
+          Please download and install drivers:
+        </div>
+        <ul class="my-2.5 list-disc pl-10">
+          <li
+            v-for="driver in FINGERPRINT_DRIVER_DOWNLOADS"
+            :key="driver.url"
+            class="my-1"
+          >
             <a
               :href="driver.url"
               target="_blank"
               rel="noopener"
-              class="font-medium text-blue-600 underline"
+              class="font-bold"
+              style="color: blue"
               >{{ driver.label }}</a
             >
           </li>
         </ul>
-        <p class="text-xs text-gray-600">
-          After installation, restart your browser and make sure the driver
-          service is running.
-        </p>
-        <div>
-          <Button variant="subtle" @click="openFingerprint">
-            <template #prefix>
-              <FeatherIcon name="refresh-cw" class="h-4 w-4" />
-            </template>
-            Search again
-          </Button>
+        <div class="px-4 pb-4 text-xs text-gray-600">
+          After installation, restart your browser and ensure services are
+          running.
         </div>
+        <Button variant="subtle" class="ml-1" @click="openFingerprint">
+          <template #prefix>
+            <FeatherIcon name="refresh-cw" class="h-4 w-4" />
+          </template>
+          Search again
+        </Button>
       </div>
 
       <div v-else class="flex flex-col gap-3">
         <p class="flex items-center gap-1 text-sm text-green-700">
           <FeatherIcon name="check-circle" class="h-4 w-4" />
-          Reader connected
+          Device Connected
         </p>
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <FieldLabel label="Device" />
+            <FieldLabel label="Select Device" />
             <Select :options="deviceOptions" v-model="selectedDevice" />
           </div>
           <div>
-            <FieldLabel label="Finger" />
+            <FieldLabel label="Select Finger to Scan" />
             <Select
               :options="FINGER_CODES"
               v-model="finger"
@@ -143,7 +143,11 @@
     <template #actions>
       <div class="flex justify-end gap-2">
         <Button variant="subtle" @click="cancel">Cancel</Button>
-        <Button variant="solid" :disabled="!captured" @click="confirm"
+        <Button
+          v-if="method === 'FACIAL'"
+          variant="solid"
+          :disabled="!captured"
+          @click="confirm"
           >Use capture</Button
         >
       </div>
@@ -189,9 +193,7 @@ let camera = null;
 let scanner = null;
 
 const title = computed(() =>
-  props.method === "FACIAL"
-    ? "Capture the patient's face"
-    : "Scan the patient's fingerprint"
+  props.method === "FACIAL" ? "Capture the patient's face" : "Scan Fingerprint"
 );
 const cameraOptions = computed(() =>
   cameras.value.map((item, index) => ({
@@ -241,10 +243,12 @@ const openFingerprint = async () => {
   result.value = null;
   finger.value = "";
   scanner = new FingerprintScanner({
+    // A scan goes straight on to the NHIF call, like the desk dialog
     onSample: ({ result: sample, image }) => {
       scanning.value = false;
       result.value = sample;
       fingerprintImage.value = image;
+      confirm();
     },
     onError: (message) => {
       scanning.value = false;

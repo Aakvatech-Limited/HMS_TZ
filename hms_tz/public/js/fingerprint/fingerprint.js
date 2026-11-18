@@ -65,13 +65,19 @@ export class Fingerprint {
   }
 
   async loadDevices() {
+    this.setStatus(this.statusHTML("orange", __("Scanning for devices...")));
     this.devices = await this.scanner.findDevices();
     const hasDevices = this.devices.length > 0;
     for (const field of ["device", "finger", "fingerprint"]) {
       this.dialog.set_df_property(field, "hidden", hasDevices ? 0 : 1);
     }
+    // set_df_property leaves the emptied sections and their dividers on screen
+    this.dialog.refresh_sections();
     if (!hasDevices) {
       this.setStatus(this.noDeviceHTML());
+      this.dialog.$wrapper
+        .find(".hms-search-again")
+        .on("click", () => this.loadDevices());
       return;
     }
     this.dialog.set_df_property(
@@ -151,7 +157,10 @@ export class Fingerprint {
         ${__(
           "After installation, restart your browser and ensure services are running."
         )}
-      </div>`;
+      </div>
+      <button type="button" class="btn btn-default btn-sm hms-search-again" style="margin-left: 5px;">
+        <i class="fa fa-refresh"></i> ${__("Search again")}
+      </button>`;
   }
 }
 
