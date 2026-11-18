@@ -1,6 +1,6 @@
-import "./fingerprint/digitalPersona/digitalpersona-shims.js";
 import "./fingerprint/fingerprint.js";
 import "./facial/facial_recognition.js";
+import "./biometric/capture_biometric.js";
 import "./signature/signature.js";
 import "./request_approval.js";
 import "./service_dialog.js";
