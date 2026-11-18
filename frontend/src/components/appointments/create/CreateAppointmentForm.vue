@@ -33,7 +33,7 @@
       :api-enabled="settings.enable_nhif_api"
       :authorizing="busy"
       :can-authorize="canAuthorize"
-      @authorize="authorize(() => authorizeNhif(captureBiometric))"
+      @authorize="authorizeNhif(captureBiometric)"
     />
     <JubileeAuthorizationSection
       v-else-if="isInsurance"
@@ -41,7 +41,7 @@
       :api-enabled="form.payment === 'Jubilee' && settings.enable_jubilee_api"
       :authorizing="busy"
       :can-authorize="canAuthorizeJubilee"
-      @authorize="authorize(authorizeJubilee)"
+      @authorize="authorizeJubilee"
     />
 
     <BiometricCaptureDialog
@@ -101,7 +101,6 @@ const {
 });
 
 const showCapture = ref(false);
-const authorizing = ref(false);
 let resolveCapture = null;
 
 const captureBiometric = () =>
@@ -115,15 +114,6 @@ const onCaptured = (result) => {
   resolveCapture = null;
 };
 
-const authorize = async (work) => {
-  authorizing.value = true;
-  try {
-    await work();
-  } finally {
-    authorizing.value = false;
-  }
-};
-
 const submit = async () => {
   const appointment = await book();
   if (appointment) emit("created", appointment, form.payment);
@@ -133,7 +123,6 @@ const submit = async () => {
 watch([busy, status, showCapture], () =>
   emit("progress", {
     busy: busy.value && !showCapture.value,
-    title: authorizing.value ? "Authorizing Patient" : "Creating Appointment",
     ...status.value,
   })
 );
