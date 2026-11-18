@@ -60,7 +60,7 @@ export function useBookingForm(initial) {
   const settings = ref({ enable_nhif_api: false, enable_jubilee_api: false });
   const busy = ref(false);
   const providerReply = ref(null);
-  const status = ref({ message: "", percent: 0 });
+  const status = ref({ title: "", message: "", percent: 0 });
 
   const form = reactive({
     company: initial.company,
@@ -128,10 +128,12 @@ export function useBookingForm(initial) {
   };
 
   const setStatus = (message, percent) => {
-    status.value = { message, percent };
+    status.value = { ...status.value, message, percent };
   };
 
-  const run = async (work) => {
+  // The title names the action on the progress overlay.
+  const run = async (title, work) => {
+    status.value = { title, message: "", percent: 0 };
     busy.value = true;
     providerReply.value = null;
     try {
@@ -184,7 +186,7 @@ export function useBookingForm(initial) {
   };
 
   const selectSubscription = (name) =>
-    run(async () =>
+    run("Loading Subscription", async () =>
       applySubscription(name ? await getSubscription(name) : null)
     );
 
@@ -258,7 +260,7 @@ export function useBookingForm(initial) {
   };
 
   const checkCard = () =>
-    run(async () => {
+    run(`Checking with ${form.payment}`, async () => {
       if (isNhif.value && !form.card_type) {
         showError("Select the card type");
         return;
@@ -322,7 +324,7 @@ export function useBookingForm(initial) {
   };
 
   const authorizeNhif = (captureBiometric) =>
-    run(async () => {
+    run("Authorizing Patient", async () => {
       const errors = validationErrors({ forAuthorization: true });
       if (errors.length) return showErrors(errors);
       await ensurePatient();
@@ -367,7 +369,7 @@ export function useBookingForm(initial) {
     });
 
   const authorizeJubilee = () =>
-    run(async () => {
+    run("Authorizing Patient", async () => {
       const errors = validationErrors({ forAuthorization: true });
       if (errors.length) return showErrors(errors);
       const card_no = jubileeCardNo();
@@ -408,7 +410,7 @@ export function useBookingForm(initial) {
   });
 
   const book = () =>
-    run(async () => {
+    run("Creating Appointment", async () => {
       const errors = validationErrors({ forAuthorization: false });
       if (errors.length) return showErrors(errors);
       await ensurePatient();
