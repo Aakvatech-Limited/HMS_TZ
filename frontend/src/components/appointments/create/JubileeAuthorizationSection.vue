@@ -41,7 +41,6 @@
         variant="solid"
         :loading="authorizing"
         :disabled="authorizing"
-        title="Saves a new patient and subscription first, then gets the authorization no for the card from Jubilee. An empty authorization no is requested when the appointment is created."
         @click="emit('authorize')"
       >
         <template #prefix>
