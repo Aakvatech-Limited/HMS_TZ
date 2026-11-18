@@ -220,6 +220,7 @@
                 The patient is not authorized. Click Edit to authorize or to
                 enter the authorization no.
               </div>
+              <PaymentModeStrip :payment="paymentSection" />
               <FieldMap :sections="sections" :data="appointment" />
               <AuthorizeAppointmentSection
                 v-if="props.mode === 'edit' && isUnauthorized"
@@ -523,6 +524,7 @@ import { useAppointmentStore } from "@/data/appointment";
 import { useDateStore } from "@/data/date";
 import { useToast } from "@/composables/useToast";
 import FieldMap from "@/components/controls/FieldMap.vue";
+import PaymentModeStrip from "@/components/appointments/PaymentModeStrip.vue";
 import CreateAppointmentForm from "@/components/appointments/create/CreateAppointmentForm.vue";
 import PaymentDialog from "@/components/appointments/PaymentDialog.vue";
 import AuthorizeAppointmentSection from "@/components/appointments/AuthorizeAppointmentSection.vue";
@@ -701,6 +703,16 @@ const isNhif = computed(
     isInsurance.value &&
     appointment["Patient Appointment"]["insurance_company"]?.includes("NHIF")
 );
+// The create-mode payment tab; insurance companies are told apart by name, as in provider_condition.
+const paymentSection = computed(() => {
+  if (!isInsurance.value) return "Cash";
+  if (isNhif.value) return "NHIF";
+  return appointment["Patient Appointment"]["insurance_company"]?.includes(
+    "Jubilee"
+  )
+    ? "Jubilee"
+    : "Other";
+});
 // Edit mode keeps the number saved when it opened, so typing in the field does not swap in the authorization section.
 const authorizationNumberAtEdit = ref("");
 watch(
@@ -788,22 +800,6 @@ const sections = computed(() => {
   }
 
   return [
-    {
-      label: "Initial Data",
-      doctype: "Patient Appointment",
-      fields: readOnly([
-        field("payment_mode", "Payment Mode", "Select", {
-          options: [
-            { label: "", value: "" },
-            { label: "Cash", value: "Cash" },
-            { label: "Insurance", value: "Insurance" },
-          ],
-          reqd: true,
-        }),
-      ]),
-      columns: 2,
-      hideLabel: true,
-    },
     {
       label: "Flags",
       doctype: "Patient Appointment",
