@@ -11,6 +11,7 @@ declare module 'vue' {
     AppointmentCard: typeof import('./src/components/appointments/AppointmentCard.vue')['default']
     AppointmentDialog: typeof import('./src/components/appointments/AppointmentDialog.vue')['default']
     AppointmentGrid: typeof import('./src/components/appointments/AppointmentGrid.vue')['default']
+    AuthorizeAppointmentSection: typeof import('./src/components/appointments/AuthorizeAppointmentSection.vue')['default']
     Autocomplete: typeof import('./src/components/controls/Autocomplete.vue')['default']
     BiometricCaptureDialog: typeof import('./src/components/appointments/create/BiometricCaptureDialog.vue')['default']
     CreateAppointmentForm: typeof import('./src/components/appointments/create/CreateAppointmentForm.vue')['default']
