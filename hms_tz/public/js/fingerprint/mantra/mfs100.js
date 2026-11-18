@@ -122,8 +122,7 @@ export class MFS100 {
         errorMessage = __(`Failed to capture fingerprint: ${error.message}`);
       }
 
-      frappe.msgprint(errorMessage);
-      throw error;
+      throw new Error(errorMessage, { cause: error });
     } finally {
       this.isScanning = false;
       this.currentScanController = null;
