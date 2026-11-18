@@ -310,11 +310,8 @@ async function capture_signature_and_sign(frm) {
  */
 async function capture_fingerprint_and_sign(frm) {
   try {
-    let fingerprint = await new Fingerprint({ label: "Sign Folio" });
-    if (!fingerprint) {
-      frappe.msgprint(__("Fingerprint capture failed. Please try again."));
-      return;
-    }
+    const fingerprint = await captureBiometric("FINGERPRINT", "Sign Folio");
+    if (!fingerprint) return;
 
     frappe.call({
       method: "hms_tz.nhif.nhif_api.patient_claim.sign_folio",
