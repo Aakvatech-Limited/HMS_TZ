@@ -50,8 +50,11 @@ const DEFAULT_NHIF_CARD_TYPE = "NHIF Beneficiary Card";
 
 export const patientSummary = (patient) => {
   if (!patient) return "";
-  const age = patient.dob ? `${dayjs().diff(patient.dob, "year")} years` : "";
-  return [patient.sex, age, patient.mobile].filter(Boolean).join(" · ");
+  const age = patient.dob ? `Age ${dayjs().diff(patient.dob, "year")}` : "";
+  const mobile = patient.mobile ? `Mob ${patient.mobile}` : "";
+  return [patient.patient_name, patient.sex, age, mobile]
+    .filter(Boolean)
+    .join(" · ");
 };
 
 /** State and server calls of the New Appointment form. */
