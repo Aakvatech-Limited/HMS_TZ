@@ -57,6 +57,7 @@ doctype_js = {
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 
 doctype_list_js = {
+	"Patient Appointment": "nhif/api/patient_appointment_list.js",
 	"Therapy Plan": ["nhif/api/therapy_plan_list.js"],
 	"Custom Field": "hms_tz/patches/custom_fields/custom_field.js",
 	"Property Setter": "hms_tz/patches/property_setter/property_setter.js",
