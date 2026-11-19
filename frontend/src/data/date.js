@@ -28,7 +28,7 @@ export const getTimeSlots = (date, slotDuration, dayStartHour) => {
 export const useDateStore = defineStore("date", {
   state: () => ({
     selectedDate: dayjs().format("YYYY-MM-DD"),
-    slotDuration: 10, // minutes
+    slotDuration: 10, // minutes; the grid sets it per company from HMS TZ Setting
     dayStartHour: 7, // first row of the grid
     bufferTime: 5, // minutes buffer for future bookings
   }),
