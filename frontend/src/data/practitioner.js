@@ -1,5 +1,10 @@
 import { defineStore } from "pinia";
 import { call } from "frappe-ui";
+import {
+  EMPTY_PRACTITIONER_FILTERS,
+  contains,
+  matchesPractitioner,
+} from "./appointmentFilters";
 import { fetchLatest } from "./latestRequest";
 
 export const usePractitionerStore = defineStore("practitioners", {
@@ -8,31 +13,25 @@ export const usePractitionerStore = defineStore("practitioners", {
     isFetching: false,
     loadError: null,
     searchQuery: "",
+    filters: { ...EMPTY_PRACTITIONER_FILTERS },
     latestRequest: 0,
   }),
 
   getters: {
-    filteredPractitioners: (state) => {
-      let filtered = state.practitioners;
-
-      // Apply search query
-      if (state.searchQuery) {
-        filtered = filtered.filter(
-          (practitioner) =>
-            practitioner.name
-              .toLowerCase()
-              .includes(state.searchQuery.toLowerCase()) ||
-            practitioner.department
-              .toLowerCase()
-              .includes(state.searchQuery.toLowerCase())
-        );
-      }
-
-      return filtered;
-    },
+    filteredPractitioners: (state) =>
+      state.practitioners.filter(
+        (practitioner) =>
+          (contains(practitioner.name, state.searchQuery) ||
+            contains(practitioner.department, state.searchQuery)) &&
+          matchesPractitioner(practitioner, state.filters)
+      ),
   },
 
   actions: {
+    clearFilters() {
+      this.filters = { ...EMPTY_PRACTITIONER_FILTERS };
+    },
+
     setSearchQuery(query) {
       this.searchQuery = query;
     },
