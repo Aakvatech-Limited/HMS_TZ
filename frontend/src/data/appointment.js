@@ -132,6 +132,10 @@ export const useAppointmentStore = defineStore("appointments", {
       ];
       return state.userRoles.some((role) => allowedRoles.includes(role));
     },
+
+    /** The desk Patient Appointment form shows Itemized Bill to the same role. */
+    canViewItemizedBill: (state) =>
+      state.userRoles.includes("Healthcare Receptionist"),
   },
 
   actions: {
