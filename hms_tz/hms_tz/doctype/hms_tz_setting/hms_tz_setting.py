@@ -16,8 +16,22 @@ from hms_tz.nhif.doctype.nhif_response_log.nhif_response_log import add_log
 
 
 class HMSTZSetting(Document):
+	def validate(self):
+		self.validate_appointment_slot_duration()
+
 	def before_save(self):
 		self.validate_api_urls()
+
+	def validate_appointment_slot_duration(self):
+		"""Slots must tile an hour so every hour, including the 07:00 first row, starts a slot."""
+		minutes = cint(self.appointment_slot_duration)
+		if minutes < 5 or minutes > 60 or 60 % minutes:
+			frappe.throw(
+				_(
+					"<b>Appointment Slot Duration (Minutes)</b> must be 5 to 60 minutes and divide an hour evenly, for example 10, 15, 20 or 30. It is {0}."
+				).format(minutes),
+				title=_("Invalid Appointment Slot Duration"),
+			)
 
 	def validate_api_urls(self):
 		"""Enforce HTTPS and strip trailing slashes on all API URL fields."""
