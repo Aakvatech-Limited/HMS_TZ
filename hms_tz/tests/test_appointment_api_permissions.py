@@ -146,11 +146,15 @@ class TestAppointmentApiPermissions(FrappeTestCase):
 			practitioner_name="Test Practitioner",
 			status="Active",
 			hms_tz_company=COMPANY,
+			op_consulting_charge_item="_Test Specialist",
+			inpatient_visit_charge_item="_Test Super Specialist",
 		)
 		frappe.set_user(USER)
 
 		practitioners = practitioner_api.get_practioner_list(COMPANY, nowdate())["practitioners"]
 		self.assertEqual([practitioner["name"] for practitioner in practitioners], [PRACTITIONER])
+		self.assertEqual(practitioners[0]["billing_item"], "_Test Specialist")
+		self.assertEqual(practitioners[0]["inpatient_billing_item"], "_Test Super Specialist")
 
 		self.assertEqual(practitioner_api.get_practioner_list(OTHER_COMPANY, nowdate())["practitioners"], [])
 

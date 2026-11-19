@@ -38,6 +38,7 @@ def get_practioner_list(company, date=None):
 				"name": practitioner.name,
 				"department": practitioner.department or "General",
 				"billing_item": practitioner.op_consulting_charge_item,
+				"inpatient_billing_item": practitioner.inpatient_visit_charge_item,
 				"avatar": get_abbr(practitioner.practitioner_name) or "P",
 				# get_practitioner_avatar(practitioner.practitioner_name),
 				"is_available": True,

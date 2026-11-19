@@ -10,11 +10,22 @@ export const EMPTY_APPOINTMENT_FILTERS = Object.freeze({
   apply_fasttrack_charge: false,
 });
 
-/** Practitioner and department filters pick grid columns, so a column keeps all its cards. */
+/** Practitioner filters pick grid columns, so a column keeps all its cards. */
 export const EMPTY_PRACTITIONER_FILTERS = Object.freeze({
   practitioner: "",
+  level: "",
   department: "",
 });
+
+/** A practitioner's level is its consulting charge item, as validate_practitioner_level compares them. */
+const getLevels = (practitioner) => [
+  practitioner.billing_item,
+  practitioner.inpatient_billing_item,
+];
+
+/** The distinct levels of the practitioners, in alphabetical order. */
+export const getPractitionerLevels = (practitioners) =>
+  [...new Set(practitioners.flatMap(getLevels).filter(Boolean))].sort();
 
 /** The create-mode payment tab of an appointment; insurance companies are told apart by name, as in provider_condition. */
 export const getPaymentOption = (isInsurance, insuranceCompany) => {
@@ -44,6 +55,7 @@ export const matchesAppointment = (appointment, filters) =>
 
 export const matchesPractitioner = (practitioner, filters) =>
   contains(practitioner.name, filters.practitioner) &&
+  (!filters.level || getLevels(practitioner).includes(filters.level)) &&
   contains(practitioner.department, filters.department);
 
 export const countActiveFilters = (filters) =>
