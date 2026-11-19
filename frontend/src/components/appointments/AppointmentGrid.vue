@@ -228,6 +228,7 @@ const selectedDate = computed({
   set: (date) => date && dateStore.setSelectedDate(date),
 });
 const companies = ref([]);
+const slotDurations = ref({});
 const companyError = ref(null);
 
 // Simple appointment dialog state
@@ -296,8 +297,12 @@ watchDebounced(
   { debounce: 150, immediate: true }
 );
 
+watch(selectedCompany, (company) => {
+  if (company) dateStore.slotDuration = slotDurations.value[company];
+});
+
 watch(
-  () => dateStore.selectedDate,
+  () => dateStore.timeSlots,
   () => scrollToCurrentSlot()
 );
 
@@ -426,10 +431,13 @@ const goToNextDay = () => {
 const fetchUserCompanies = async () => {
   companyError.value = null;
   try {
-    const { companies: permitted, default_company } = await call(
-      "hms_tz.api.appointment.get_user_companies"
-    );
+    const {
+      companies: permitted,
+      default_company,
+      slot_durations,
+    } = await call("hms_tz.api.appointment.get_user_companies");
     companies.value = permitted;
+    slotDurations.value = slot_durations;
     if (!default_company) {
       companyError.value = "No company is permitted for your user.";
     } else if (!selectedCompany.value) {
