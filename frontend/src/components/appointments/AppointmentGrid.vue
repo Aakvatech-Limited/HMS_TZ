@@ -148,7 +148,7 @@
             :data-time-row="row"
           >
             <span class="text-sm font-bold text-gray-900">{{
-              slot.display
+              slot.time
             }}</span>
           </div>
           <SlotCell
@@ -158,7 +158,7 @@
             :practitioner="practitioner"
             :appointments="getAppointments(slot.time, practitioner.name)"
             :is-current="row === currentSlotIndex"
-            :is-past="row < firstFutureSlotIndex"
+            :is-past="slot.timestamp < firstFutureTimestamp"
             :tabindex="
               activeCell.row === row && activeCell.column === column ? 0 : -1
             "
@@ -321,11 +321,12 @@ const scrollPractitioners = (direction) => {
 };
 
 // A computed changes only at slot boundaries, so the minute tick does not re-render every cell.
-const firstFutureSlotIndex = computed(() => {
-  const index = slots.value.findIndex(
-    (slot) => slot.timestamp >= nowTime.value
-  );
-  return index < 0 ? slots.value.length : index;
+// Rows wrap past midnight, so past-ness compares timestamps, not row order.
+const firstFutureTimestamp = computed(() => {
+  let first = Infinity;
+  for (const { timestamp } of slots.value)
+    if (timestamp >= nowTime.value && timestamp < first) first = timestamp;
+  return first;
 });
 
 const currentSlotIndex = computed(() => {
