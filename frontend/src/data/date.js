@@ -9,28 +9,33 @@ export const getSlotTime = (time, slotDuration) => {
   return dayjs().startOf("day").add(slotMinutes, "minute").format("HH:mm");
 };
 
+/** One day of `slotDuration`-minute slots on `date`, listed from `dayStartHour` and wrapping past midnight back to it. */
+export const getTimeSlots = (date, slotDuration, dayStartHour) => {
+  const day = dayjs(date);
+  const dayMinutes = 24 * 60;
+  const startMinute = dayStartHour * 60;
+  const slots = [];
+  for (let offset = 0; offset < dayMinutes; offset += slotDuration) {
+    const slotStart = day.add((startMinute + offset) % dayMinutes, "minute");
+    slots.push({
+      time: slotStart.format("HH:mm"),
+      timestamp: slotStart.valueOf(),
+    });
+  }
+  return slots;
+};
+
 export const useDateStore = defineStore("date", {
   state: () => ({
     selectedDate: dayjs().format("YYYY-MM-DD"),
     slotDuration: 10, // minutes
+    dayStartHour: 7, // first row of the grid
     bufferTime: 5, // minutes buffer for future bookings
   }),
 
   getters: {
-    /** Slots of `slotDuration` minutes across the whole selected day. */
-    timeSlots: (state) => {
-      const day = dayjs(state.selectedDate);
-      const slots = [];
-      for (let minute = 0; minute < 24 * 60; minute += state.slotDuration) {
-        const slotStart = day.add(minute, "minute");
-        slots.push({
-          time: slotStart.format("HH:mm"),
-          display: slotStart.format("h:mm A"),
-          timestamp: slotStart.valueOf(),
-        });
-      }
-      return slots;
-    },
+    timeSlots: (state) =>
+      getTimeSlots(state.selectedDate, state.slotDuration, state.dayStartHour),
   },
 
   actions: {
