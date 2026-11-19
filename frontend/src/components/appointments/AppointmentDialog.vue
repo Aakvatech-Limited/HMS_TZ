@@ -525,6 +525,7 @@ import { useDateStore } from "@/data/date";
 import { useToast } from "@/composables/useToast";
 import FieldMap from "@/components/controls/FieldMap.vue";
 import PaymentModeStrip from "@/components/appointments/PaymentModeStrip.vue";
+import { getPaymentOption } from "@/data/appointmentFilters";
 import CreateAppointmentForm from "@/components/appointments/create/CreateAppointmentForm.vue";
 import PaymentDialog from "@/components/appointments/PaymentDialog.vue";
 import AuthorizeAppointmentSection from "@/components/appointments/AuthorizeAppointmentSection.vue";
@@ -698,21 +699,13 @@ const appointment = reactive(emptyAppointment());
 const isInsurance = computed(
   () => appointment["Patient Appointment"]["payment_mode"] === "Insurance"
 );
-const isNhif = computed(
-  () =>
-    isInsurance.value &&
-    appointment["Patient Appointment"]["insurance_company"]?.includes("NHIF")
-);
-// The create-mode payment tab; insurance companies are told apart by name, as in provider_condition.
-const paymentSection = computed(() => {
-  if (!isInsurance.value) return "Cash";
-  if (isNhif.value) return "NHIF";
-  return appointment["Patient Appointment"]["insurance_company"]?.includes(
-    "Jubilee"
+const paymentSection = computed(() =>
+  getPaymentOption(
+    isInsurance.value,
+    appointment["Patient Appointment"]["insurance_company"] ?? ""
   )
-    ? "Jubilee"
-    : "Other";
-});
+);
+const isNhif = computed(() => paymentSection.value === "NHIF");
 // Edit mode keeps the number saved when it opened, so typing in the field does not swap in the authorization section.
 const authorizationNumberAtEdit = ref("");
 watch(

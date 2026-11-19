@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build --base=/assets/hms_tz/frontend/",
     "preview": "vite preview",
-    "lint": "biome check --write ."
+    "lint": "biome check --write .",
+    "test": "node --test \"tests/**/*.test.js\""
   },
   "dependencies": {
     "@headlessui/vue": "^1.7.22",
