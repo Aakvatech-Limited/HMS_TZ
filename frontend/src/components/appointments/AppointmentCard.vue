@@ -17,7 +17,7 @@
 
       <!-- Compact Info Section -->
       <div class="flex flex-col space-y-0.5">
-        <!-- Insurance Company -->
+        <!-- Coverage Plan -->
         <div class="flex items-start flex-shrink-0" :class="statusStyle.text">
           <FeatherIcon
             name="shield"
@@ -26,8 +26,8 @@
           <span
             class="text-2xs font-semibold leading-tight truncate"
             style="font-size: 10px"
-            :title="appointment.insurance_company"
-            >{{ appointment.insurance_company || "Cash" }}</span
+            :title="coverageLabel"
+            >{{ coverageLabel }}</span
           >
         </div>
 
@@ -83,6 +83,11 @@ const props = defineProps({
 });
 
 const statusStyle = computed(() => getStatusStyle(props.appointment.status));
+// insurance_company is already "Cash" for cash appointments.
+const coverageLabel = computed(
+  () =>
+    props.appointment.coverage_plan_name || props.appointment.insurance_company
+);
 
 const formatAmount = (amount) => {
   if (!amount || amount === 0) return "TZS 0";
