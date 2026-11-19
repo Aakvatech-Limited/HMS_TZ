@@ -64,22 +64,25 @@
             </div>
           </div>
         </div>
-        <ul
-          class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-700"
-          aria-label="Appointment status colours"
-        >
-          <li
-            v-for="style in APPOINTMENT_STATUSES"
-            :key="style.status"
-            class="flex items-center gap-1.5"
+        <div class="mt-3 flex flex-wrap items-center justify-between gap-4">
+          <ul
+            class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-700"
+            aria-label="Appointment status colours"
           >
-            <span
-              class="h-3 w-3 rounded-sm border border-dotted"
-              :class="style.card"
-            />
-            {{ style.label }}
-          </li>
-        </ul>
+            <li
+              v-for="style in APPOINTMENT_STATUSES"
+              :key="style.status"
+              class="flex items-center gap-1.5"
+            >
+              <span
+                class="h-3 w-3 rounded-sm border border-dotted"
+                :class="style.card"
+              />
+              {{ style.label }}
+            </li>
+          </ul>
+          <DefaultViewControls />
+        </div>
       </div>
     </div>
 
@@ -205,6 +208,7 @@ import {
 } from "@vueuse/core";
 import PractitionerCard from "./PractitionerCard.vue";
 import SlotCell from "./SlotCell.vue";
+import DefaultViewControls from "./DefaultViewControls.vue";
 import { APPOINTMENT_STATUSES } from "./appointmentStatus";
 import AppointmentDialog from "./AppointmentDialog.vue";
 import AppointmentFilters from "./AppointmentFilters.vue";
