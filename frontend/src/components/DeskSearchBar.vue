@@ -134,6 +134,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { createResource } from "frappe-ui";
+import { matchPages } from "@/data/search";
 
 const containerRef = ref(null);
 const searchInput = ref(null);
@@ -230,11 +231,7 @@ async function search() {
   isSearching.value = true;
 
   // 1. Filter matching pages from the permission-checked list
-  const matchedPages = pages.value.filter(
-    (p) =>
-      p.label.toLowerCase().includes(q) ||
-      p.description.toLowerCase().includes(q)
-  );
+  const matchedPages = matchPages(pages.value, q);
 
   // 2. Search records via global search (also respects permissions server-side)
   const records = await searchGlobalRecords(q);
