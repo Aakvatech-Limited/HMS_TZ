@@ -106,6 +106,25 @@
               Make Payment
             </Button>
 
+            <Button
+              v-if="appointmentStore.canViewItemizedBill"
+              variant="subtle"
+              size="lg"
+              :disabled="!isClosed"
+              :title="
+                isClosed
+                  ? 'Open the Itemized Bill Report to view and print it'
+                  : 'The itemized bill is ready after the appointment is Closed'
+              "
+              class="font-semibold inline-flex items-center"
+              @click="openItemizedBill"
+            >
+              <template #prefix>
+                <FeatherIcon name="file-text" class="w-4 h-4" />
+              </template>
+              Itemized Bill
+            </Button>
+
             <!-- Print Button - Only show if invoice has been created -->
             <Print
               v-if="appointment['Patient Appointment']['ref_sales_invoice']"
@@ -627,6 +646,22 @@ const modeBadgeText = computed(() => {
       return "Unknown Mode";
   }
 });
+
+// The Itemized Bill Report refuses appointments that are not Closed.
+const isClosed = computed(
+  () => appointment["Patient Appointment"].status?.toLowerCase() === "closed"
+);
+
+// The desk report owns the data and its print template; its filters come from the URL.
+const openItemizedBill = () => {
+  const { name, patient } = appointment["Patient Appointment"];
+  const filters = new URLSearchParams({ patient, patient_appointment: name });
+  window.open(
+    `/app/query-report/Itemized%20Bill%20Report?${filters}`,
+    "_blank",
+    "noopener"
+  );
+};
 
 // Role-based visibility for Cancel button
 const canShowCancelButton = computed(() => {
