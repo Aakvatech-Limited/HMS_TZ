@@ -32,7 +32,7 @@
           <template #body-main>
             <ul
               class="min-w-48 p-1"
-              :aria-label="`Appointments at ${timeSlot.display}`"
+              :aria-label="`Appointments at ${timeSlot.time}`"
               @keydown.esc.prevent="closeList"
               @keydown.down.prevent="moveListFocus(1)"
               @keydown.up.prevent="moveListFocus(-1)"
@@ -67,7 +67,7 @@
     <div
       v-else-if="kind === 'add'"
       class="add-appointment-button group cursor-pointer"
-      :title="`Create appointment for ${practitioner.name} at ${timeSlot.display}`"
+      :title="`Create appointment for ${practitioner.name} at ${timeSlot.time}`"
     >
       <span
         aria-hidden="true"
@@ -115,7 +115,7 @@ const unavailableReason = computed(() =>
 );
 
 const ariaLabel = computed(() => {
-  const prefix = `${props.practitioner.name}, ${props.timeSlot.display}`;
+  const prefix = `${props.practitioner.name}, ${props.timeSlot.time}`;
   if (kind.value === "appointment") {
     const [{ patient_name, status }, ...others] = props.appointments;
     const more = others.length ? `, and ${others.length} more` : "";
