@@ -55,8 +55,23 @@ class TestAppointmentApiPermissions(FrappeTestCase):
 		self.assertFalse(frappe.has_permission("Company", "read"))
 		self.assertEqual(
 			appointment_api.get_user_companies(),
-			{"companies": [COMPANY], "default_company": COMPANY},
+			{
+				"companies": [COMPANY],
+				"default_company": COMPANY,
+				"slot_durations": {COMPANY: appointment_api.DEFAULT_SLOT_DURATION},
+			},
 		)
+
+	def test_slot_durations_come_from_hms_tz_setting(self):
+		insert("HMS TZ Setting", COMPANY, company=COMPANY, appointment_slot_duration=15)
+
+		self.assertEqual(
+			appointment_api.get_slot_durations([COMPANY, OTHER_COMPANY]),
+			{COMPANY: 15, OTHER_COMPANY: appointment_api.DEFAULT_SLOT_DURATION},
+		)
+
+	def test_slot_durations_of_no_companies_is_empty(self):
+		self.assertEqual(appointment_api.get_slot_durations([]), {})
 
 	def test_user_without_company_permissions_gets_every_company(self):
 		companies = appointment_api.get_user_companies()["companies"]
