@@ -7,6 +7,7 @@ import {
   countActiveFilters,
   getMatchedGrid,
   getPaymentOption,
+  getPractitionerLevels,
   matchesAppointment,
   matchesPractitioner,
 } from "../src/data/appointmentFilters.js";
@@ -142,6 +143,51 @@ describe("matchesPractitioner", () => {
         practitioner,
         withFilters({ department: "Surgery" })
       )
+    );
+  });
+});
+
+describe("practitioner level", () => {
+  const specialist = {
+    name: "Dr Juma",
+    billing_item: "Specialist",
+    inpatient_billing_item: "Specialist",
+  };
+  const inpatientOnly = {
+    name: "Dr Neema",
+    inpatient_billing_item: "Super Specialist",
+  };
+  const noLevel = { name: "Dr Baraka" };
+
+  test("matches the outpatient or the inpatient charge item exactly", () => {
+    assert.ok(
+      matchesPractitioner(specialist, withFilters({ level: "Specialist" }))
+    );
+    assert.ok(
+      matchesPractitioner(
+        inpatientOnly,
+        withFilters({ level: "Super Specialist" })
+      )
+    );
+    assert.ok(
+      !matchesPractitioner(
+        specialist,
+        withFilters({ level: "Super Specialist" })
+      )
+    );
+    assert.ok(
+      !matchesPractitioner(noLevel, withFilters({ level: "Specialist" }))
+    );
+  });
+
+  test("a blank level matches every practitioner", () => {
+    assert.ok(matchesPractitioner(noLevel, withFilters({})));
+  });
+
+  test("lists each level once, sorted, without blanks", () => {
+    assert.deepEqual(
+      getPractitionerLevels([specialist, inpatientOnly, noLevel]),
+      ["Specialist", "Super Specialist"]
     );
   });
 });
