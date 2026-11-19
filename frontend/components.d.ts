@@ -16,6 +16,7 @@ declare module 'vue' {
     Autocomplete: typeof import('./src/components/controls/Autocomplete.vue')['default']
     BiometricCaptureDialog: typeof import('./src/components/appointments/create/BiometricCaptureDialog.vue')['default']
     CreateAppointmentForm: typeof import('./src/components/appointments/create/CreateAppointmentForm.vue')['default']
+    DefaultViewControls: typeof import('./src/components/appointments/DefaultViewControls.vue')['default']
     DeskSearchBar: typeof import('./src/components/DeskSearchBar.vue')['default']
     FieldLabel: typeof import('./src/components/appointments/create/FieldLabel.vue')['default']
     FieldMap: typeof import('./src/components/controls/FieldMap.vue')['default']
