@@ -12,6 +12,8 @@
   "facility_code",
   "patient_appointment_conf_section",
   "cancel_appointment_after",
+  "column_break_eulo",
+  "appointment_slot_duration",
   "hms_tz_settings_section",
   "auto_finalize_patient_encounter",
   "valid_days_to_auto_finalize_encounter",
@@ -687,6 +689,14 @@
    "label": "Cancel Draft Appointment After"
   },
   {
+   "default": "10",
+   "description": "Minutes from one time slot to the next on the Appointments page. Use 5 to 60 minutes that divide an hour evenly, for example 10, 15, 20 or 30.",
+   "fieldname": "appointment_slot_duration",
+   "fieldtype": "Int",
+   "label": "Appointment Slot Duration (Minutes)",
+   "non_negative": 1
+  },
+  {
    "collapsible": 1,
    "fieldname": "delivery_note_conf_section",
    "fieldtype": "Section Break",
@@ -723,11 +733,15 @@
   {
    "fieldname": "column_break_jsba",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_eulo",
+   "fieldtype": "Column Break"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-11-04 10:00:00.000000",
+ "modified": "2026-11-19 10:54:19.507188",
  "modified_by": "Administrator",
  "module": "Hms Tz",
  "name": "HMS TZ Setting",

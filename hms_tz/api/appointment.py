@@ -12,6 +12,8 @@ from hms_tz.nhif.api.patient_appointment import (
 	validate_cancellable,
 )
 
+DEFAULT_SLOT_DURATION = 10
+
 
 @frappe.whitelist()
 def get_user_companies():
@@ -30,7 +32,24 @@ def get_user_companies():
 	if default_company not in companies:
 		default_company = companies[0] if companies else None
 
-	return {"companies": companies, "default_company": default_company}
+	return {
+		"companies": companies,
+		"default_company": default_company,
+		"slot_durations": get_slot_durations(companies),
+	}
+
+
+def get_slot_durations(companies):
+	"""Appointment grid slot minutes per company, from HMS TZ Setting; companies without one get the default."""
+	configured = dict(
+		frappe.get_all(
+			"HMS TZ Setting",
+			filters={"name": ["in", companies]},
+			fields=["name", "appointment_slot_duration"],
+			as_list=True,
+		)
+	)
+	return {company: configured.get(company) or DEFAULT_SLOT_DURATION for company in companies}
 
 
 @frappe.whitelist()
