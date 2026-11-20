@@ -8,7 +8,9 @@
       :is-nhif="isNhif"
       :can-check-card="canCheckCard"
       :checking="busy"
+      :card-needs-check="cardNeedsCheck"
       @set-payment="setPayment"
+      @change-card="changeCard"
       @check-card="checkCard"
       @select-subscription="selectSubscription"
     />
@@ -76,6 +78,8 @@ const {
   creates,
   canAuthorize,
   canAuthorizeJubilee,
+  cardNeedsCheck,
+  changeCard,
   canSubmit,
   loadSettings,
   setPayment,
