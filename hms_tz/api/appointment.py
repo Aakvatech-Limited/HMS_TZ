@@ -168,10 +168,12 @@ def update_appointment(
 		if value is not None and value != (appointment_doc.get(fieldname) or "")
 	}
 	if "practitioner" in changes:
+		validate_practitioner_changeable(appointment_doc)
 		validate_active_practitioner(practitioner)
 		validate_practitioner_level(
 			appointment_doc.practitioner, practitioner, appointment_doc.inpatient_record
 		)
+		set_department_of_practitioner(appointment_doc, practitioner)
 	if "authorization_number" in changes and not appointment_doc.insurance_subscription:
 		frappe.throw(_("Appointment {0} is not an insurance appointment").format(appointment_doc.name))
 
@@ -190,6 +192,31 @@ def update_appointment(
 		appointment_doc.update(changes)
 		appointment_doc.save(ignore_permissions=True)
 	return True
+
+
+def validate_practitioner_changeable(appointment_doc):
+	"""The submitted invoice names the practitioner, so an invoiced appointment keeps its practitioner."""
+	if appointment_doc.ref_sales_invoice:
+		frappe.throw(
+			_(
+				"Appointment {0} is invoiced in {1}, so its practitioner cannot change. The time can still change."
+			).format(appointment_doc.name, appointment_doc.ref_sales_invoice)
+		)
+
+
+def set_department_of_practitioner(appointment_doc, practitioner):
+	"""The department follows a new practitioner.
+
+	Department is set only once on save, so it is written to the database first; `modified` is kept, so the save
+	of the practitioner that follows still passes the timestamp and set-only-once checks.
+	"""
+	department = frappe.db.get_value("Healthcare Practitioner", practitioner, "department")
+	if not department or department == appointment_doc.department:
+		return
+	frappe.db.set_value(
+		"Patient Appointment", appointment_doc.name, "department", department, update_modified=False
+	)
+	appointment_doc.department = department
 
 
 def validate_editable(appointment_doc):
