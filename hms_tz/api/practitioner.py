@@ -13,62 +13,92 @@ PRACTITIONER_STATUSES = {"Active": ["Active"], "Disabled": ["Disabled"], "All": 
 
 @frappe.whitelist()
 def get_practioner_list(company, date=None, status="Active"):
+	"""Grid columns for a company and date: doctors with the given status, and everyone who has appointments.
+
+	An active doctor on holiday or leave is hidden unless they have appointments on the date. A practitioner
+	with appointments always gets a column, so every appointment the user can read is on the page; columns of
+	practitioners who cannot take a new booking that day are not available. Disabled practitioners are listed
+	only for their records.
 	"""
-	Get all available practitioners for a company on a specific date
-	Filters out practitioners who are:
-	- Not available based on schedules and availability
-	- On leave or unavailable
-	- Have no practitioner schedules
+	date = getdate(date or nowdate())
+	booked = get_booked_practitioners(company, date)
+	doctors = get_practitioners(company, status)
+	listed = {doctor.name for doctor in doctors}
 
-	Returns practitioners with their availability data. Disabled practitioners are listed only for their
-	records, so they are never available.
-	"""
-
-	if not date:
-		date = nowdate()
-
-	date = getdate(date)
-
-	available_practitioners = []
-
-	practitioners = get_practitioners(company, status)
-
-	for practitioner in practitioners:
-		try:
-			is_active = practitioner.status == "Active"
-			# Check employee availability (holidays, leaves)
-			if is_active and not check_practitioner_employee_availability(
-				practitioner.name, date, employee=practitioner.employee, user_id=practitioner.user_id
-			):
-				continue
-
-			# Transform practitioner data to match frontend schema
-			practitioner_data = {
-				"name": practitioner.name,
-				"department": practitioner.department or "General",
-				"billing_item": practitioner.op_consulting_charge_item,
-				"inpatient_billing_item": practitioner.inpatient_visit_charge_item,
-				"avatar": get_abbr(practitioner.practitioner_name) or "P",
-				# get_practitioner_avatar(practitioner.practitioner_name),
-				"status": practitioner.status,
-				"is_available": is_active,
-				"mobile_phone": practitioner.mobile_phone,
-				"image": practitioner.image,
-				# 'timeslots': [],
-				# 'present_events': [],
-			}
-
-			available_practitioners.append(practitioner_data)
-
-		except Exception:
-			continue
+	columns = []
+	for doctor in doctors:
+		is_available = doctor.status == "Active" and check_practitioner_employee_availability(
+			doctor.name, date, employee=doctor.employee, user_id=doctor.user_id
+		)
+		if is_available or doctor.status != "Active" or doctor.name in booked:
+			columns.append(get_column(doctor, bool(is_available)))
+	found = get_practitioners_by_name(booked - listed, status)
+	for practitioner in found:
+		columns.append(get_column(practitioner, False))
+	for practitioner in get_missing_practitioners(company, date, booked - listed - {p.name for p in found}):
+		columns.append(get_column(practitioner, False))
+	columns.sort(key=lambda column: column["name"])
 
 	return {
-		"practitioners": available_practitioners,
-		"total_count": len(available_practitioners),
+		"practitioners": columns,
+		"total_count": len(columns),
 		"date": date,
 		"company": company,
 	}
+
+
+def get_column(practitioner, is_available):
+	return {
+		"name": practitioner.name,
+		"department": practitioner.department or "General",
+		"billing_item": practitioner.get("op_consulting_charge_item"),
+		"inpatient_billing_item": practitioner.get("inpatient_visit_charge_item"),
+		"avatar": get_abbr(practitioner.practitioner_name) or "P",
+		"status": practitioner.status,
+		"is_available": is_available,
+		"mobile_phone": practitioner.get("mobile_phone"),
+		"image": practitioner.get("image"),
+	}
+
+
+def get_missing_practitioners(company, date, names):
+	"""Booked practitioners that have no Healthcare Practitioner record: broken data, shown so it can be fixed.
+
+	The column takes the name and department from the appointments and is marked Missing, so it is read only.
+	"""
+	missing = [name for name in names if not frappe.db.exists("Healthcare Practitioner", name)]
+	if not missing:
+		return []
+	rows = frappe.get_list(
+		"Patient Appointment",
+		filters={"company": company, "appointment_date": date, "practitioner": ["in", missing]},
+		fields=["practitioner as name", "department"],
+		distinct=True,
+	)
+	columns = {}
+	for row in rows:
+		columns.setdefault(
+			row.name,
+			frappe._dict(
+				name=row.name,
+				practitioner_name=row.name,
+				department=row.department,
+				status="Missing",
+			),
+		)
+	return list(columns.values())
+
+
+def get_booked_practitioners(company, date):
+	"""Practitioners of the appointments on the date that the user may read, as the List view shows them."""
+	return set(
+		frappe.get_list(
+			"Patient Appointment",
+			filters={"company": company, "appointment_date": date},
+			pluck="practitioner",
+			distinct=True,
+		)
+	)
 
 
 @frappe.whitelist()
@@ -96,31 +126,49 @@ def search_practitioners(txt=""):
 	)
 
 
+PRACTITIONER_COLUMN_FIELDS = [
+	"name",
+	"practitioner_name",
+	"department",
+	"op_consulting_charge_item",
+	"inpatient_visit_charge_item",
+	"mobile_phone",
+	"image",
+	"status",
+	"employee",
+	"user_id",
+]
+
+
 def get_practitioners(company, status="Active"):
 	"""Doctors of the company with the given filter status that the user may read, after user permissions."""
-	if status not in PRACTITIONER_STATUSES:
-		frappe.throw(_("Practitioner status must be one of {0}").format(", ".join(PRACTITIONER_STATUSES)))
 	return frappe.get_list(
 		"Healthcare Practitioner",
 		filters={
-			"status": ["in", PRACTITIONER_STATUSES[status]],
+			"status": ["in", get_statuses(status)],
 			"hms_tz_company": company,
 			"practitioner_role": APPOINTMENT_PRACTITIONER_ROLE,
 		},
-		fields=[
-			"name",
-			"practitioner_name",
-			"department",
-			"op_consulting_charge_item",
-			"inpatient_visit_charge_item",
-			"mobile_phone",
-			"image",
-			"status",
-			"employee",
-			"user_id",
-		],
+		fields=PRACTITIONER_COLUMN_FIELDS,
 		order_by="name asc",
 	)
+
+
+def get_practitioners_by_name(names, status="Active"):
+	"""The named practitioners with the filter status, of any role or company, for their booked appointments."""
+	if not names:
+		return []
+	return frappe.get_list(
+		"Healthcare Practitioner",
+		filters={"name": ["in", list(names)], "status": ["in", get_statuses(status)]},
+		fields=PRACTITIONER_COLUMN_FIELDS,
+	)
+
+
+def get_statuses(status):
+	if status not in PRACTITIONER_STATUSES:
+		frappe.throw(_("Practitioner status must be one of {0}").format(", ".join(PRACTITIONER_STATUSES)))
+	return PRACTITIONER_STATUSES[status]
 
 
 def check_practitioner_employee_availability(practitioner, date, employee=None, user_id=None):
