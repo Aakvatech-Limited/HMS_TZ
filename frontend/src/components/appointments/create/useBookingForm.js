@@ -9,6 +9,7 @@ import {
   getInsuranceApiSettings,
   getPatient,
   getSubscription,
+  NHIF_WAIT_MESSAGE,
   validateNewPatientCashBooking,
 } from "@/data/insurance";
 import { computed, reactive, ref } from "vue";
@@ -60,8 +61,13 @@ export const patientSummary = (patient) => {
 
 /** State and server calls of the New Appointment form. */
 export function useBookingForm(initial) {
-  const { showError, showErrorReply, clearError, handleResourceError } =
-    useToast();
+  const {
+    showError,
+    showErrorReply,
+    showSuccess,
+    clearError,
+    handleResourceError,
+  } = useToast();
   const settings = ref({ enable_nhif_api: false, enable_jubilee_api: false });
   const busy = ref(false);
   const status = ref({ title: "", message: "", percent: 0 });
@@ -137,6 +143,8 @@ export function useBookingForm(initial) {
 
   // The title names the action on the progress overlay.
   const run = async (title, work) => {
+    // One request at a time: a second click while NHIF is busy would authorize twice.
+    if (busy.value) return null;
     status.value = { title, message: "", percent: 0 };
     busy.value = true;
     clearError();
@@ -335,7 +343,7 @@ export function useBookingForm(initial) {
           ? { Data: "", fpCode: "" }
           : await captureBiometric(method);
       if (!biometric) return;
-      setStatus("Authorizing with NHIF...", 75);
+      setStatus(NHIF_WAIT_MESSAGE, 75);
       const data = await authorizeNhifPatient({
         insurance_subscription: form.subscription.name,
         appointment_type: form.appointment_type,
@@ -355,6 +363,10 @@ export function useBookingForm(initial) {
           title: data.authorizationStatus,
           message: data.remarks,
         });
+      } else {
+        showSuccess(
+          `NHIF authorized the patient: authorization no ${data.authorizationNo}`
+        );
       }
       form.authorization = {
         coverage_plan_name: data.coveragePlanName,
