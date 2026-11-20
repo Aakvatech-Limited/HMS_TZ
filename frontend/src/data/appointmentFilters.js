@@ -15,7 +15,16 @@ export const EMPTY_PRACTITIONER_FILTERS = Object.freeze({
   practitioner: "",
   level: "",
   department: "",
+  practitioner_status: "Active",
 });
+
+/** Practitioner Status values; the server lists the practitioners, so the grid never matches on it. */
+export const PRACTITIONER_STATUS_OPTIONS = ["Active", "Disabled", "All"];
+
+const FILTER_DEFAULTS = {
+  ...EMPTY_APPOINTMENT_FILTERS,
+  ...EMPTY_PRACTITIONER_FILTERS,
+};
 
 /** A practitioner's level is its consulting charge item, as validate_practitioner_level compares them. */
 const getLevels = (practitioner) => [
@@ -58,9 +67,12 @@ export const matchesPractitioner = (practitioner, filters) =>
   (!filters.level || getLevels(practitioner).includes(filters.level)) &&
   contains(practitioner.department, filters.department);
 
+/** Filters set away from their default; a blank text counts as unset. */
 export const countActiveFilters = (filters) =>
-  Object.values(filters).filter((value) =>
-    typeof value === "string" ? value.trim() : value
+  Object.entries(filters).filter(
+    ([key, value]) =>
+      (typeof value === "string" ? value.trim() : value) !==
+      FILTER_DEFAULTS[key]
   ).length;
 
 /** The time slots and practitioners that hold a filtered appointment; a slot counts only if its match is in a shown column. */
