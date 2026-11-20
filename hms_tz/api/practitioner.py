@@ -4,6 +4,9 @@ from frappe import _
 from frappe.query_builder import DocType
 from frappe.utils import get_abbr, get_time, getdate, nowdate
 
+# Only doctors take appointments; nurses, lab technicians and claim reviewers are practitioners too.
+APPOINTMENT_PRACTITIONER_ROLE = "Doctor"
+
 # Values of the Practitioner Status filter on the Appointments page.
 PRACTITIONER_STATUSES = {"Active": ["Active"], "Disabled": ["Disabled"], "All": ["Active", "Disabled"]}
 
@@ -70,7 +73,7 @@ def get_practioner_list(company, date=None, status="Active"):
 
 @frappe.whitelist()
 def search_practitioners(txt=""):
-	"""Active practitioners whose ID, name, department or MCT code contains the text, with NHIF details."""
+	"""Active doctors whose ID, name, department or MCT code contains the text, with NHIF details."""
 	pattern = f"%{txt}%"
 	return frappe.get_list(
 		"Healthcare Practitioner",
@@ -81,7 +84,7 @@ def search_practitioners(txt=""):
 			"nhif_physician_qualification",
 			"tz_mct_code",
 		],
-		filters={"status": "Active"},
+		filters={"status": "Active", "practitioner_role": APPOINTMENT_PRACTITIONER_ROLE},
 		or_filters=[
 			["name", "like", pattern],
 			["practitioner_name", "like", pattern],
@@ -94,12 +97,16 @@ def search_practitioners(txt=""):
 
 
 def get_practitioners(company, status="Active"):
-	"""Practitioners of the company with the given filter status that the user may read, after user permissions."""
+	"""Doctors of the company with the given filter status that the user may read, after user permissions."""
 	if status not in PRACTITIONER_STATUSES:
 		frappe.throw(_("Practitioner status must be one of {0}").format(", ".join(PRACTITIONER_STATUSES)))
 	return frappe.get_list(
 		"Healthcare Practitioner",
-		filters={"status": ["in", PRACTITIONER_STATUSES[status]], "hms_tz_company": company},
+		filters={
+			"status": ["in", PRACTITIONER_STATUSES[status]],
+			"hms_tz_company": company,
+			"practitioner_role": APPOINTMENT_PRACTITIONER_ROLE,
+		},
 		fields=[
 			"name",
 			"practitioner_name",
