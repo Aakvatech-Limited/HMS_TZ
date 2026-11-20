@@ -89,6 +89,8 @@ def insert_plan(name, insurance_company, scheme_id=None):
 
 
 def insert_card_type(name, card_type_id):
+	# Sites may already have the card type; tearDown's rollback brings their row back.
+	frappe.db.delete("Healthcare Card Verifier", name)
 	insert(
 		"Healthcare Card Verifier",
 		name,
@@ -368,6 +370,26 @@ class TestAppointmentInsurance(FrappeTestCase):
 			(row.patient_name, row.sex, row.mobile, row.card_no),
 			("Card Holder", "Male", "_Test Mobile 7731", "_TCARD7731"),
 		)
+
+	def test_search_patients_finds_a_mobile_typed_in_local_form(self):
+		frappe.db.set_value("Patient", CARD_HOLDER, "mobile", "255799887731")
+		values = lambda txt: [row.value for row in appointment_insurance.search_patients(txt)]  # noqa: E731
+
+		for txt in ("0799887731", "079988", "0799 887 731", "255799887731", "799887731"):
+			self.assertEqual(values(txt), [CARD_HOLDER], txt)
+
+	def test_international_mobile_of_local_numbers_only(self):
+		self.assertEqual(appointment_insurance.get_international_mobile("0712345601"), "255712345601")
+		self.assertEqual(appointment_insurance.get_international_mobile("0712-345"), "255712345")
+		for txt in ("071", "255712345601", "Mohamed", "", None, "07123456789"):
+			self.assertIsNone(appointment_insurance.get_international_mobile(txt), txt)
+
+	def test_search_patients_returns_page_length_rows(self):
+		for name in (CARD_HOLDER, JUBILEE_HOLDER, NID_HOLDER):
+			frappe.db.set_value("Patient", name, {"status": "Active", "mobile": "_Test Page 7731"})
+
+		self.assertEqual(len(appointment_insurance.search_patients("_Test Page 7731", page_length=2)), 2)
+		self.assertEqual(len(appointment_insurance.search_patients("_Test Page 7731", page_length=3)), 3)
 
 	@patch.object(patient_appointment, "manage_fee_validity", new=lambda appointment: None)
 	@patch.object(nhif_appointment, "get_insurance_amount", new=lambda *args, **kwargs: (0, 0))
