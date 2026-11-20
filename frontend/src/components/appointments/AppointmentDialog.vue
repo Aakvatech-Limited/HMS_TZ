@@ -24,6 +24,12 @@
     </template> -->
     <template #body-content>
       <div class="space-y-4 relative">
+        <DialogErrorPanel
+          v-if="dialogError"
+          :error="dialogError"
+          @close="dialogError = null"
+        />
+
         <!-- Mode Badge -->
         <div
           v-if="!isCreateMode"
@@ -542,12 +548,14 @@ import { createResource } from "frappe-ui";
 import { useAppointmentStore } from "@/data/appointment";
 import { useDateStore } from "@/data/date";
 import { useToast } from "@/composables/useToast";
+import { provideDialogError } from "@/composables/dialogError";
 import FieldMap from "@/components/controls/FieldMap.vue";
 import PaymentModeStrip from "@/components/appointments/PaymentModeStrip.vue";
 import { getPaymentOption } from "@/data/appointmentFilters";
 import CreateAppointmentForm from "@/components/appointments/create/CreateAppointmentForm.vue";
 import PaymentDialog from "@/components/appointments/PaymentDialog.vue";
 import AuthorizeAppointmentSection from "@/components/appointments/AuthorizeAppointmentSection.vue";
+import DialogErrorPanel from "@/components/appointments/DialogErrorPanel.vue";
 import Print from "@/components/controls/Print.vue";
 import dayjs from "dayjs";
 
@@ -590,7 +598,9 @@ const emit = defineEmits([
 
 const appointmentStore = useAppointmentStore();
 const dateStore = useDateStore();
-const { notifications, handleResourceError, showError, showInfo } = useToast();
+const dialogError = provideDialogError();
+const { notifications, handleResourceError, showError, showInfo, clearError } =
+  useToast(dialogError);
 
 // Local dialog state for v-model approach
 const localShowDialog = ref(props.showDialog);
@@ -881,6 +891,9 @@ const sections = computed(() => {
     },
   ];
 });
+
+// An error belongs to one opening of the dialog.
+watch(localShowDialog, clearError);
 
 // Dialog state update handler
 const updateDialogState = (newVal) => {
@@ -1233,7 +1246,6 @@ const update_appointment_doc = createResource({
   },
   onError: (err) => {
     handleResourceError(err);
-    notifications.error.appointmentUpdateFailed(err.message);
 
     // Reset loading state on error
     isCreating.value = false;
@@ -1244,6 +1256,7 @@ const update_appointment_doc = createResource({
 
 const handleSubmit = async () => {
   error.value = "";
+  clearError();
   if (props.mode === "edit" && validateForm()) {
     await update_appointment();
   }
@@ -1372,12 +1385,7 @@ const cancel_appointment_doc = createResource({
     // Close dialog automatically
     closeDialog();
   },
-  onError: (err) => {
-    handleResourceError(err);
-    notifications.error.appointmentUpdateFailed(
-      err.message || "Failed to cancel appointment"
-    );
-  },
+  onError: handleResourceError,
 });
 
 const cancelAppointment = async () => {
@@ -1386,6 +1394,7 @@ const cancelAppointment = async () => {
 
 const confirmCancelAppointment = async () => {
   showCancelConfirmation.value = false;
+  clearError();
   try {
     await cancel_appointment_doc.submit();
   } catch (error) {
