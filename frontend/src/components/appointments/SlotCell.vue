@@ -112,8 +112,6 @@ const kind = computed(() => {
 
 const unavailableReason = computed(() => {
   if (props.practitioner.status === "Disabled") return "Practitioner disabled";
-  if (props.practitioner.status === "Missing")
-    return "No practitioner record in HMS";
   return props.isPast ? "Past time slot" : "Practitioner unavailable";
 });
 
