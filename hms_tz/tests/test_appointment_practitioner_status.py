@@ -11,10 +11,11 @@ from hms_tz.tests.utils import insert
 COMPANY = "_Test Practitioner Status Clinic"
 ACTIVE = "_Test Status Active Practitioner"
 DISABLED = "_Test Status Disabled Practitioner"
+CLAIM_REVIEWER = "_Test Status Claim Reviewer"
 APPOINTMENT = "_Test Status Appointment"
 
 
-def insert_practitioner(name, status):
+def insert_practitioner(name, status, role="Doctor"):
 	insert(
 		"Healthcare Practitioner",
 		name,
@@ -22,6 +23,7 @@ def insert_practitioner(name, status):
 		practitioner_name=name,
 		status=status,
 		hms_tz_company=COMPANY,
+		practitioner_role=role,
 	)
 
 
@@ -37,6 +39,7 @@ class TestAppointmentPractitionerStatus(FrappeTestCase):
 		insert("Company", COMPANY, company_name=COMPANY, abbr="_TPS", default_currency="TZS")
 		insert_practitioner(ACTIVE, "Active")
 		insert_practitioner(DISABLED, "Disabled")
+		insert_practitioner(CLAIM_REVIEWER, "Active", role="Claim Reviewer")
 
 	def tearDown(self):
 		frappe.db.rollback()
@@ -59,6 +62,12 @@ class TestAppointmentPractitionerStatus(FrappeTestCase):
 		self.assertEqual(sorted(practitioners), sorted([ACTIVE, DISABLED]))
 		self.assertTrue(practitioners[ACTIVE]["is_available"])
 		self.assertFalse(practitioners[DISABLED]["is_available"])
+
+	def test_only_doctors_are_listed(self):
+		self.assertNotIn(CLAIM_REVIEWER, listed("All"))
+		searched = [row.value for row in practitioner_api.search_practitioners("_Test Status")]
+		self.assertIn(ACTIVE, searched)
+		self.assertNotIn(CLAIM_REVIEWER, searched)
 
 	def test_unknown_status_is_refused(self):
 		with self.assertRaisesRegex(frappe.ValidationError, "Practitioner status must be one of"):
