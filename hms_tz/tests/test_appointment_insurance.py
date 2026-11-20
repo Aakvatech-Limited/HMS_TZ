@@ -280,6 +280,13 @@ class TestAppointmentInsurance(FrappeTestCase):
 			)
 		authorize.assert_not_called()
 
+	def test_booking_dialog_checks_an_existing_patient_first(self):
+		appointment_api.check_patient_can_book(CARD_HOLDER)
+		frappe.db.set_value("Patient", CARD_HOLDER, "inpatient_record", "_Test Admission")
+
+		with self.assertRaisesRegex(frappe.ValidationError, "patient already admitted"):
+			appointment_api.check_patient_can_book(CARD_HOLDER)
+
 	def test_admitted_patient_is_refused_before_jubilee_is_asked(self):
 		frappe.db.set_value("Patient", JUBILEE_HOLDER, "inpatient_record", "_Test Admission")
 
