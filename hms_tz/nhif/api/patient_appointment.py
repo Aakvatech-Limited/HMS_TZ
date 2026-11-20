@@ -33,11 +33,7 @@ def publish_grid_update(doc, method):
 	"""Tell open appointment grids which company and date changed, once the save commits."""
 	frappe.publish_realtime(
 		"patient_appointment_update",
-		{
-			"company": doc.company,
-			"appointment_date": str(doc.appointment_date),
-			"user": frappe.session.user,
-		},
+		{"company": doc.company, "appointment_date": str(doc.appointment_date)},
 		room=get_doctype_room(doc.doctype),
 		after_commit=True,
 	)
