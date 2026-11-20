@@ -110,9 +110,10 @@ const kind = computed(() => {
   return "unavailable";
 });
 
-const unavailableReason = computed(() =>
-  props.isPast ? "Past time slot" : "Practitioner unavailable"
-);
+const unavailableReason = computed(() => {
+  if (props.practitioner.status === "Disabled") return "Practitioner disabled";
+  return props.isPast ? "Past time slot" : "Practitioner unavailable";
+});
 
 const ariaLabel = computed(() => {
   const prefix = `${props.practitioner.name}, ${props.timeSlot.time}`;

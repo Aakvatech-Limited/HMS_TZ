@@ -25,8 +25,12 @@
         >
           {{ practitioner.name }}
         </h3>
-        <p class="text-xs font-semibold text-gray-700 truncate leading-tight">
-          {{ practitioner.department || "General" }}
+        <p
+          class="text-xs font-semibold text-gray-700 truncate leading-tight"
+          :title="isDisabled ? 'Disabled: appointments are read only' : ''"
+        >
+          <span v-if="isDisabled" class="text-red-600">Disabled · </span
+          >{{ practitioner.department || "General" }}
         </p>
         <!-- <p class="text-xs font-semibold text-gray-700 truncate leading-tight">
           {{ practitioner.billing_item }}
@@ -37,6 +41,7 @@
 </template>
 
 <script setup>
+import { computed } from "vue";
 import { Avatar, Badge } from "frappe-ui";
 
 const props = defineProps({
@@ -45,4 +50,6 @@ const props = defineProps({
     required: true,
   },
 });
+
+const isDisabled = computed(() => props.practitioner.status === "Disabled");
 </script>
