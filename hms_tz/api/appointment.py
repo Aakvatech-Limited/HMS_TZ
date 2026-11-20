@@ -2,7 +2,7 @@ import frappe
 from frappe import _
 from frappe.core.doctype.user_permission.user_permission import get_user_permissions
 from frappe.query_builder import DocType
-from frappe.utils import get_datetime, get_time, getdate, now_datetime
+from frappe.utils import cint, get_datetime, get_time, getdate, now_datetime
 
 from hms_tz.api.appointment_insurance import link_jubilee_benefits
 from hms_tz.nhif.api.patient_appointment import (
@@ -77,24 +77,18 @@ def create_appointment(appointment_data):
 	validate_not_in_past(appointment_doc.appointment_date, appointment_doc.appointment_time)
 	validate_active_practitioner(appointment_doc.practitioner)
 
-	billing_item = get_consulting_charge_item(
-		appointment_data.get("appointment_type"),
-		appointment_data.get("practitioner"),
+	appointment_doc.billing_item = get_consulting_charge_item(
+		appointment_doc.appointment_type, appointment_doc.practitioner
 	)
-	appointment_doc.billing_item = billing_item
-
-	if appointment_data.get("payment_mode") == "Cash":
-		mops = get_mode_of_payment()
-
-		cash_mop = next((mop for mop in mops if mop.type == "Cash"), None)
-		mode_of_payment = cash_mop.mode_of_payment if cash_mop else mops[0].mode_of_payment
-		appointment_doc.mode_of_payment = mode_of_payment
-
-		appointment_doc.paid_amount = get_cash_amount(
-			billing_item,
-			mop=mode_of_payment,
-			company=appointment_data.get("company"),
-			patient=appointment_data.get("patient"),
+	if appointment_doc.payment_mode == "Cash":
+		appointment_doc.update(
+			get_cash_charge(
+				appointment_doc.practitioner,
+				appointment_doc.appointment_type,
+				appointment_doc.company,
+				appointment_doc.patient,
+				appointment_doc.has_no_consultation_charges,
+			)
 		)
 
 	appointment_doc.insert(ignore_permissions=True)
@@ -107,6 +101,43 @@ def create_appointment(appointment_data):
 		appointment_doc.reload()
 
 	return appointment_doc.as_dict()
+
+
+@frappe.whitelist()
+def get_cash_charge(practitioner, appointment_type, company, patient=None, has_no_consultation_charges=0):
+	"""Billing item, mode of payment and amount of a cash appointment; refuses one that cannot be billed.
+
+	The booking dialog calls it before it creates a new patient, so a refused booking creates nothing.
+	"""
+	frappe.has_permission("Patient Appointment", "create", throw=True)
+	billing_item = get_consulting_charge_item(appointment_type, practitioner)
+	if not billing_item:
+		frappe.throw(
+			_(
+				"Practitioner {0} has no OPD consulting charge item, so a cash appointment cannot be billed. Set the item on the practitioner first."
+			).format(practitioner)
+		)
+
+	mops = get_mode_of_payment()
+	cash_mop = next((mop for mop in mops if mop.type == "Cash"), mops[0])
+	paid_amount = get_cash_amount(
+		billing_item,
+		mop=cash_mop.mode_of_payment,
+		company=company,
+		patient=patient,
+		has_no_consultation_charges=has_no_consultation_charges,
+	)
+	if not paid_amount and not cint(has_no_consultation_charges):
+		frappe.throw(
+			_(
+				"Consulting charge item {0} has no price for mode of payment {1}, so a cash appointment cannot be billed. Add an Item Price first."
+			).format(billing_item, cash_mop.mode_of_payment)
+		)
+	return {
+		"billing_item": billing_item,
+		"mode_of_payment": cash_mop.mode_of_payment,
+		"paid_amount": paid_amount,
+	}
 
 
 @frappe.whitelist()
