@@ -15,6 +15,7 @@ import {
 } from "@/data/insurance";
 import { computed, reactive, ref } from "vue";
 import dayjs from "dayjs";
+import { cardKey, needsCardCheck } from "./cardCheck";
 
 const PATIENT_CARD_FIELDS = [
   "first_name",
@@ -83,6 +84,7 @@ export function useBookingForm(initial) {
     payment: "Cash",
     card_type: "",
     card_no: "",
+    checkedCardKey: "",
     card: null,
     cardStatus: null,
     patientMode: "existing",
@@ -117,8 +119,12 @@ export function useBookingForm(initial) {
     docs.push("Appointment");
     return `Creates: ${docs.join(" → ")}`;
   });
+  const cardNeedsCheck = computed(() =>
+    needsCardCheck(form, canCheckCard.value)
+  );
   const canAuthorize = computed(
     () =>
+      !cardNeedsCheck.value &&
       Boolean(form.appointment_type) &&
       (form.patientMode !== "existing" || Boolean(form.patient)) &&
       (form.subscriptionMode !== "existing" || Boolean(form.subscription)) &&
@@ -166,8 +172,37 @@ export function useBookingForm(initial) {
     form.authorization = null;
   };
 
+  // Everything the last Check or loaded subscription filled in belongs to the old card.
+  const clearCardResult = () => {
+    const patientFromCard =
+      form.fromCard.patient ||
+      (form.subscription && form.patient === form.subscription.patient);
+    if (patientFromCard) {
+      form.patient = "";
+      form.patientDetails = null;
+    }
+    if (PATIENT_CARD_FIELDS.some((field) => form.fromCard[field]))
+      form.newPatient = emptyPatient();
+    form.fromCard = {};
+    form.checkedCardKey = "";
+    form.card = null;
+    form.cardStatus = null;
+    clearAuthorization();
+    form.subscription = null;
+    form.subscriptionMode = "existing";
+    form.newSubscription = emptySubscription();
+  };
+
+  // The card no and card type change only here, so another card never keeps the old card's data.
+  const changeCard = (values) => {
+    Object.assign(form, values);
+    if (form.checkedCardKey && cardKey(form) !== form.checkedCardKey)
+      clearCardResult();
+  };
+
   const setPayment = (payment) => {
     form.payment = payment;
+    form.checkedCardKey = "";
     form.cardStatus = null;
     clearAuthorization();
     form.subscription = null;
@@ -190,6 +225,8 @@ export function useBookingForm(initial) {
     form.card_no = subscription.coverage_plan_card_number || form.card_no;
     if (isNhif.value)
       form.card_type = subscription.card_type_name || DEFAULT_NHIF_CARD_TYPE;
+    // A subscription in HMS needs no Check for its own card.
+    form.checkedCardKey = cardKey(form);
     form.patientMode = "existing";
     await selectPatient(subscription.patient);
   };
@@ -201,6 +238,8 @@ export function useBookingForm(initial) {
 
   const fillNewPatientFromCard = (card) => {
     form.patientMode = "new";
+    // Fields the card does not give stay empty, so nothing of an earlier card is kept.
+    form.newPatient = emptyPatient();
     form.fromCard = {};
     for (const field of PATIENT_CARD_FIELDS) {
       if (!card[field]) continue;
@@ -240,6 +279,7 @@ export function useBookingForm(initial) {
       fillNewSubscriptionFromCard(result);
     }
     form.cardStatus = cardStatusFor(result);
+    form.checkedCardKey = cardKey(form);
   };
 
   const cardStatusFor = (result, inHms = "found in HMS") => {
@@ -447,6 +487,10 @@ export function useBookingForm(initial) {
     if (!form.appointment_date) errors.push("Date is required");
     if (!form.appointment_time) errors.push("Time is required");
     if (!form.appointment_type) errors.push("Visit type is required");
+    if (cardNeedsCheck.value)
+      errors.push(
+        `Click Check with ${form.payment} for card no ${form.card_no}`
+      );
     if (form.patientMode === "new") {
       for (const [field, label] of [
         ["first_name", "First name"],
@@ -522,6 +566,8 @@ export function useBookingForm(initial) {
     creates,
     canAuthorize,
     canAuthorizeJubilee,
+    cardNeedsCheck,
+    changeCard,
     canSubmit,
     loadSettings,
     setPayment,
