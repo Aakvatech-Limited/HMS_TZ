@@ -2,6 +2,7 @@ import json
 from unittest.mock import Mock, patch
 
 import frappe
+import requests
 from frappe.model.document import Document
 from frappe.tests.utils import FrappeTestCase
 from frappe.utils import add_days, nowdate
@@ -254,6 +255,17 @@ class TestAppointmentInsurance(FrappeTestCase):
 		self.assertIn("Failed to AuthorizePatient", reply["message"])
 		self.assertIn("Status Code: 400", reply["message"])
 		self.assertIn("NHIF Response: <b>Use a test card.", reply["message"])
+
+	def test_authorize_nhif_patient_tells_to_check_the_portal_on_timeout(self):
+		with (
+			patch.object(
+				appointment_insurance, "authorize_patient", side_effect=requests.exceptions.ReadTimeout
+			),
+			self.assertRaisesRegex(frappe.ValidationError, "check the NHIF portal before you try again"),
+		):
+			appointment_insurance.authorize_nhif_patient(
+				**{**AUTHORIZE_ARGS, "insurance_subscription": NHIF_SUBSCRIPTION}
+			)
 
 	def test_authorize_nhif_patient_raises_a_rejected_reply(self):
 		reply_text = '{"authorizationStatus": "REJECTED", "remarks": "Card is inactive"}'
