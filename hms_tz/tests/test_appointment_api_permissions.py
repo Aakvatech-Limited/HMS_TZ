@@ -146,6 +146,7 @@ class TestAppointmentApiPermissions(FrappeTestCase):
 			practitioner_name="Test Practitioner",
 			status="Active",
 			hms_tz_company=COMPANY,
+			practitioner_role="Doctor",
 			op_consulting_charge_item="_Test Specialist",
 			inpatient_visit_charge_item="_Test Super Specialist",
 		)
