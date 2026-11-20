@@ -166,7 +166,7 @@ class TestAppointmentApiPermissions(FrappeTestCase):
 
 		publish_realtime.assert_called_once_with(
 			"patient_appointment_update",
-			{"company": COMPANY, "appointment_date": nowdate(), "user": "Administrator"},
+			{"company": COMPANY, "appointment_date": nowdate()},
 			room="doctype:Patient Appointment",
 			after_commit=True,
 		)
