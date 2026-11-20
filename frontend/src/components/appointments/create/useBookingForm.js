@@ -3,6 +3,7 @@ import {
   authorizeJubileePatient,
   authorizeNhifPatient,
   checkCard as checkCardApi,
+  checkPatientCanBook,
   createAppointment,
   createPatient,
   createSubscription,
@@ -301,8 +302,13 @@ export function useBookingForm(initial) {
     );
   };
 
+  // First step of every booking: an admitted or disabled patient is refused before a subscription,
+  // an authorization or the appointment is made. A new patient cannot be admitted yet.
   const ensurePatient = async () => {
-    if (form.patientMode !== "new") return;
+    if (form.patientMode !== "new") {
+      await checkPatientCanBook(form.patient);
+      return;
+    }
     setStatus("Creating the patient record...", 25);
     const patient = await createPatient({
       ...form.newPatient,
