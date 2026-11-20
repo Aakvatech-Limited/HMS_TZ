@@ -251,8 +251,12 @@
                 class="mb-5 flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700"
               >
                 <FeatherIcon name="lock" class="h-4 w-4 shrink-0" />
-                The practitioner is disabled. This appointment is kept as a
-                record and cannot be changed.
+                {{
+                  practitionerStatus === "Missing"
+                    ? "The practitioner of this appointment has no record in HMS."
+                    : "The practitioner is disabled."
+                }}
+                This appointment is kept as a record and cannot be changed.
               </div>
               <div
                 v-else-if="isViewMode && isUnauthorized"
@@ -800,13 +804,15 @@ const isReadOnlyStatus = computed(() =>
   )
 );
 
-// Appointments of a disabled practitioner are records only; the server refuses changes too.
+const practitionerStatus = computed(
+  () =>
+    practitionerStore.practitioners.find(
+      ({ name }) => name === appointment["Patient Appointment"].practitioner
+    )?.status
+);
+// Appointments of a disabled practitioner, or of one with no record, are records only.
 const isPractitionerDisabled = computed(() =>
-  practitionerStore.practitioners.some(
-    ({ name, status }) =>
-      name === appointment["Patient Appointment"].practitioner &&
-      status === "Disabled"
-  )
+  ["Disabled", "Missing"].includes(practitionerStatus.value)
 );
 
 const EDITABLE_FIELDS = [
