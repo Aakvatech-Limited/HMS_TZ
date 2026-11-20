@@ -717,7 +717,6 @@ const emptyAppointment = () => ({
     insurance_company: "",
     coverage_plan_name: "",
     coverage_plan_card_number: "",
-    national_id: "",
     authorization_number: "",
     require_fingerprint: "",
     require_facial_recognation: "",
@@ -740,7 +739,6 @@ const emptyAppointment = () => ({
     scheme_id: "",
     membership_no: "",
     card_no: "",
-    national_id: "",
     next_to_kin_name: "",
     next_to_kin_mobile_no: "",
     next_to_kin_relationship: "",
@@ -751,7 +749,6 @@ const emptyAppointment = () => ({
     insurance_company: "",
     healthcare_insurance_coverage_plan: "",
     coverage_plan_card_number: "",
-    national_id: "",
   },
 });
 
