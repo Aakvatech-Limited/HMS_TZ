@@ -35,6 +35,7 @@ export const usePractitionerStore = defineStore("practitioners", {
             ? call("hms_tz.api.practitioner.get_practioner_list", {
                 company,
                 date,
+                status: this.filters.practitioner_status,
               })
             : [],
         (data) => {
