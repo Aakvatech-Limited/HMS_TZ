@@ -355,3 +355,6 @@ before_tests = "hms_tz.install.before_tests"
 website_route_rules = [
 	{"from_route": "/frontend/<path:app_path>", "to_route": "frontend"},
 ]
+
+# The Vue pages show only the errors of a failed request, not its info alerts.
+after_request = ["hms_tz.api.page_errors.drop_alerts_from_page_errors"]
