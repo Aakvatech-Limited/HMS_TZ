@@ -214,7 +214,9 @@
               </p>
               <p class="text-xs text-blue-600 mt-1">
                 Only practitioner, appointment time and, for insurance, the
-                authorization no, referral no and remarks can be edited.
+                authorization no, referral no and remarks can be edited. The
+                visit type can be changed until the appointment is authorized
+                or invoiced.
               </p>
             </div>
           </div>
@@ -812,6 +814,18 @@ const EDITABLE_FIELDS = [
   "remarks",
 ];
 
+// The visit type decides what NHIF authorizes and what is billed, so it changes only before either.
+const canChangeVisitType = computed(
+  () =>
+    !authorizationNumberAtEdit.value &&
+    !appointment["Patient Appointment"].invoiced
+);
+const editableFields = computed(() =>
+  canChangeVisitType.value
+    ? [...EDITABLE_FIELDS, "appointment_type"]
+    : EDITABLE_FIELDS
+);
+
 const field = (name, label, type, extra = {}) => ({
   name,
   label,
@@ -820,12 +834,12 @@ const field = (name, label, type, extra = {}) => ({
   ...extra,
 });
 
-// View and edit show the saved appointment; only EDITABLE_FIELDS open in edit mode.
+// View and edit show the saved appointment; only editableFields open in edit mode.
 const sections = computed(() => {
   const readOnly = (fields) =>
     fields.map((item) => ({
       ...item,
-      read_only: isViewMode.value || !EDITABLE_FIELDS.includes(item.name),
+      read_only: isViewMode.value || !editableFields.value.includes(item.name),
     }));
   const revenueFields = isInsurance.value
     ? [
