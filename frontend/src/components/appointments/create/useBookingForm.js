@@ -9,6 +9,7 @@ import {
   getInsuranceApiSettings,
   getPatient,
   getSubscription,
+  validateNewPatientCashBooking,
 } from "@/data/insurance";
 import { computed, reactive, ref } from "vue";
 import dayjs from "dayjs";
@@ -409,6 +410,13 @@ export function useBookingForm(initial) {
     run("Creating Appointment", async () => {
       const errors = validationErrors({ forAuthorization: false });
       if (errors.length) return showErrors(errors);
+      // The server refuses an existing patient's booking itself; a new patient must not be created first.
+      if (!isInsurance.value && form.patientMode === "new")
+        await validateNewPatientCashBooking({
+          practitioner: form.practitioner,
+          appointment_type: form.appointment_type,
+          company: form.company,
+        });
       await ensurePatient();
       await ensureSubscription();
       setStatus("Creating the appointment...", 75);

@@ -560,12 +560,35 @@ def set_follow_up(appointment_doc, method):
 			# frappe.msgprint(_("This appointment requires to be paid for!"), alert=True)
 
 
+def validate_cash_billing(appointment):
+	"""Refuses a charged cash appointment that cannot be billed.
+
+	Free follow-ups and visit types without cash charges are marked invoiced, so they need no item or price.
+	"""
+	if appointment.invoiced:
+		return
+	if not appointment.billing_item:
+		frappe.throw(
+			_(
+				"Practitioner {0} has no OPD consulting charge item, so a cash appointment cannot be billed. Set the item on the practitioner first."
+			).format(appointment.practitioner)
+		)
+	if not appointment.paid_amount:
+		frappe.throw(
+			_(
+				"Consulting charge item {0} has no price for mode of payment {1}, so a cash appointment cannot be billed. Add an Item Price first."
+			).format(appointment.billing_item, appointment.mode_of_payment)
+		)
+
+
 def make_next_doc(doc, method, from_hook=True):
 	validate_disabled_patient(doc.patient, doc.patient_name)
 	validate_insurance_subscription(doc)
 	check_multiple_appointments(doc)
 	if doc.is_new():
 		validate_has_no_consultation(doc, method)
+		if doc.flags.validate_cash_billing:
+			validate_cash_billing(doc)
 		return
 
 	if doc.insurance_subscription:
