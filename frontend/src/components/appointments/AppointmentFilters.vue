@@ -11,7 +11,7 @@
     </template>
     <template #body-main>
       <div class="flex w-[56rem] max-w-[calc(100vw-2rem)] flex-col gap-4 p-4">
-        <div class="grid gap-4 md:grid-cols-3">
+        <div class="grid gap-4 md:grid-cols-[1fr_1fr_1.3fr]">
           <section :class="CARD_CLASS">
             <h3 class="text-sm font-semibold text-ink-gray-8">
               Patient &amp; Payment
@@ -92,6 +92,27 @@
               label="Department"
               placeholder="Department contains"
             />
+            <div
+              role="radiogroup"
+              aria-label="Practitioner Status"
+              class="flex items-center gap-x-2.5 whitespace-nowrap"
+            >
+              <span class="text-xs text-ink-gray-5">Practitioner Status</span>
+              <label
+                v-for="status in PRACTITIONER_STATUS_OPTIONS"
+                :key="status"
+                class="inline-flex select-none items-center gap-1 text-sm font-medium text-ink-gray-8"
+              >
+                <input
+                  v-model="practitionerStore.filters.practitioner_status"
+                  type="radio"
+                  name="practitioner-status"
+                  :value="status"
+                  class="h-3.5 w-3.5 border-outline-gray-4 text-ink-gray-9 focus:ring-0 focus:ring-offset-0 focus-visible:ring-2 focus-visible:ring-outline-gray-3"
+                />
+                {{ status }}
+              </label>
+            </div>
           </section>
         </div>
         <Button
@@ -110,6 +131,7 @@ import { computed } from "vue";
 import { useAppointmentStore } from "@/data/appointment";
 import { usePractitionerStore } from "@/data/practitioner";
 import {
+  PRACTITIONER_STATUS_OPTIONS,
   countActiveFilters,
   getPractitionerLevels,
 } from "@/data/appointmentFilters";
