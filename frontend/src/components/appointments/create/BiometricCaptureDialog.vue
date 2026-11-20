@@ -6,6 +6,12 @@
     class="z-[1100]"
   >
     <template #body-content>
+      <DialogErrorPanel
+        v-if="dialogError"
+        class="mb-3"
+        :error="dialogError"
+        @close="dialogError = null"
+      />
       <div v-if="method === 'FACIAL'" class="flex flex-col gap-3">
         <div v-if="cameraError" class="flex flex-col items-center gap-3 py-6">
           <FeatherIcon name="camera-off" class="h-8 w-8 text-red-500" />
@@ -158,12 +164,14 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useToast } from "@/composables/useToast";
+import { provideDialogError } from "@/composables/dialogError";
 import { FaceCamera } from "@desk/facial/camera.js";
 import { FINGERPRINT_DRIVER_DOWNLOADS } from "@desk/fingerprint/drivers.js";
 import {
   FINGER_CODES,
   FingerprintScanner,
 } from "@desk/fingerprint/scanner.js";
+import DialogErrorPanel from "../DialogErrorPanel.vue";
 import FieldLabel from "./FieldLabel.vue";
 
 const props = defineProps({
@@ -172,7 +180,8 @@ const props = defineProps({
 });
 const emit = defineEmits(["update:show", "captured"]);
 
-const { showError } = useToast();
+const dialogError = provideDialogError();
+const { showError, clearError } = useToast(dialogError);
 
 const video = ref(null);
 const cameras = ref([]);
@@ -272,6 +281,7 @@ const scan = () => {
   fingerprintImage.value = "";
   result.value = null;
   scanning.value = true;
+  clearError();
   scanner.scan(device, finger.value);
 };
 
@@ -306,6 +316,7 @@ watch(
   () => props.show,
   (show) => {
     if (!show) return;
+    clearError();
     if (props.method === "FACIAL") openFacial();
     else openFingerprint();
   }
