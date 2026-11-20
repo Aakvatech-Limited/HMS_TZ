@@ -73,7 +73,9 @@
             <Button
               v-if="
                 appointment['Patient Appointment']['status']?.toLowerCase() !==
-                  'cancelled' && canShowCancelButton
+                  'cancelled' &&
+                canShowCancelButton &&
+                !isPractitionerDisabled
               "
               variant="subtle"
               size="md"
@@ -96,7 +98,8 @@
               v-if="
                 appointment['Patient Appointment']['payment_mode'] ===
                   'Cash' &&
-                !appointment['Patient Appointment']['ref_sales_invoice']
+                !appointment['Patient Appointment']['ref_sales_invoice'] &&
+                !isPractitionerDisabled
               "
               variant="subtle"
               size="lg"
@@ -238,7 +241,15 @@
             />
             <template v-else-if="sections">
               <div
-                v-if="isViewMode && isUnauthorized"
+                v-if="isViewMode && isPractitionerDisabled"
+                class="mb-5 flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700"
+              >
+                <FeatherIcon name="lock" class="h-4 w-4 shrink-0" />
+                The practitioner is disabled. This appointment is kept as a
+                record and cannot be changed.
+              </div>
+              <div
+                v-else-if="isViewMode && isUnauthorized"
                 class="mb-5 flex items-center gap-2 rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm text-orange-800"
               >
                 <FeatherIcon name="alert-triangle" class="h-4 w-4 shrink-0" />
@@ -394,7 +405,7 @@
         <div class="flex gap-2">
           <template v-if="isViewMode">
             <Button
-              v-if="!isReadOnlyStatus"
+              v-if="!isReadOnlyStatus && !isPractitionerDisabled"
               variant="subtle"
               size="lg"
               theme="gray"
@@ -546,6 +557,7 @@ import {
 } from "vue";
 import { createResource } from "frappe-ui";
 import { useAppointmentStore } from "@/data/appointment";
+import { usePractitionerStore } from "@/data/practitioner";
 import { useDateStore } from "@/data/date";
 import { useToast } from "@/composables/useToast";
 import { provideDialogError } from "@/composables/dialogError";
@@ -597,6 +609,7 @@ const emit = defineEmits([
 ]);
 
 const appointmentStore = useAppointmentStore();
+const practitionerStore = usePractitionerStore();
 const dateStore = useDateStore();
 const dialogError = provideDialogError();
 const { notifications, handleResourceError, showError, showInfo, clearError } =
@@ -779,6 +792,15 @@ const isUnauthorized = computed(() => {
 const isReadOnlyStatus = computed(() =>
   ["closed", "cancelled"].includes(
     appointment["Patient Appointment"]["status"]?.toLowerCase()
+  )
+);
+
+// Appointments of a disabled practitioner are records only; the server refuses changes too.
+const isPractitionerDisabled = computed(() =>
+  practitionerStore.practitioners.some(
+    ({ name, status }) =>
+      name === appointment["Patient Appointment"].practitioner &&
+      status === "Disabled"
   )
 );
 

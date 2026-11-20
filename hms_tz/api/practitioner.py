@@ -1,11 +1,15 @@
 import frappe
 from erpnext.setup.doctype.employee.employee import is_holiday
+from frappe import _
 from frappe.query_builder import DocType
 from frappe.utils import get_abbr, get_time, getdate, nowdate
 
+# Values of the Practitioner Status filter on the Appointments page.
+PRACTITIONER_STATUSES = {"Active": ["Active"], "Disabled": ["Disabled"], "All": ["Active", "Disabled"]}
+
 
 @frappe.whitelist()
-def get_practioner_list(company, date=None):
+def get_practioner_list(company, date=None, status="Active"):
 	"""
 	Get all available practitioners for a company on a specific date
 	Filters out practitioners who are:
@@ -13,7 +17,8 @@ def get_practioner_list(company, date=None):
 	- On leave or unavailable
 	- Have no practitioner schedules
 
-	Returns practitioners with their availability data
+	Returns practitioners with their availability data. Disabled practitioners are listed only for their
+	records, so they are never available.
 	"""
 
 	if not date:
@@ -23,12 +28,13 @@ def get_practioner_list(company, date=None):
 
 	available_practitioners = []
 
-	practitioners = get_practitioners(company)
+	practitioners = get_practitioners(company, status)
 
 	for practitioner in practitioners:
 		try:
+			is_active = practitioner.status == "Active"
 			# Check employee availability (holidays, leaves)
-			if not check_practitioner_employee_availability(
+			if is_active and not check_practitioner_employee_availability(
 				practitioner.name, date, employee=practitioner.employee, user_id=practitioner.user_id
 			):
 				continue
@@ -41,7 +47,8 @@ def get_practioner_list(company, date=None):
 				"inpatient_billing_item": practitioner.inpatient_visit_charge_item,
 				"avatar": get_abbr(practitioner.practitioner_name) or "P",
 				# get_practitioner_avatar(practitioner.practitioner_name),
-				"is_available": True,
+				"status": practitioner.status,
+				"is_available": is_active,
 				"mobile_phone": practitioner.mobile_phone,
 				"image": practitioner.image,
 				# 'timeslots': [],
@@ -86,11 +93,13 @@ def search_practitioners(txt=""):
 	)
 
 
-def get_practitioners(company):
-	"""Active practitioners of the company that the user may read, after user permissions."""
+def get_practitioners(company, status="Active"):
+	"""Practitioners of the company with the given filter status that the user may read, after user permissions."""
+	if status not in PRACTITIONER_STATUSES:
+		frappe.throw(_("Practitioner status must be one of {0}").format(", ".join(PRACTITIONER_STATUSES)))
 	return frappe.get_list(
 		"Healthcare Practitioner",
-		filters={"status": "Active", "hms_tz_company": company},
+		filters={"status": ["in", PRACTITIONER_STATUSES[status]], "hms_tz_company": company},
 		fields=[
 			"name",
 			"practitioner_name",
