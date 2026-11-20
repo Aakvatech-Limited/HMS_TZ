@@ -217,6 +217,10 @@
                 authorization no, referral no and remarks can be edited. The
                 visit type can be changed until the appointment is authorized
                 or invoiced.
+                <template v-if="isInvoiced">
+                  This appointment is invoiced, so its practitioner cannot
+                  change.
+                </template>
               </p>
             </div>
           </div>
@@ -725,6 +729,7 @@ const emptyAppointment = () => ({
     poc_reference_no: "",
     mode_of_payment: "",
     ref_sales_invoice: "",
+    invoiced: 0,
     status: "",
     company: "",
   },
@@ -818,11 +823,16 @@ const canChangeVisitType = computed(
     !authorizationNumberAtEdit.value &&
     !appointment["Patient Appointment"].invoiced
 );
-const editableFields = computed(() =>
-  canChangeVisitType.value
-    ? [...EDITABLE_FIELDS, "appointment_type"]
-    : EDITABLE_FIELDS
+// The submitted invoice names the practitioner, so an invoiced appointment keeps it.
+const isInvoiced = computed(() =>
+  Boolean(appointment["Patient Appointment"].ref_sales_invoice)
 );
+const editableFields = computed(() => {
+  const fields = EDITABLE_FIELDS.filter(
+    (name) => name !== "practitioner" || !isInvoiced.value
+  );
+  return canChangeVisitType.value ? [...fields, "appointment_type"] : fields;
+});
 
 const field = (name, label, type, extra = {}) => ({
   name,
