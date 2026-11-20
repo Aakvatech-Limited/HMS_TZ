@@ -1,5 +1,3 @@
-import { computed, reactive, ref } from "vue";
-import dayjs from "dayjs";
 import { useToast } from "@/composables/useToast";
 import {
   authorizeJubileePatient,
@@ -12,6 +10,8 @@ import {
   getPatient,
   getSubscription,
 } from "@/data/insurance";
+import { computed, reactive, ref } from "vue";
+import dayjs from "dayjs";
 
 const PATIENT_CARD_FIELDS = [
   "first_name",
@@ -59,10 +59,10 @@ export const patientSummary = (patient) => {
 
 /** State and server calls of the New Appointment form. */
 export function useBookingForm(initial) {
-  const { showError, handleResourceError } = useToast();
+  const { showError, showErrorReply, clearError, handleResourceError } =
+    useToast();
   const settings = ref({ enable_nhif_api: false, enable_jubilee_api: false });
   const busy = ref(false);
-  const providerReply = ref(null);
   const status = ref({ title: "", message: "", percent: 0 });
 
   const form = reactive({
@@ -138,15 +138,11 @@ export function useBookingForm(initial) {
   const run = async (title, work) => {
     status.value = { title, message: "", percent: 0 };
     busy.value = true;
-    providerReply.value = null;
+    clearError();
     try {
       return await work();
     } catch (error) {
-      if (error.exc_type === "ProviderReplyError") {
-        providerReply.value = JSON.parse(error.messages[0]);
-      } else {
-        handleResourceError(error);
-      }
+      handleResourceError(error);
       return null;
     } finally {
       busy.value = false;
@@ -354,10 +350,10 @@ export function useBookingForm(initial) {
       });
       form.verification.authorization_number = data.authorizationNo;
       if (data.authorizationStatus !== "ACCEPTED") {
-        providerReply.value = {
+        showErrorReply({
           title: data.authorizationStatus,
           message: data.remarks,
-        };
+        });
       }
       form.authorization = {
         coverage_plan_name: data.coveragePlanName,
@@ -388,10 +384,7 @@ export function useBookingForm(initial) {
       // Marks the number as returned, so a change of payment, card or subscription drops it.
       form.authorization = {};
       if (!String(data.status || "").includes("OK")) {
-        providerReply.value = {
-          title: data.status,
-          message: data.description,
-        };
+        showErrorReply({ title: data.status, message: data.description });
       }
     });
 
@@ -496,7 +489,6 @@ export function useBookingForm(initial) {
     form,
     settings,
     busy,
-    providerReply,
     status,
     isInsurance,
     isNhif,
