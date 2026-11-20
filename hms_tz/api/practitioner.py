@@ -32,10 +32,7 @@ def get_practioner_list(company, date=None, status="Active"):
 		)
 		if is_available or doctor.status != "Active" or doctor.name in booked:
 			columns.append(get_column(doctor, bool(is_available)))
-	found = get_practitioners_by_name(booked - listed, status)
-	for practitioner in found:
-		columns.append(get_column(practitioner, False))
-	for practitioner in get_missing_practitioners(company, date, booked - listed - {p.name for p in found}):
+	for practitioner in get_practitioners_by_name(booked - listed, status):
 		columns.append(get_column(practitioner, False))
 	columns.sort(key=lambda column: column["name"])
 
@@ -51,42 +48,14 @@ def get_column(practitioner, is_available):
 	return {
 		"name": practitioner.name,
 		"department": practitioner.department or "General",
-		"billing_item": practitioner.get("op_consulting_charge_item"),
-		"inpatient_billing_item": practitioner.get("inpatient_visit_charge_item"),
+		"billing_item": practitioner.op_consulting_charge_item,
+		"inpatient_billing_item": practitioner.inpatient_visit_charge_item,
 		"avatar": get_abbr(practitioner.practitioner_name) or "P",
 		"status": practitioner.status,
 		"is_available": is_available,
-		"mobile_phone": practitioner.get("mobile_phone"),
-		"image": practitioner.get("image"),
+		"mobile_phone": practitioner.mobile_phone,
+		"image": practitioner.image,
 	}
-
-
-def get_missing_practitioners(company, date, names):
-	"""Booked practitioners that have no Healthcare Practitioner record: broken data, shown so it can be fixed.
-
-	The column takes the name and department from the appointments and is marked Missing, so it is read only.
-	"""
-	missing = [name for name in names if not frappe.db.exists("Healthcare Practitioner", name)]
-	if not missing:
-		return []
-	rows = frappe.get_list(
-		"Patient Appointment",
-		filters={"company": company, "appointment_date": date, "practitioner": ["in", missing]},
-		fields=["practitioner as name", "department"],
-		distinct=True,
-	)
-	columns = {}
-	for row in rows:
-		columns.setdefault(
-			row.name,
-			frappe._dict(
-				name=row.name,
-				practitioner_name=row.name,
-				department=row.department,
-				status="Missing",
-			),
-		)
-	return list(columns.values())
 
 
 def get_booked_practitioners(company, date):
