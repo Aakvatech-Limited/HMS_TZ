@@ -63,7 +63,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { call } from "frappe-ui";
 import { useToast } from "@/composables/useToast";
 import {
@@ -153,6 +153,7 @@ const authorizeNhif = async () => {
     biometric_method: method,
     referral_no,
     remarks,
+    appointment_type: props.appointment.appointment_type,
   });
   if (result.authorization_status !== "ACCEPTED") {
     showErrorReply({
@@ -164,7 +165,10 @@ const authorizeNhif = async () => {
 };
 
 const authorizeJubilee = async () => {
-  const number = await authorizeJubileeAppointment(props.appointment.name);
+  const number = await authorizeJubileeAppointment({
+    appointment: props.appointment.name,
+    appointment_type: props.appointment.appointment_type,
+  });
   if (!number) {
     showError("Jubilee did not return an authorization no");
     return;
@@ -188,6 +192,9 @@ const loadVisitType = async () => {
     requires_referral_no: visitType?.requires_referral_no || 0,
   };
 };
+
+// A visit type changed in Edit brings its own referral and remarks rules.
+watch(() => props.appointment.appointment_type, loadVisitType);
 
 onMounted(async () => {
   [settings.value] = await Promise.all([
