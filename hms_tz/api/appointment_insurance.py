@@ -10,6 +10,7 @@ from frappe.utils import cint
 from hms_tz.api.provider_reply import provider_call
 from hms_tz.jubilee.api.api import get_authorization_number, get_member_card_detials
 from hms_tz.nhif.api.patient import check_card_number, check_national_id, set_card_type
+from hms_tz.nhif.api.patient_appointment import change_visit_type
 from hms_tz.nhif.nhif_api.verification import (
 	authorize_patient,
 	get_card_details_by_card_no,
@@ -155,9 +156,10 @@ def create_insurance_subscription(subscription_data):
 
 
 @frappe.whitelist()
-def authorize_jubilee_appointment(appointment):
-	"""Request the Jubilee authorization no for a saved appointment and store it on it."""
+def authorize_jubilee_appointment(appointment, appointment_type=None):
+	"""Request the Jubilee authorization no for a saved appointment and store it on it, with a visit type changed in Edit."""
 	doc = get_appointment_to_authorize(appointment)
+	change_visit_type(doc, appointment_type)
 	card_no = frappe.db.get_value(
 		"Healthcare Insurance Subscription", doc.insurance_subscription, "coverage_plan_card_number"
 	)
@@ -239,10 +241,14 @@ def authorize_nhif_patient(
 
 @frappe.whitelist()
 def authorize_nhif_appointment(
-	appointment, fingerprint, fpcode, biometric_method, referral_no="", remarks=""
+	appointment, fingerprint, fpcode, biometric_method, referral_no="", remarks="", appointment_type=None
 ):
-	"""NHIF authorization of a saved appointment; stores the reply on it as the desk Get Authorization Number does."""
+	"""NHIF authorization of a saved appointment; stores the reply on it as the desk Get Authorization Number does.
+
+	A visit type changed in Edit is applied first, so NHIF authorizes the new one.
+	"""
 	doc = get_appointment_to_authorize(appointment)
+	change_visit_type(doc, appointment_type)
 	method = biometric_method.upper()
 	if method == "NONE" and not remarks:
 		frappe.throw(_("Remarks are required when the patient is not verified by biometrics"))
