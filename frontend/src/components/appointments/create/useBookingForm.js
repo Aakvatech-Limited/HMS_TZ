@@ -47,7 +47,6 @@ const emptySubscription = () => ({
   insurance_company: "",
   healthcare_insurance_coverage_plan: "",
   coverage_plan_card_number: "",
-  national_id: "",
 });
 
 const DEFAULT_NHIF_CARD_TYPE = "NHIF Beneficiary Card";
@@ -254,7 +253,6 @@ export function useBookingForm(initial) {
       insurance_company: result.coverage_plan?.insurance_company || "",
       healthcare_insurance_coverage_plan: result.coverage_plan?.name || "",
       coverage_plan_card_number: result.card.card_no,
-      national_id: result.card.national_id,
     };
     if (result.coverage_plan)
       form.fromCard.healthcare_insurance_coverage_plan = true;
@@ -353,7 +351,6 @@ export function useBookingForm(initial) {
     const patient = await createPatient({
       ...form.newPatient,
       card_no: isInsurance.value ? form.card?.card_no || form.card_no : "",
-      national_id: isInsurance.value ? form.card?.national_id || "" : "",
       card_type: isNhif.value ? form.card_type : "",
     });
     form.patientMode = "existing";
@@ -395,7 +392,6 @@ export function useBookingForm(initial) {
         appointment_type: form.appointment_type,
         company: form.company,
         card_no: form.subscription.coverage_plan_card_number || form.card_no,
-        national_id: form.subscription.national_id || "",
         fingerprint: biometric.Data,
         fpcode: biometric.fpCode,
         biometric_method: method,
