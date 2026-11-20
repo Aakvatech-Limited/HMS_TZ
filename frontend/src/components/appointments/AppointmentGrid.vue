@@ -295,8 +295,13 @@ onUnmounted(() => {
 });
 
 // The only trigger that loads a day. The debounce collapses fast date clicks into one load.
+// The server lists practitioners by status, so a status change loads the day again.
 watchDebounced(
-  () => [selectedCompany.value, dateStore.selectedDate],
+  () => [
+    selectedCompany.value,
+    dateStore.selectedDate,
+    practitionerStore.filters.practitioner_status,
+  ],
   loadDay,
   { debounce: 150, immediate: true }
 );
