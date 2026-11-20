@@ -11,7 +11,7 @@ from frappe.utils import cint
 from hms_tz.api.provider_reply import provider_call
 from hms_tz.jubilee.api.api import get_authorization_number, get_member_card_detials
 from hms_tz.nhif.api.patient import check_card_number, check_national_id, set_card_type
-from hms_tz.nhif.api.patient_appointment import change_visit_type
+from hms_tz.nhif.api.patient_appointment import change_visit_type, validate_patient_can_book
 from hms_tz.nhif.nhif_api.verification import (
 	authorize_patient,
 	get_card_details_by_card_no,
@@ -161,6 +161,7 @@ def authorize_jubilee_appointment(appointment, appointment_type=None):
 	"""Request the Jubilee authorization no for a saved appointment and store it on it, with a visit type changed in Edit."""
 	doc = get_appointment_to_authorize(appointment)
 	change_visit_type(doc, appointment_type)
+	validate_patient_can_book(doc.patient)
 	card_no = frappe.db.get_value(
 		"Healthcare Insurance Subscription", doc.insurance_subscription, "coverage_plan_card_number"
 	)
@@ -178,6 +179,7 @@ def authorize_jubilee_appointment(appointment, appointment_type=None):
 def authorize_jubilee_patient(company, card_no, insurance_subscription):
 	"""Jubilee authorization for the appointments page, before the appointment exists."""
 	frappe.has_permission("Patient Appointment", "create", throw=True)
+	validate_subscription_patient_can_book(insurance_subscription)
 	with provider_call("Jubilee"):
 		data = get_authorization_number(company, card_no, None, insurance_subscription)
 		if not data or not data.get("AuthorizationNo"):
@@ -187,6 +189,13 @@ def authorize_jubilee_patient(company, card_no, insurance_subscription):
 		"status": data.get("Status"),
 		"description": data.get("Description"),
 	}
+
+
+def validate_subscription_patient_can_book(insurance_subscription):
+	"""Local checks that would refuse the appointment run before the provider is asked for an authorization."""
+	validate_patient_can_book(
+		frappe.db.get_value("Healthcare Insurance Subscription", insurance_subscription, "patient")
+	)
 
 
 def link_jubilee_benefits(appointment):
@@ -219,6 +228,7 @@ def authorize_nhif_patient(
 ):
 	"""NHIF authorization for the appointments page; a reply without an authorization no raises NHIF's reply."""
 	frappe.has_permission("Patient Appointment", "create", throw=True)
+	validate_subscription_patient_can_book(insurance_subscription)
 	try:
 		with provider_call("NHIF"):
 			data = authorize_patient(

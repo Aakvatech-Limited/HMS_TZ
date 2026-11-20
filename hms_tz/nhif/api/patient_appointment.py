@@ -17,16 +17,26 @@ from hms_tz.nhif.api.healthcare_utils import get_discount_percent, get_item_rate
 
 
 def before_insert(doc, method):
-	validate_disabled_patient(doc.patient, doc.patient_name)
+	validate_patient_can_book(doc.patient)
+	get_patient_customer(doc.patient)
 
-	if doc.inpatient_record:
+
+def validate_patient_can_book(patient):
+	"""A disabled or admitted patient gets no appointment.
+
+	The appointments page also checks this before it asks NHIF or Jubilee for an authorization, which is used up
+	even if the appointment is then refused.
+	"""
+	patient_name, inpatient_record = frappe.db.get_value(
+		"Patient", patient, ["patient_name", "inpatient_record"]
+	) or (None, None)
+	validate_disabled_patient(patient, patient_name)
+	if inpatient_record:
 		frappe.throw(
 			_(
 				"You cannot create an appointment for a patient already admitted.<br>First <b>discharge the patient</b> and then create the appointment."
 			)
 		)
-
-	get_patient_customer(doc.patient)
 
 
 def publish_grid_update(doc, method):
