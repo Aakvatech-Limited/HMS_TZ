@@ -15,3 +15,9 @@ export const matchPages = (pages, text) => {
     )
     .sort((first, second) => rank(first.label) - rank(second.label));
 };
+
+/** The rows to show and whether more match; the server is asked for one row more than the page shows. */
+export const splitPage = (rows, pageLength) => ({
+  rows: pageLength ? rows.slice(0, pageLength) : rows,
+  hasMore: Boolean(pageLength) && rows.length > pageLength,
+});
