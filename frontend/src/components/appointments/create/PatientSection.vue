@@ -19,6 +19,7 @@
           :value="form.patient"
           doctype="Patient"
           :search-method="SEARCH_PATIENTS_METHOD"
+          :page-length="20"
           placeholder="Search by name, ID, mobile or card no"
           @change="(value) => emit('select-patient', value)"
         >

@@ -1,5 +1,7 @@
 """Insurance card checks, subscription lookup and authorization for the appointments page."""
 
+import re
+
 import frappe
 from frappe import _
 from frappe.query_builder import Criterion, DocType
@@ -30,6 +32,9 @@ SUBSCRIPTION_FIELDS = [
 ]
 PATIENT_FIELDS = ["name", "patient_name", "sex", "dob", "mobile"]
 NATIONAL_ID_CARD_TYPE = "NIDA ID"
+
+# Rows one patient search may return.
+MAX_PATIENT_SEARCH_ROWS = 100
 
 
 @frappe.whitelist()
@@ -101,23 +106,38 @@ def get_patient(name):
 
 
 @frappe.whitelist()
-def search_patients(txt=""):
-	"""Active patients whose ID, name, mobile or card no contains the text, with details to tell them apart."""
+def search_patients(txt="", page_length=20):
+	"""Active patients whose ID, name, mobile or card no contains the text, with details to tell them apart.
+
+	The search page asks for one row more than it shows, to tell the user that more patients match.
+	"""
 	pattern = f"%{txt}%"
+	or_filters = [
+		["name", "like", pattern],
+		["patient_name", "like", pattern],
+		["mobile", "like", pattern],
+		["card_no", "like", pattern],
+		["insurance_card_detail", "like", pattern],
+	]
+	international_mobile = get_international_mobile(txt)
+	if international_mobile:
+		or_filters.append(["mobile", "like", f"%{international_mobile}%"])
 	return frappe.get_list(
 		"Patient",
 		fields=["name as value", "patient_name", "sex", "mobile", "card_no"],
 		filters={"status": "Active"},
-		or_filters=[
-			["name", "like", pattern],
-			["patient_name", "like", pattern],
-			["mobile", "like", pattern],
-			["card_no", "like", pattern],
-			["insurance_card_detail", "like", pattern],
-		],
+		or_filters=or_filters,
 		order_by="modified desc",
-		limit=20,
+		limit=min(cint(page_length) or 20, MAX_PATIENT_SEARCH_ROWS),
 	)
+
+
+def get_international_mobile(txt):
+	"""The 255 form of a local mobile typed as 07..., also part of one; mobiles are stored as 255XXXXXXXXX."""
+	digits = re.sub(r"[\s-]", "", txt or "")
+	if re.fullmatch(r"0\d{3,9}", digits):
+		return f"255{digits[1:]}"
+	return None
 
 
 @frappe.whitelist()
