@@ -256,6 +256,40 @@ class TestAppointmentInsurance(FrappeTestCase):
 		self.assertIn("Status Code: 400", reply["message"])
 		self.assertIn("NHIF Response: <b>Use a test card.", reply["message"])
 
+	def test_admitted_patient_is_refused_before_nhif_is_asked(self):
+		frappe.db.set_value("Patient", CARD_HOLDER, "inpatient_record", "_Test Admission")
+
+		with (
+			patch.object(appointment_insurance, "authorize_patient") as authorize,
+			self.assertRaisesRegex(frappe.ValidationError, "patient already admitted"),
+		):
+			appointment_insurance.authorize_nhif_patient(
+				**{**AUTHORIZE_ARGS, "insurance_subscription": NHIF_SUBSCRIPTION}
+			)
+		authorize.assert_not_called()
+
+	def test_disabled_patient_is_refused_before_nhif_is_asked(self):
+		frappe.db.set_value("Patient", CARD_HOLDER, "status", "Disabled")
+
+		with (
+			patch.object(appointment_insurance, "authorize_patient") as authorize,
+			self.assertRaisesRegex(frappe.ValidationError, "is disabled"),
+		):
+			appointment_insurance.authorize_nhif_patient(
+				**{**AUTHORIZE_ARGS, "insurance_subscription": NHIF_SUBSCRIPTION}
+			)
+		authorize.assert_not_called()
+
+	def test_admitted_patient_is_refused_before_jubilee_is_asked(self):
+		frappe.db.set_value("Patient", JUBILEE_HOLDER, "inpatient_record", "_Test Admission")
+
+		with (
+			patch.object(appointment_insurance, "get_authorization_number") as authorize,
+			self.assertRaisesRegex(frappe.ValidationError, "patient already admitted"),
+		):
+			appointment_insurance.authorize_jubilee_patient(COMPANY, "JUB1", JUBILEE_SUBSCRIPTION)
+		authorize.assert_not_called()
+
 	def test_authorize_nhif_patient_tells_to_check_the_portal_on_timeout(self):
 		with (
 			patch.object(
