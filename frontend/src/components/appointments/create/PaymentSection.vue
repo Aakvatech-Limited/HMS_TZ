@@ -13,17 +13,21 @@
         <div v-if="isNhif">
           <FieldLabel label="Card type" required />
           <Select
-            v-model="form.card_type"
+            :model-value="form.card_type"
             :options="cardTypeOptions"
             placeholder="Select"
+            @update:model-value="
+              (card_type) => emit('change-card', { card_type })
+            "
           />
         </div>
         <div>
           <FieldLabel label="Card no" :from-card="cardNoSource" />
           <FormControl
-            v-model="form.card_no"
+            :model-value="form.card_no"
             type="text"
             :placeholder="(isNhif && form.card_type) || 'Card no'"
+            @update:model-value="(card_no) => emit('change-card', { card_no })"
           />
         </div>
         <Button
@@ -49,8 +53,12 @@
         </div>
       </div>
 
+      <p v-if="cardNeedsCheck" role="status" class="text-sm text-gray-700">
+        Click <strong>Check with {{ form.payment }}</strong> to look up this
+        card before you authorize or create the appointment.
+      </p>
       <div
-        v-if="form.cardStatus"
+        v-else-if="form.cardStatus"
         role="status"
         class="flex gap-2.5 rounded-lg p-3 text-sm"
         :class="statusClasses"
@@ -81,8 +89,14 @@ const props = defineProps({
   isNhif: { type: Boolean, default: false },
   canCheckCard: { type: Boolean, default: false },
   checking: { type: Boolean, default: false },
+  cardNeedsCheck: { type: Boolean, default: false },
 });
-const emit = defineEmits(["set-payment", "check-card", "select-subscription"]);
+const emit = defineEmits([
+  "set-payment",
+  "change-card",
+  "check-card",
+  "select-subscription",
+]);
 
 const SEARCH_SPANS = ["", "sm:col-span-3", "sm:col-span-2", "sm:col-span-1"];
 
