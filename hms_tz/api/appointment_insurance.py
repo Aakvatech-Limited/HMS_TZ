@@ -10,7 +10,7 @@ from frappe.utils import cint
 
 from hms_tz.api.provider_reply import provider_call
 from hms_tz.jubilee.api.api import get_authorization_number, get_member_card_detials
-from hms_tz.nhif.api.patient import check_card_number, check_national_id, set_card_type
+from hms_tz.nhif.api.patient import check_card_number, set_card_type
 from hms_tz.nhif.api.patient_appointment import change_visit_type, validate_patient_can_book
 from hms_tz.nhif.nhif_api.verification import (
 	authorize_patient,
@@ -26,7 +26,6 @@ SUBSCRIPTION_FIELDS = [
 	"healthcare_insurance_coverage_plan",
 	"coverage_plan_name",
 	"coverage_plan_card_number",
-	"national_id",
 	"mobile_number",
 	"company",
 	"gender",
@@ -60,8 +59,9 @@ def check_card(company, provider, card_no=None, card_type=None):
 	frappe.has_permission("Patient Appointment", "create", throw=True)
 	with provider_call(provider):
 		card = fetch_card(company, provider, card_no, card_type)
-	subscription = find_subscription(card["card_no"], card["national_id"])
-	patient = subscription["patient"] if subscription else find_patient(card["card_no"], card["national_id"])
+	card_numbers = card_numbers_of(card)
+	subscription = find_subscription(*card_numbers)
+	patient = subscription["patient"] if subscription else find_patient(*card_numbers)
 	return {
 		"card": card,
 		"patient": get_patient(patient) if patient else None,
@@ -217,7 +217,6 @@ def authorize_nhif_patient(
 	appointment_type,
 	company,
 	card_no,
-	national_id,
 	fingerprint,
 	fpcode,
 	biometric_method,
@@ -236,7 +235,8 @@ def authorize_nhif_patient(
 				appointment_type=appointment_type,
 				company=company,
 				card_no=card_no,
-				national_id=national_id,
+				# NHIF authorizes by card no and card type; FEA5-69 drops this parameter.
+				national_id="",
 				fingerprint=fingerprint,
 				fpcode=fpcode,
 				biometric_method=biometric_method,
@@ -278,7 +278,6 @@ def authorize_nhif_appointment(
 		appointment_type=doc.appointment_type,
 		company=doc.company,
 		card_no=doc.coverage_plan_card_number or "",
-		national_id=doc.national_id or "",
 		fingerprint=fingerprint,
 		fpcode=fpcode,
 		biometric_method=method,
@@ -337,7 +336,10 @@ def fetch_card(company, provider, card_no, card_type):
 
 
 def fetch_nhif_card(company, card_no, card_type):
-	"""A NIDA card type looks the number up as a National ID, any other type as a card no."""
+	"""A NIDA card type looks the number up as a National ID, any other type as a card no.
+
+	The typed number is the card no for either type. A NIDA lookup also gives the member's own NHIF card no.
+	"""
 	settings = frappe.get_cached_doc("HMS TZ Setting", company)
 	if not settings.enable_nhif_api:
 		frappe.throw(_("Enable NHIF API in HMS TZ Setting for {0}").format(company))
@@ -354,8 +356,8 @@ def fetch_nhif_card(company, card_no, card_type):
 
 	return {
 		"provider": "NHIF",
-		"card_no": data.get("CardNo") or ("" if is_national_id else card_no),
-		"national_id": data.get("CHNationalID") or (card_no if is_national_id else ""),
+		"card_no": card_no,
+		"nhif_card_no": data.get("CardNo") or "",
 		"first_name": data.get("FirstName") or "",
 		"middle_name": data.get("MiddleName") or "",
 		"last_name": data.get("LastName") or "",
@@ -385,7 +387,6 @@ def fetch_jubilee_card(company, card_no):
 	return {
 		"provider": "Jubilee",
 		"card_no": card_no,
-		"national_id": "",
 		"first_name": info.get("FirstName") or "",
 		"middle_name": info.get("MiddleName") or "",
 		"last_name": info.get("LastName") or "",
@@ -418,21 +419,33 @@ def provider_condition(his, provider):
 	return his.insurance_company.not_like("%NHIF%") & his.insurance_company.not_like("%Jubilee%")
 
 
-def find_subscription(card_no, national_id):
+def card_numbers_of(card):
+	"""The card numbers that identify this member: the typed one and, after a NIDA lookup, the NHIF card no.
+
+	NHIF's CHNationalID is the card holder's NIDA number, shared by every dependent, so it never matches a patient.
+	"""
+	return list(dict.fromkeys(number for number in (card["card_no"], card.get("nhif_card_no")) if number))
+
+
+def find_subscription(*card_numbers):
+	"""An active subscription with one of the card numbers, in their order."""
 	his = DocType("Healthcare Insurance Subscription")
-	for field, value in ((his.coverage_plan_card_number, card_no), (his.national_id, national_id)):
-		if not value:
-			continue
-		rows = active_subscriptions().where(field == value).limit(1).run(as_dict=True)
+	for card_no in card_numbers:
+		rows = (
+			active_subscriptions().where(his.coverage_plan_card_number == card_no).limit(1).run(as_dict=True)
+		)
 		if rows:
 			return rows[0]
 	return None
 
 
-def find_patient(card_no, national_id):
-	return (
-		(card_no and check_card_number(card_no)) or (national_id and check_national_id(national_id)) or None
-	)
+def find_patient(*card_numbers):
+	"""The patient with one of the card numbers, in their order."""
+	for card_no in card_numbers:
+		patient = check_card_number(card_no)
+		if patient:
+			return patient
+	return None
 
 
 def suggest_coverage_plan(company, provider, card):
