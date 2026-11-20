@@ -3,6 +3,7 @@
 import re
 
 import frappe
+import requests
 from frappe import _
 from frappe.query_builder import Criterion, DocType
 from frappe.utils import cint
@@ -218,24 +219,33 @@ def authorize_nhif_patient(
 ):
 	"""NHIF authorization for the appointments page; a reply without an authorization no raises NHIF's reply."""
 	frappe.has_permission("Patient Appointment", "create", throw=True)
-	with provider_call("NHIF"):
-		data = authorize_patient(
-			insurance_subscription=insurance_subscription,
-			appointment_type=appointment_type,
-			company=company,
-			card_no=card_no,
-			national_id=national_id,
-			fingerprint=fingerprint,
-			fpcode=fpcode,
-			biometric_method=biometric_method,
-			practitioner=practitioner,
-			referral_no=referral_no,
-			remarks=remarks,
-			ref_docname=ref_docname,
+	try:
+		with provider_call("NHIF"):
+			data = authorize_patient(
+				insurance_subscription=insurance_subscription,
+				appointment_type=appointment_type,
+				company=company,
+				card_no=card_no,
+				national_id=national_id,
+				fingerprint=fingerprint,
+				fpcode=fpcode,
+				biometric_method=biometric_method,
+				practitioner=practitioner,
+				referral_no=referral_no,
+				remarks=remarks,
+				ref_docname=ref_docname,
+			)
+			# NHIF may give an authorization no without ACCEPTED and ask the patient to visit its office.
+			if not isinstance(data, dict) or not data.get("authorizationNo"):
+				frappe.throw(_("NHIF did not authorize the patient"))
+	except requests.exceptions.Timeout:
+		# NHIF may still have authorized the patient, so a blind retry could authorize twice.
+		frappe.throw(
+			_(
+				"NHIF did not reply within a minute. NHIF may still have authorized the patient: check the NHIF portal before you try again, and enter the authorization no if there is one."
+			),
+			title=_("NHIF did not reply"),
 		)
-		# NHIF may give an authorization no without ACCEPTED and ask the patient to visit its office.
-		if not isinstance(data, dict) or not data.get("authorizationNo"):
-			frappe.throw(_("NHIF did not authorize the patient"))
 	return data
 
 
