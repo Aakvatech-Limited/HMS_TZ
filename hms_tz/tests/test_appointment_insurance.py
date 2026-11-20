@@ -32,6 +32,7 @@ JUBILEE_SUBSCRIPTION = "_Test Jubilee HIS"
 CONSULTATION_ITEM = "_Test Insurance Consultation"
 PRACTITIONER = "_Test Insurance Doctor"
 VISIT_TYPE = "_Test Insurance Visit"
+OTHER_DOCTOR = "_Test Insurance Other Doctor"
 REFERRAL_VISIT = "_Test Insurance Referral Visit"
 NHIF_CARD_TYPE = "_Test NHIF Beneficiary Card"
 NIDA_CARD_TYPE = appointment_insurance.NATIONAL_ID_CARD_TYPE
@@ -684,6 +685,49 @@ class TestAuthorizeSavedAppointment(FrappeTestCase):
 		doc.validate_set_only_once()
 		# The save's timestamp check compares these.
 		self.assertEqual(frappe.db.get_value("Patient Appointment", doc.name, "modified"), doc.modified)
+
+	def insert_doctor(self, name, department):
+		insert(
+			"Healthcare Practitioner",
+			name,
+			first_name=name,
+			practitioner_name=name,
+			status="Active",
+			practitioner_role="Doctor",
+			department=department,
+			op_consulting_charge_item=CONSULTATION_ITEM,
+		)
+
+	def test_update_refuses_another_practitioner_after_invoice_but_keeps_time_changes(self):
+		self.insert_doctor(PRACTITIONER, "_Test Paediatrics")
+		self.insert_doctor(OTHER_DOCTOR, "_Test Gynaecology")
+		appointment = self.insert_appointment(
+			"_Test Invoiced Move", ref_sales_invoice="_Test SINV", invoiced=1, status="Scheduled"
+		)
+
+		with self.assertRaisesRegex(frappe.ValidationError, "is invoiced in _Test SINV"):
+			appointment_api.update_appointment(appointment, OTHER_DOCTOR, "10:00:00", VISIT_TYPE)
+		self.assertEqual(
+			frappe.db.get_value("Patient Appointment", appointment, "practitioner"), PRACTITIONER
+		)
+
+		with patch.object(appointment_api, "validate_not_in_past", new=lambda *args: None):
+			self.assertTrue(
+				appointment_api.update_appointment(appointment, PRACTITIONER, "11:00:00", VISIT_TYPE)
+			)
+
+	def test_department_follows_a_new_practitioner(self):
+		self.insert_doctor(PRACTITIONER, "_Test Paediatrics")
+		self.insert_doctor(OTHER_DOCTOR, "_Test Gynaecology")
+		appointment = self.insert_appointment(
+			"_Test Move Department", department="_Test Paediatrics", status="Scheduled"
+		)
+
+		self.assertTrue(appointment_api.update_appointment(appointment, OTHER_DOCTOR, "10:00:00", VISIT_TYPE))
+		self.assertEqual(
+			frappe.db.get_value("Patient Appointment", appointment, ["practitioner", "department"]),
+			(OTHER_DOCTOR, "_Test Gynaecology"),
+		)
 
 	def test_update_keeps_the_visit_type_after_authorization_or_invoice(self):
 		authorized = self.insert_appointment("_Test Visit Type Authorized", authorization_number="A1")
