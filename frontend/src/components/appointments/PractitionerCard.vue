@@ -27,9 +27,11 @@
         </h3>
         <p
           class="text-xs font-semibold text-gray-700 truncate leading-tight"
-          :title="isDisabled ? 'Disabled: appointments are read only' : ''"
+          :title="readOnlyReason"
         >
-          <span v-if="isDisabled" class="text-red-600">Disabled · </span
+          <span v-if="isMissing" class="text-red-600"
+            >No practitioner record · </span
+          ><span v-else-if="isDisabled" class="text-red-600">Disabled · </span
           >{{ practitioner.department || "General" }}
         </p>
         <!-- <p class="text-xs font-semibold text-gray-700 truncate leading-tight">
@@ -52,4 +54,11 @@ const props = defineProps({
 });
 
 const isDisabled = computed(() => props.practitioner.status === "Disabled");
+// Appointments name a practitioner that has no Healthcare Practitioner record.
+const isMissing = computed(() => props.practitioner.status === "Missing");
+const readOnlyReason = computed(() => {
+  if (isMissing.value)
+    return "No Healthcare Practitioner record: appointments are read only";
+  return isDisabled.value ? "Disabled: appointments are read only" : "";
+});
 </script>
