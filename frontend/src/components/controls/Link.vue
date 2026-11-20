@@ -5,7 +5,7 @@
     </label>
     <Autocomplete
       ref="autocomplete"
-      :options="options.data"
+      :options="page.rows"
       v-model="value"
       :size="attrs.size || 'sm'"
       :variant="attrs.variant"
@@ -33,6 +33,10 @@
       </template>
 
       <template #footer="{ value, close }">
+        <p v-if="page.hasMore" class="px-2.5 pb-1.5 text-xs text-gray-600">
+          Showing the first {{ pageLength }} matches. Type more to narrow the
+          search.
+        </p>
         <div v-if="attrs.onCreate">
           <Button
             variant="ghost"
@@ -64,6 +68,7 @@
 
 <script setup>
 import Autocomplete from "./Autocomplete.vue";
+import { splitPage } from "@/data/search";
 import { watchDebounced } from "@vueuse/core";
 import { createResource } from "frappe-ui";
 import { useAttrs, computed, ref, watch } from "vue";
@@ -89,6 +94,11 @@ const props = defineProps({
   searchMethod: {
     type: String,
     default: "frappe.desk.search.search_link",
+  },
+  // Rows to show; the search method must take page_length. Unset shows all it returns.
+  pageLength: {
+    type: Number,
+    default: 0,
   },
 });
 
@@ -142,11 +152,7 @@ const options = createResource({
     filtersKey.value,
   ],
   method: "POST",
-  params: {
-    txt: text.value,
-    doctype: props.doctype,
-    filters: props.filters,
-  },
+  params: searchParams(text.value),
   transform: (data) => {
     let allData = data.map((option) => {
       return {
@@ -174,15 +180,20 @@ function reload(val) {
   )
     return;
 
-  options.update({
-    params: {
-      txt: val,
-      doctype: props.doctype,
-      filters: props.filters,
-    },
-  });
+  options.update({ params: searchParams(val) });
   options.reload();
 }
+
+function searchParams(txt) {
+  return {
+    txt,
+    doctype: props.doctype,
+    filters: props.filters,
+    ...(props.pageLength && { page_length: props.pageLength + 1 }),
+  };
+}
+
+const page = computed(() => splitPage(options.data || [], props.pageLength));
 
 function clearValue(close) {
   emit(valuePropPassed.value ? "change" : "update:modelValue", "");
