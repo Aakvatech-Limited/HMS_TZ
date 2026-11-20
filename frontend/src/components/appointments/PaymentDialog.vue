@@ -15,6 +15,12 @@
   >
     <template #body-content>
       <div class="space-y-4 p-4">
+        <DialogErrorPanel
+          v-if="dialogError"
+          :error="dialogError"
+          @close="dialogError = null"
+        />
+
         <!-- Amount to be Paid -->
         <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div class="flex items-center justify-between">
@@ -54,19 +60,14 @@
 
         <!-- Error State for Mode of Payments -->
         <div
-          v-else-if="modeOfPaymentError"
+          v-else-if="paymentMethodsFailed"
           class="bg-red-50 border border-red-200 rounded-lg p-4"
         >
           <div class="flex items-center space-x-3">
             <div class="flex-shrink-0">
               <FeatherIcon name="x-circle" class="h-4 w-4 text-red-600" />
             </div>
-            <div>
-              <p class="text-sm text-red-700">Error loading payment methods</p>
-              <h3 class="text-base font-medium text-red-800 mt-1">
-                {{ modeOfPaymentError }}
-              </h3>
-            </div>
+            <p class="text-sm text-red-700">Error loading payment methods</p>
           </div>
           <div class="mt-4">
             <Button
@@ -345,7 +346,9 @@
 import { computed, reactive, watch, ref } from "vue";
 import { createResource } from "frappe-ui";
 import { serverErrorText, useToast } from "@/composables/useToast";
+import { provideDialogError } from "@/composables/dialogError";
 import FeatherIcon from "frappe-ui/src/components/FeatherIcon.vue";
+import DialogErrorPanel from "@/components/appointments/DialogErrorPanel.vue";
 
 // Props
 const props = defineProps({
@@ -363,7 +366,9 @@ const props = defineProps({
 const emit = defineEmits(["update:showDialog", "paymentCompleted"]);
 
 // Composables
-const { notifications } = useToast();
+const dialogError = provideDialogError();
+const { notifications, showErrorReply, handleResourceError, clearError } =
+  useToast(dialogError);
 
 // Reactive state
 const modeOfPayments = ref([]);
@@ -373,7 +378,7 @@ const totalAmountToPay = computed(
 );
 const isLoadingModeOfPayments = ref(false);
 const isProcessingPayment = ref(false);
-const modeOfPaymentError = ref("");
+const paymentMethodsFailed = ref(false);
 const errors = reactive({});
 
 // Resource to fetch mode of payments
@@ -385,10 +390,14 @@ const modeOfPaymentResource = createResource({
     modeOfPayments.value = data || [];
     initializePaymentEntries();
     isLoadingModeOfPayments.value = false;
-    modeOfPaymentError.value = "";
+    paymentMethodsFailed.value = false;
   },
   onError: (error) => {
-    modeOfPaymentError.value = serverErrorText(error);
+    showErrorReply({
+      title: "Error loading payment methods",
+      message: serverErrorText(error),
+    });
+    paymentMethodsFailed.value = true;
     isLoadingModeOfPayments.value = false;
     modeOfPayments.value = [];
   },
@@ -407,7 +416,7 @@ const salesInvoiceResource = createResource({
     isProcessingPayment.value = false;
   },
   onError: (error) => {
-    notifications.error.generic(serverErrorText(error));
+    handleResourceError(error);
     isProcessingPayment.value = false;
   },
 });
@@ -423,7 +432,8 @@ const initializePaymentEntries = () => {
 // Fetch mode of payments
 const fetchModeOfPayments = () => {
   isLoadingModeOfPayments.value = true;
-  modeOfPaymentError.value = "";
+  paymentMethodsFailed.value = false;
+  clearError();
   modeOfPaymentResource.fetch();
 };
 
@@ -557,6 +567,7 @@ const processPayment = () => {
   }
 
   isProcessingPayment.value = true;
+  clearError();
 
   // Get only entries with amounts > 0
   const activePayments = paymentEntries.value.filter(
@@ -592,6 +603,7 @@ watch(
   () => props.showDialog,
   (isOpen) => {
     if (!isOpen) return;
+    clearError();
     if (modeOfPayments.value.length) {
       resetPayments();
     } else {
