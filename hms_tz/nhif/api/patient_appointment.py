@@ -560,6 +560,45 @@ def set_follow_up(appointment_doc, method):
 			# frappe.msgprint(_("This appointment requires to be paid for!"), alert=True)
 
 
+def change_visit_type(appointment, appointment_type):
+	"""Sets a new visit type before the appointment is authorized or invoiced.
+
+	The billing item follows the visit type (NHIF follow-up and fast track items), and so does a cash amount.
+	Visit type is set only once on save, so the values are written to the database; `modified` is kept, so a
+	save of the same document later in the request still passes the timestamp and set-only-once checks.
+	"""
+	if not appointment_type or appointment_type == appointment.appointment_type:
+		return
+	if appointment.authorization_number or appointment.invoiced:
+		frappe.throw(
+			_("The visit type of appointment {0} cannot change after it is authorized or invoiced").format(
+				appointment.name
+			)
+		)
+	values = {
+		"appointment_type": appointment_type,
+		"billing_item": get_consulting_charge_item(
+			appointment_type,
+			appointment.practitioner,
+			appointment.inpatient_record,
+			appointment.insurance_company,
+			appointment.insurance_subscription,
+			appointment.apply_fasttrack_charge,
+		),
+	}
+	if appointment.mode_of_payment:
+		values["paid_amount"] = get_cash_amount(
+			values["billing_item"], appointment.mode_of_payment, appointment.company, appointment.patient
+		)
+	frappe.db.set_value("Patient Appointment", appointment.name, values, update_modified=False)
+	# The database write skips on_update and the version log, so the change is told and recorded here.
+	appointment.add_comment(
+		"Info", _("Visit type changed from {0} to {1}").format(appointment.appointment_type, appointment_type)
+	)
+	appointment.update(values)
+	publish_grid_update(appointment, "on_update")
+
+
 def validate_cash_billing(appointment):
 	"""Refuses a charged cash appointment that cannot be billed.
 
