@@ -31,6 +31,7 @@ JUBILEE_SUBSCRIPTION = "_Test Jubilee HIS"
 CONSULTATION_ITEM = "_Test Insurance Consultation"
 PRACTITIONER = "_Test Insurance Doctor"
 VISIT_TYPE = "_Test Insurance Visit"
+REFERRAL_VISIT = "_Test Insurance Referral Visit"
 NHIF_CARD_TYPE = "_Test NHIF Beneficiary Card"
 NIDA_CARD_TYPE = appointment_insurance.NATIONAL_ID_CARD_TYPE
 HMS_TZ_SETTING = "hms_tz.hms_tz.doctype.hms_tz_setting.hms_tz_setting.HMSTZSetting"
@@ -577,6 +578,75 @@ class TestAuthorizeSavedAppointment(FrappeTestCase):
 		self.assertEqual(result["authorization_status"], "PENDING")
 		self.assertEqual(
 			frappe.db.get_value("Patient Appointment", appointment, "authorization_number"), "A2"
+		)
+
+	@patch.object(
+		nhif_appointment, "get_consulting_charge_item", new=lambda visit_type, *args: f"Item {visit_type}"
+	)
+	def test_update_changes_the_visit_type_before_authorization(self):
+		appointment = self.insert_appointment("_Test Visit Type Change")
+
+		with patch.object(nhif_appointment, "publish_grid_update") as publish:
+			self.assertTrue(
+				appointment_api.update_appointment(appointment, PRACTITIONER, "10:00:00", REFERRAL_VISIT)
+			)
+		self.assertEqual(
+			frappe.db.get_value("Patient Appointment", appointment, ["appointment_type", "billing_item"]),
+			(REFERRAL_VISIT, f"Item {REFERRAL_VISIT}"),
+		)
+		publish.assert_called_once()
+		self.assertTrue(
+			frappe.db.exists(
+				"Comment",
+				{
+					"reference_name": appointment,
+					"comment_type": "Info",
+					"content": f"Visit type changed from {VISIT_TYPE} to {REFERRAL_VISIT}",
+				},
+			)
+		)
+
+	@patch.object(
+		nhif_appointment, "get_consulting_charge_item", new=lambda visit_type, *args: f"Item {visit_type}"
+	)
+	def test_changed_visit_type_passes_the_checks_of_a_later_save(self):
+		doc = frappe.get_doc("Patient Appointment", self.insert_appointment("_Test Visit Type Later Save"))
+
+		nhif_appointment.change_visit_type(doc, REFERRAL_VISIT)
+		doc.load_doc_before_save()
+		doc.validate_set_only_once()
+		# The save's timestamp check compares these.
+		self.assertEqual(frappe.db.get_value("Patient Appointment", doc.name, "modified"), doc.modified)
+
+	def test_update_keeps_the_visit_type_after_authorization_or_invoice(self):
+		authorized = self.insert_appointment("_Test Visit Type Authorized", authorization_number="A1")
+		invoiced = self.insert_appointment("_Test Visit Type Invoiced", invoiced=1)
+
+		for appointment in (authorized, invoiced):
+			with self.assertRaisesRegex(
+				frappe.ValidationError, "cannot change after it is authorized or invoiced"
+			):
+				appointment_api.update_appointment(appointment, PRACTITIONER, "10:00:00", REFERRAL_VISIT)
+
+	@patch.object(
+		nhif_appointment, "get_consulting_charge_item", new=lambda visit_type, *args: f"Item {visit_type}"
+	)
+	def test_nhif_authorization_uses_a_visit_type_changed_in_edit(self):
+		appointment = self.insert_appointment("_Test Auth New Visit Type")
+		reply = {"authorizationStatus": "ACCEPTED", "authorizationNo": "A2", "remarks": "Successful"}
+		with patch.object(appointment_insurance, "authorize_patient", return_value=reply) as authorize:
+			appointment_insurance.authorize_nhif_appointment(
+				appointment, "", "", "NONE", remarks="Referred", appointment_type=REFERRAL_VISIT
+			)
+
+		self.assertEqual(authorize.call_args.kwargs["appointment_type"], REFERRAL_VISIT)
+		self.assertEqual(
+			frappe.db.get_value(
+				"Patient Appointment",
+				appointment,
+				["appointment_type", "billing_item", "authorization_number"],
+			),
+			(REFERRAL_VISIT, f"Item {REFERRAL_VISIT}", "A2"),
 		)
 
 	def test_nhif_authorization_is_stored_on_the_appointment(self):
