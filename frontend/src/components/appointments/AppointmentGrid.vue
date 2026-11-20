@@ -193,7 +193,6 @@
 import { onMounted, onUnmounted, computed, ref, nextTick, watch } from "vue";
 import { call } from "frappe-ui";
 import { useSocket } from "@/socket";
-import { sessionUser } from "@/data/session";
 // All Frappe UI components are now globally available from main.js
 import { useAppointmentStore } from "@/data/appointment";
 import { usePractitionerStore } from "@/data/practitioner";
@@ -285,12 +284,14 @@ onMounted(() => {
   if (socket?.connected) subscribeToAppointments();
   socket?.on("connect", subscribeToAppointments);
   socket?.on("patient_appointment_update", onAppointmentUpdate);
+  socket?.io.on("reconnect", loadDay);
   scrollToCurrentSlot();
 });
 
 onUnmounted(() => {
   socket?.off("connect", subscribeToAppointments);
   socket?.off("patient_appointment_update", onAppointmentUpdate);
+  socket?.io.off("reconnect", loadDay);
   socket?.emit("doctype_unsubscribe", "Patient Appointment");
 });
 
@@ -460,8 +461,8 @@ const fetchUserCompanies = async () => {
 const retryLoad = () =>
   companyError.value ? fetchUserCompanies() : loadDay();
 
-// Another user's save on this company and date reloads the day. maxWait keeps a
-// steady stream of saves from delaying the reload forever.
+// Any save on this company and date reloads the day, also one from the same user in another tab or
+// on another computer. maxWait keeps a steady stream of saves from delaying the reload forever.
 const reloadAppointments = useDebounceFn(
   () =>
     appointmentStore.fetchAppointments(
@@ -472,13 +473,15 @@ const reloadAppointments = useDebounceFn(
   { maxWait: 2000 }
 );
 
-const onAppointmentUpdate = ({ company, appointment_date, user }) => {
+// Every open page gets the event at the same moment, so each waits a random time to spread the reloads.
+const RELOAD_SPREAD_MS = 2000;
+
+const onAppointmentUpdate = ({ company, appointment_date }) => {
   if (
     company === selectedCompany.value &&
-    appointment_date === dateStore.selectedDate &&
-    user !== sessionUser()
+    appointment_date === dateStore.selectedDate
   )
-    reloadAppointments();
+    setTimeout(reloadAppointments, Math.random() * RELOAD_SPREAD_MS);
 };
 
 // Rooms are lost on reconnect, so subscribe on every connect.
