@@ -9,10 +9,8 @@ export function initSocket() {
   const protocol = port ? "http" : "https";
   const url = `${protocol}://${host}${port}/${siteName}`;
 
-  socket = io(url, {
-    withCredentials: true,
-    reconnectionAttempts: 5,
-  });
+  // Pages stay open all day, so they keep trying to reconnect after a server restart.
+  socket = io(url, { withCredentials: true });
   return socket;
 }
 
