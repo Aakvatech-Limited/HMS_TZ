@@ -40,7 +40,6 @@ AUTHORIZE_ARGS = {
 	"appointment_type": VISIT_TYPE,
 	"company": COMPANY,
 	"card_no": "101",
-	"national_id": "NID1",
 	"fingerprint": "face-jpeg",
 	"fpcode": "FACE",
 	"biometric_method": "FACIAL",
@@ -174,7 +173,9 @@ class TestAppointmentInsurance(FrappeTestCase):
 		self.assertEqual(result["card"]["dob"], "1990-01-01")
 		self.assertEqual(result["card"]["scheme_id"], "SCH1")
 
-	def test_check_card_with_nida_card_type_looks_up_the_national_id(self):
+	def test_check_card_with_nida_card_type_matches_by_card_numbers(self):
+		# The NIDA number is the card no; the lookup also gives the member's own NHIF card no.
+		frappe.db.set_value("Patient", NID_HOLDER, "insurance_card_detail", "303, ")
 		card = {**NHIF_CARD, "CardNo": "303", "CHNationalID": "NID2", "SchemeID": "SCH9"}
 		with (
 			patch.object(appointment_insurance, "get_card_details_by_card_no") as by_card_no,
@@ -192,7 +193,21 @@ class TestAppointmentInsurance(FrappeTestCase):
 		self.assertEqual(result["patient"]["name"], NID_HOLDER)
 		self.assertIsNone(result["subscription"])
 		self.assertIsNone(result["coverage_plan"])
-		self.assertEqual(result["card"]["card_no"], "303")
+		self.assertEqual(result["card"]["card_no"], "NID2")
+		self.assertEqual(result["card"]["nhif_card_no"], "303")
+		self.assertNotIn("national_id", result["card"])
+
+	def test_check_card_never_matches_by_the_card_holders_national_id(self):
+		# A dependent's card carries the card holder's NIDA number, which CARD_HOLDER's records also have.
+		card = {**NHIF_CARD, "CardNo": "777", "CHNationalID": "NID1", "FirstName": "Dependent"}
+		with patch.object(appointment_insurance, "get_card_details_by_card_no", return_value=card):
+			result = appointment_insurance.check_card(
+				COMPANY, "NHIF", card_no="777", card_type=NHIF_CARD_TYPE
+			)
+
+		self.assertIsNone(result["patient"])
+		self.assertIsNone(result["subscription"])
+		self.assertEqual(result["card"]["first_name"], "Dependent")
 
 	def test_check_card_unknown_card_has_no_patient(self):
 		card = {**NHIF_CARD, "CardNo": "404", "CHNationalID": "NID4"}
@@ -481,7 +496,6 @@ class TestAppointmentInsurance(FrappeTestCase):
 				"insurance_company": NHIF_COMPANY,
 				"healthcare_insurance_coverage_plan": NHIF_PLAN,
 				"coverage_plan_card_number": "303",
-				"national_id": "NID2",
 				"company": COMPANY,
 			}
 		)
@@ -490,7 +504,7 @@ class TestAppointmentInsurance(FrappeTestCase):
 		self.assertEqual(
 			frappe.db.get_value("Healthcare Insurance Subscription", subscription["name"], "docstatus"), 1
 		)
-		self.assertEqual(appointment_insurance.find_subscription("303", "")["name"], subscription["name"])
+		self.assertEqual(appointment_insurance.find_subscription("303")["name"], subscription["name"])
 
 	def test_create_insurance_subscription_copies_the_card_type(self):
 		subscription = appointment_insurance.create_insurance_subscription(
