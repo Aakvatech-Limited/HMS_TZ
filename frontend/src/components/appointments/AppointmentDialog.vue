@@ -266,6 +266,7 @@
                 :key="appointment['Patient Appointment'].name"
                 class="mt-5"
                 :appointment="appointment['Patient Appointment']"
+                @progress="onProgress"
                 @authorized="onAuthorized"
               />
             </template>
