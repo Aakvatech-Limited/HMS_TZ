@@ -54,8 +54,8 @@ export const validateNewPatientCashBooking = (args) =>
 export const createAppointment = (appointment_data) =>
   call("hms_tz.api.appointment.create_appointment", { appointment_data });
 
-export const authorizeJubileeAppointment = (appointment) =>
-  call(`${INSURANCE_API}.authorize_jubilee_appointment`, { appointment });
+export const authorizeJubileeAppointment = (args) =>
+  call(`${INSURANCE_API}.authorize_jubilee_appointment`, args);
 
 export const authorizeNhifAppointment = (args) =>
   call(`${INSURANCE_API}.authorize_nhif_appointment`, args);
