@@ -9,6 +9,10 @@ export const PAYMENT_OPTIONS = [
   { label: "Other insurance", value: "Other" },
 ];
 
+// NHIF can take up to a minute to authorize, so the progress says so.
+export const NHIF_WAIT_MESSAGE =
+  "Waiting for NHIF. This can take up to a minute.";
+
 export const SEARCH_PATIENTS_METHOD = `${INSURANCE_API}.search_patients`;
 
 export const getInsuranceApiSettings = (company) =>

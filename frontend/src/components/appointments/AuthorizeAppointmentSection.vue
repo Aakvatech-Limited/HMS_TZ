@@ -70,6 +70,7 @@ import {
   authorizeJubileeAppointment,
   authorizeNhifAppointment,
   getInsuranceApiSettings,
+  NHIF_WAIT_MESSAGE,
 } from "@/data/insurance";
 import BiometricCaptureDialog from "./create/BiometricCaptureDialog.vue";
 import FieldLabel from "./create/FieldLabel.vue";
@@ -78,7 +79,7 @@ import NhifVerificationSection from "./create/NhifVerificationSection.vue";
 const props = defineProps({
   appointment: { type: Object, required: true },
 });
-const emit = defineEmits(["authorized"]);
+const emit = defineEmits(["authorized", "progress"]);
 
 const {
   showError,
@@ -112,7 +113,11 @@ const isJubileeApi = computed(
     settings.value.enable_jubilee_api
 );
 
+const waitMessage = ref("");
+
 const run = async (work) => {
+  // One request at a time: a second click while NHIF is busy would authorize twice.
+  if (busy.value) return;
   busy.value = true;
   clearError();
   try {
@@ -146,6 +151,7 @@ const authorizeNhif = async () => {
   const biometric =
     method === "NONE" ? { Data: "", fpCode: "" } : await captureBiometric();
   if (!biometric) return;
+  waitMessage.value = NHIF_WAIT_MESSAGE;
   const result = await authorizeNhifAppointment({
     appointment: props.appointment.name,
     fingerprint: biometric.Data,
@@ -165,6 +171,7 @@ const authorizeNhif = async () => {
 };
 
 const authorizeJubilee = async () => {
+  waitMessage.value = "Waiting for Jubilee...";
   const number = await authorizeJubileeAppointment({
     appointment: props.appointment.name,
     appointment_type: props.appointment.appointment_type,
@@ -192,6 +199,16 @@ const loadVisitType = async () => {
     requires_referral_no: visitType?.requires_referral_no || 0,
   };
 };
+
+// The Appointment dialog shows the progress and stays open; the capture dialog is not covered.
+watch([busy, showCapture, waitMessage], () =>
+  emit("progress", {
+    busy: busy.value && !showCapture.value,
+    title: "Authorizing Patient",
+    message: waitMessage.value,
+    percent: 75,
+  })
+);
 
 // A visit type changed in Edit brings its own referral and remarks rules.
 watch(() => props.appointment.appointment_type, loadVisitType);
