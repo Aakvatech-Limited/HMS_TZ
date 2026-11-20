@@ -7,6 +7,7 @@ from frappe.utils import cint, get_datetime, get_time, getdate, now_datetime
 from hms_tz.api.appointment_insurance import link_jubilee_benefits
 from hms_tz.nhif.api.patient_appointment import (
 	add_cancel_comment,
+	change_visit_type,
 	get_cash_amount,
 	get_consulting_charge_item,
 	validate_cancellable,
@@ -178,11 +179,15 @@ def update_appointment(
 		validate_not_in_past(appointment_doc.appointment_date, new_appointment_time)
 		changes["appointment_time"] = new_appointment_time
 
-	if not changes:
+	# Checked against the saved appointment, before a typed authorization no is applied.
+	visit_type = changes.pop("appointment_type", None)
+	if not changes and not visit_type:
 		return False
 
-	appointment_doc.update(changes)
-	appointment_doc.save(ignore_permissions=True)
+	change_visit_type(appointment_doc, visit_type)
+	if changes:
+		appointment_doc.update(changes)
+		appointment_doc.save(ignore_permissions=True)
 	return True
 
 
