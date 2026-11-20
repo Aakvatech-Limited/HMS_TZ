@@ -1,11 +1,5 @@
 <template>
   <div class="flex flex-col gap-3">
-    <ProviderReplyPanel
-      v-if="providerReply"
-      :reply="providerReply"
-      @close="providerReply = null"
-    />
-
     <NhifVerificationSection
       v-if="isNhif"
       :form="form"
@@ -80,18 +74,21 @@ import {
 import BiometricCaptureDialog from "./create/BiometricCaptureDialog.vue";
 import FieldLabel from "./create/FieldLabel.vue";
 import NhifVerificationSection from "./create/NhifVerificationSection.vue";
-import ProviderReplyPanel from "./create/ProviderReplyPanel.vue";
 
 const props = defineProps({
   appointment: { type: Object, required: true },
 });
 const emit = defineEmits(["authorized"]);
 
-const { showError, showSuccess, showWarning, handleResourceError } =
-  useToast();
+const {
+  showError,
+  showErrorReply,
+  showSuccess,
+  clearError,
+  handleResourceError,
+} = useToast();
 const settings = ref({ enable_nhif_api: false, enable_jubilee_api: false });
 const busy = ref(false);
-const providerReply = ref(null);
 const showCapture = ref(false);
 const form = reactive({
   visitType: { requires_remarks: 0, requires_referral_no: 0 },
@@ -117,15 +114,11 @@ const isJubileeApi = computed(
 
 const run = async (work) => {
   busy.value = true;
-  providerReply.value = null;
+  clearError();
   try {
     await work();
   } catch (error) {
-    if (error.exc_type === "ProviderReplyError") {
-      providerReply.value = JSON.parse(error.messages[0]);
-    } else {
-      handleResourceError(error);
-    }
+    handleResourceError(error);
   } finally {
     busy.value = false;
   }
@@ -162,8 +155,9 @@ const authorizeNhif = async () => {
     remarks,
   });
   if (result.authorization_status !== "ACCEPTED") {
-    showWarning(`${result.authorization_status}: ${result.remarks}`, {
-      timeout: 10000,
+    showErrorReply({
+      title: result.authorization_status,
+      message: result.remarks,
     });
   }
   done(result.authorization_number);

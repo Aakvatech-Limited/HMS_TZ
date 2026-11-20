@@ -1,11 +1,5 @@
 <template>
   <div class="flex flex-col gap-6">
-    <ProviderReplyPanel
-      v-if="providerReply"
-      :reply="providerReply"
-      @close="providerReply = null"
-    />
-
     <SlotFields :form="form" />
 
     <PaymentSection
@@ -59,7 +53,6 @@ import JubileeAuthorizationSection from "./JubileeAuthorizationSection.vue";
 import NhifVerificationSection from "./NhifVerificationSection.vue";
 import PatientSection from "./PatientSection.vue";
 import PaymentSection from "./PaymentSection.vue";
-import ProviderReplyPanel from "./ProviderReplyPanel.vue";
 import SlotFields from "./SlotFields.vue";
 import SubscriptionSection from "./SubscriptionSection.vue";
 import { useBookingForm } from "./useBookingForm";
@@ -76,7 +69,6 @@ const {
   form,
   settings,
   busy,
-  providerReply,
   status,
   isInsurance,
   isNhif,
