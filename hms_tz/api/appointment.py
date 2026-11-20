@@ -12,6 +12,7 @@ from hms_tz.nhif.api.patient_appointment import (
 	get_consulting_charge_item,
 	validate_cancellable,
 	validate_cash_billing,
+	validate_patient_can_book,
 )
 
 DEFAULT_SLOT_DURATION = 10
@@ -199,6 +200,13 @@ def validate_editable(appointment_doc):
 				appointment_doc.name, appointment_doc.status
 			)
 		)
+
+
+@frappe.whitelist()
+def check_patient_can_book(patient):
+	"""Refuses an admitted or disabled patient before the dialog creates a subscription, authorization or appointment."""
+	frappe.has_permission("Patient Appointment", "create", throw=True)
+	validate_patient_can_book(patient)
 
 
 def validate_active_practitioner(practitioner):
