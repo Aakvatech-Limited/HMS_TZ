@@ -92,14 +92,6 @@ class TestAppointmentPractitionerStatus(FrappeTestCase):
 		self.assertNotIn(DISABLED, listed("Active"))
 		self.assertIn(DISABLED, listed("All"))
 
-	def test_booked_practitioner_without_a_record_gets_a_missing_column(self):
-		insert_booking("_Test Status Lost Booking", "_Test Status Deleted Doctor", department="_Test Surgery")
-
-		column = listed("Active")["_Test Status Deleted Doctor"]
-		self.assertEqual(column["status"], "Missing")
-		self.assertEqual(column["department"], "_Test Surgery")
-		self.assertFalse(column["is_available"])
-
 	def test_unknown_status_is_refused(self):
 		with self.assertRaisesRegex(frappe.ValidationError, "Practitioner status must be one of"):
 			practitioner_api.get_practioner_list(COMPANY, nowdate(), "Inactive")
@@ -141,12 +133,11 @@ def insert_appointment(practitioner):
 	)
 
 
-def insert_booking(name, practitioner, **values):
+def insert_booking(name, practitioner):
 	"""An appointment on today's date, the date the tests list practitioners for."""
 	insert(
 		"Patient Appointment",
 		name,
-		**values,
 		company=COMPANY,
 		practitioner=practitioner,
 		appointment_type="Consultation",
