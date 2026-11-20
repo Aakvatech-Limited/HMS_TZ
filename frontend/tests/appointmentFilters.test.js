@@ -203,6 +203,16 @@ describe("contains", () => {
 });
 
 describe("countActiveFilters", () => {
+  test("Practitioner Status counts only when it is not Active", () => {
+    assert.equal(EMPTY_PRACTITIONER_FILTERS.practitioner_status, "Active");
+    assert.equal(countActiveFilters(EMPTY_PRACTITIONER_FILTERS), 0);
+    for (const practitioner_status of ["Disabled", "All"])
+      assert.equal(
+        countActiveFilters(withFilters({ practitioner_status })),
+        1
+      );
+  });
+
   test("counts filters that are not blank", () => {
     assert.equal(countActiveFilters(EMPTY_APPOINTMENT_FILTERS), 0);
     assert.equal(
