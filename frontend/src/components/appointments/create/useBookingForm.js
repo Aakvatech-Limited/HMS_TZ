@@ -6,6 +6,7 @@ import {
   createAppointment,
   createPatient,
   createSubscription,
+  getCashCharge,
   getInsuranceApiSettings,
   getPatient,
   getSubscription,
@@ -409,6 +410,14 @@ export function useBookingForm(initial) {
     run("Creating Appointment", async () => {
       const errors = validationErrors({ forAuthorization: false });
       if (errors.length) return showErrors(errors);
+      // Refuses a cash booking that cannot be billed before a new patient is created.
+      if (!isInsurance.value)
+        await getCashCharge({
+          practitioner: form.practitioner,
+          appointment_type: form.appointment_type,
+          company: form.company,
+          patient: form.patient,
+        });
       await ensurePatient();
       await ensureSubscription();
       setStatus("Creating the appointment...", 75);
