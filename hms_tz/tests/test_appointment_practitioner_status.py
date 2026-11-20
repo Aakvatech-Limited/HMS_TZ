@@ -69,6 +69,37 @@ class TestAppointmentPractitionerStatus(FrappeTestCase):
 		self.assertIn(ACTIVE, searched)
 		self.assertNotIn(CLAIM_REVIEWER, searched)
 
+	def test_unavailable_doctor_gets_a_column_only_with_appointments(self):
+		with patch.object(
+			practitioner_api, "check_practitioner_employee_availability", new=lambda *a, **k: False
+		):
+			self.assertNotIn(ACTIVE, listed("Active"))
+			insert_booking("_Test Status On Leave Booking", ACTIVE)
+			self.assertFalse(listed("Active")[ACTIVE]["is_available"])
+
+	def test_non_doctor_with_appointments_gets_an_unavailable_column(self):
+		self.assertNotIn(CLAIM_REVIEWER, listed("Active"))
+		insert_booking("_Test Status Reviewer Booking", CLAIM_REVIEWER)
+
+		practitioners = listed("Active")
+		self.assertIn(CLAIM_REVIEWER, practitioners)
+		self.assertFalse(practitioners[CLAIM_REVIEWER]["is_available"])
+		self.assertEqual(list(practitioners), sorted(practitioners))
+
+	def test_booked_practitioners_still_follow_the_status_filter(self):
+		insert_booking("_Test Status Disabled Booking", DISABLED)
+
+		self.assertNotIn(DISABLED, listed("Active"))
+		self.assertIn(DISABLED, listed("All"))
+
+	def test_booked_practitioner_without_a_record_gets_a_missing_column(self):
+		insert_booking("_Test Status Lost Booking", "_Test Status Deleted Doctor", department="_Test Surgery")
+
+		column = listed("Active")["_Test Status Deleted Doctor"]
+		self.assertEqual(column["status"], "Missing")
+		self.assertEqual(column["department"], "_Test Surgery")
+		self.assertFalse(column["is_available"])
+
 	def test_unknown_status_is_refused(self):
 		with self.assertRaisesRegex(frappe.ValidationError, "Practitioner status must be one of"):
 			practitioner_api.get_practioner_list(COMPANY, nowdate(), "Inactive")
@@ -105,6 +136,21 @@ def insert_appointment(practitioner):
 		practitioner=practitioner,
 		appointment_type="Consultation",
 		appointment_date=add_days(nowdate(), 1),
+		appointment_time="10:00:00",
+		status="Scheduled",
+	)
+
+
+def insert_booking(name, practitioner, **values):
+	"""An appointment on today's date, the date the tests list practitioners for."""
+	insert(
+		"Patient Appointment",
+		name,
+		**values,
+		company=COMPANY,
+		practitioner=practitioner,
+		appointment_type="Consultation",
+		appointment_date=nowdate(),
 		appointment_time="10:00:00",
 		status="Scheduled",
 	)
