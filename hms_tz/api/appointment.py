@@ -75,6 +75,7 @@ def create_appointment(appointment_data):
 	# Checks the role and the user's company permission before ignore_permissions saves.
 	appointment_doc.check_permission("create")
 	validate_not_in_past(appointment_doc.appointment_date, appointment_doc.appointment_time)
+	validate_active_practitioner(appointment_doc.practitioner)
 
 	billing_item = get_consulting_charge_item(
 		appointment_data.get("appointment_type"),
@@ -123,6 +124,7 @@ def update_appointment(
 	appointment_doc = frappe.get_doc("Patient Appointment", appointment_id)
 	appointment_doc.check_permission("write")
 	validate_editable(appointment_doc)
+	validate_active_practitioner(appointment_doc.practitioner)
 
 	values = {
 		"practitioner": practitioner,
@@ -138,6 +140,7 @@ def update_appointment(
 		if value is not None and value != (appointment_doc.get(fieldname) or "")
 	}
 	if "practitioner" in changes:
+		validate_active_practitioner(practitioner)
 		validate_practitioner_level(
 			appointment_doc.practitioner, practitioner, appointment_doc.inpatient_record
 		)
@@ -163,6 +166,16 @@ def validate_editable(appointment_doc):
 		frappe.throw(
 			_("Appointment {0} is {1} and cannot be edited").format(
 				appointment_doc.name, appointment_doc.status
+			)
+		)
+
+
+def validate_active_practitioner(practitioner):
+	"""Appointments of a disabled practitioner are kept as records and cannot be added or changed."""
+	if frappe.db.get_value("Healthcare Practitioner", practitioner, "status") == "Disabled":
+		frappe.throw(
+			_("Practitioner {0} is disabled, so appointments cannot be added or changed for them").format(
+				practitioner
 			)
 		)
 
