@@ -1,8 +1,7 @@
 import frappe
 from erpnext.setup.doctype.employee.employee import is_holiday
 from frappe import _
-from frappe.query_builder import DocType
-from frappe.utils import get_abbr, get_time, getdate, nowdate
+from frappe.utils import get_abbr, getdate, nowdate
 
 # Only doctors take appointments; nurses, lab technicians and claim reviewers are practitioners too.
 APPOINTMENT_PRACTITIONER_ROLE = "Doctor"
@@ -141,38 +140,41 @@ def get_statuses(status):
 
 
 def check_practitioner_employee_availability(practitioner, date, employee=None, user_id=None):
+	"""Whether the practitioner can take bookings on the date: not when their Employee is on holiday or approved leave.
+
+	A practitioner without an Employee is available. An error in the check is logged against the practitioner,
+	who then stays available, so a broken holiday or leave record never hides a doctor without a trace.
 	"""
-	Check if practitioner is available based on employee status
-	Returns False if on holiday or leave
-	"""
+	if not employee and user_id:
+		employee = frappe.get_cached_value("Employee", {"user_id": user_id}, "name")
+	if not employee:
+		return True
 	try:
-		if not employee:
-			employee = frappe.get_cached_value("Employee", {"user_id": user_id}, "name")
-
-		if not employee:
-			return True
-
-		# Check holiday
-		if is_holiday(employee, date):
-			return False
-
-		# Check leave status
-		if "hrms" in frappe.get_installed_apps():
-			la = DocType("Leave Application")
-
-			leave_records = (
-				frappe.qb.from_(la)
-				.select(la.name)
-				.where(
-					(la.employee == employee)
-					& (la.docstatus == 1)
-					& (la.from_date <= date)
-					& (la.to_date >= date)
-				)
-			).run(as_dict=True)
-
-			if len(leave_records) > 0:
-				return False
-
+		# No holiday list on the Employee or company means no holidays, not an error.
+		return not is_holiday(employee, date, raise_exception=False) and not is_on_approved_leave(
+			employee, date
+		)
 	except Exception:
+		frappe.log_error(
+			title=f"Availability check failed for practitioner {practitioner}",
+			reference_doctype="Healthcare Practitioner",
+			reference_name=practitioner,
+		)
+		return True
+
+
+def is_on_approved_leave(employee, date):
+	if "hrms" not in frappe.get_installed_apps():
 		return False
+	return bool(
+		frappe.db.exists(
+			"Leave Application",
+			{
+				"employee": employee,
+				"docstatus": 1,
+				"status": "Approved",
+				"from_date": ("<=", date),
+				"to_date": (">=", date),
+			},
+		)
+	)
