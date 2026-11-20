@@ -1,4 +1,5 @@
 import { useToast as useVueToastification } from "vue-toastification";
+import { injectDialogError, providerReplyOf } from "./dialogError";
 
 /** Plain text with line breaks kept: tags and entities removed. */
 export const toPlainText = (text) => {
@@ -41,7 +42,8 @@ export const serverErrorText = (error) => {
   return errors.map((e) => `• ${e}`).join("\n");
 };
 
-export const useToast = () => {
+/** A dialog passes its own error ref; components inside a dialog get it injected. */
+export const useToast = (dialogError = injectDialogError()) => {
   const toast = useVueToastification();
 
   /** Every toast passes here, so server HTML never reaches the user. */
@@ -83,8 +85,21 @@ export const useToast = () => {
     showToast(message, "success", options);
   };
 
+  /** Inside a dialog the error stays in its panel until dismissed, so it can be read and copied. */
+  const showErrorReply = ({ title, message }, options = {}) => {
+    if (!dialogError) {
+      showToast(title ? `${title}\n${message}` : message, "error", options);
+      return;
+    }
+    dialogError.value = { title: title || "Error", message };
+  };
+
   const showError = (message, options = {}) => {
-    showToast(message, "error", options);
+    showErrorReply({ message }, options);
+  };
+
+  const clearError = () => {
+    if (dialogError) dialogError.value = null;
   };
 
   const showWarning = (message, options = {}) => {
@@ -151,7 +166,10 @@ export const useToast = () => {
   };
 
   const handleResourceError = (error) => {
-    showError(serverErrorText(error), { timeout: 10000 });
+    showErrorReply(
+      providerReplyOf(error) || { message: serverErrorText(error) },
+      { timeout: 10000 }
+    );
   };
 
   // Convenience object for easy access to notification methods
@@ -166,6 +184,8 @@ export const useToast = () => {
     showToast,
     showSuccess,
     showError,
+    showErrorReply,
+    clearError,
     showWarning,
     showInfo,
     clear,
