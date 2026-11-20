@@ -7,7 +7,7 @@
     <div class="flex items-start justify-between gap-3">
       <div class="flex items-center gap-2 text-red-700">
         <FeatherIcon name="alert-triangle" class="h-5 w-5 shrink-0" />
-        <h3 class="text-base font-semibold">{{ reply.title }}</h3>
+        <h3 class="text-base font-semibold">{{ error.title }}</h3>
       </div>
       <div class="flex gap-2">
         <Button variant="subtle" @click="copy">
@@ -34,18 +34,18 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from "vue";
 import { toPlainText } from "@/composables/useToast";
+import { computed, ref, watch } from "vue";
 
 const props = defineProps({
-  reply: { type: Object, required: true },
+  error: { type: Object, required: true },
 });
 const emit = defineEmits(["close"]);
 
 const panel = ref(null);
 const copied = ref(false);
 
-const text = computed(() => toPlainText(props.reply.message));
+const text = computed(() => toPlainText(props.error.message));
 // The provider's own words follow "NHIF Response:" or "Jubilee Response:", shown bold as on the desk.
 const lines = computed(() =>
   text.value.split("\n").map((line) => {
@@ -55,9 +55,17 @@ const lines = computed(() =>
 );
 
 const copy = async () => {
-  await navigator.clipboard.writeText(`${props.reply.title}\n${text.value}`);
+  await navigator.clipboard.writeText(`${props.error.title}\n${text.value}`);
   copied.value = true;
 };
 
-onMounted(() => panel.value?.scrollIntoView({ block: "nearest" }));
+// A new error replaces the shown one, so the panel scrolls into view each time.
+watch(
+  () => props.error,
+  () => {
+    copied.value = false;
+    panel.value?.scrollIntoView({ block: "nearest" });
+  },
+  { immediate: true, flush: "post" }
+);
 </script>
