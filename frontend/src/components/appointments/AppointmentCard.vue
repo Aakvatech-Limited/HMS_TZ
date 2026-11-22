@@ -50,13 +50,16 @@
         </div>
 
         <!-- Paid Amount / Item Rate -->
-        <div class="flex items-start flex-shrink-0" :class="statusStyle.text">
+        <div
+          class="flex items-start gap-1 flex-shrink-0"
+          :class="[statusStyle.text, { 'pr-6': hasMore }]"
+        >
           <FeatherIcon
             name="dollar-sign"
-            class="h-2 w-2 mr-1 flex-shrink-0 mt-0.5"
+            class="h-2 w-2 flex-shrink-0 mt-0.5"
           />
           <span
-            class="text-2xs font-semibold leading-tight"
+            class="text-2xs font-semibold leading-tight whitespace-nowrap"
             style="font-size: 10px"
             >{{
               formatAmount(
@@ -64,6 +67,19 @@
               )
             }}</span
           >
+          <span
+            v-if="paymentMarker"
+            class="ml-auto flex min-w-0 items-center rounded px-0.5 font-bold leading-tight"
+            :class="paymentMarker.badge"
+            :title="paymentMarker.label"
+          >
+            <FeatherIcon
+              v-if="paymentMarker.icon"
+              :name="paymentMarker.icon"
+              class="h-2 w-2 mr-0.5 flex-shrink-0"
+            />
+            <span class="truncate">{{ paymentMarker.label }}</span>
+          </span>
         </div>
       </div>
     </div>
@@ -73,16 +89,19 @@
 <script setup>
 import { computed } from "vue";
 import { FeatherIcon } from "frappe-ui";
-import { getStatusStyle } from "./appointmentStatus";
+import { getPaymentMarker, getStatusStyle } from "./appointmentStatus";
 
 const props = defineProps({
   appointment: {
     type: Object,
     required: true,
   },
+  // The slot's "+N" chip covers the bottom-right corner of the card.
+  hasMore: { type: Boolean, default: false },
 });
 
 const statusStyle = computed(() => getStatusStyle(props.appointment.status));
+const paymentMarker = computed(() => getPaymentMarker(props.appointment));
 // insurance_company is already "Cash" for cash appointments.
 const coverageLabel = computed(
   () =>
