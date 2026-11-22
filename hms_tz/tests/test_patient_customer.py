@@ -1,7 +1,7 @@
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from hms_tz.hms_tz.doctype.patient.patient import get_patient_customer
+from hms_tz.hms_tz.doctype.patient.patient import get_non_group_customer_group, get_patient_customer
 from hms_tz.tests.utils import insert
 
 PATIENT = "_Test Customer Link Patient"
@@ -51,3 +51,13 @@ class TestPatientCustomer(FrappeTestCase):
 
 		self.assertEqual(frappe.db.get_value("Customer", customer, "customer_name"), PATIENT_NAME)
 		self.assertEqual(self.get_linked_customer(), customer)
+
+	def test_update_keeps_the_customer_group_when_the_patient_has_a_group(self):
+		leaf_group = get_non_group_customer_group()
+		self.insert_patient()
+		customer = get_patient_customer(PATIENT)
+		frappe.db.set_value("Patient", PATIENT, "customer_group", "All Customer Groups")
+
+		frappe.get_doc("Patient", PATIENT).run_method("on_update")
+
+		self.assertEqual(frappe.db.get_value("Customer", customer, "customer_group"), leaf_group)
