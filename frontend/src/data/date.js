@@ -9,14 +9,12 @@ export const getSlotTime = (time, slotDuration) => {
   return dayjs().startOf("day").add(slotMinutes, "minute").format("HH:mm");
 };
 
-/** One day of `slotDuration`-minute slots on `date`, listed from `dayStartHour` and wrapping past midnight back to it. */
-export const getTimeSlots = (date, slotDuration, dayStartHour) => {
+/** One day of `slotDuration`-minute slots on `date`, from 00:00 to the last slot that starts before midnight. */
+export const getTimeSlots = (date, slotDuration) => {
   const day = dayjs(date);
-  const dayMinutes = 24 * 60;
-  const startMinute = dayStartHour * 60;
   const slots = [];
-  for (let offset = 0; offset < dayMinutes; offset += slotDuration) {
-    const slotStart = day.add((startMinute + offset) % dayMinutes, "minute");
+  for (let minute = 0; minute < 24 * 60; minute += slotDuration) {
+    const slotStart = day.add(minute, "minute");
     slots.push({
       time: slotStart.format("HH:mm"),
       timestamp: slotStart.valueOf(),
@@ -29,13 +27,11 @@ export const useDateStore = defineStore("date", {
   state: () => ({
     selectedDate: dayjs().format("YYYY-MM-DD"),
     slotDuration: 10, // minutes; the grid sets it per company from HMS TZ Setting
-    dayStartHour: 7, // first row of the grid
     bufferTime: 5, // minutes buffer for future bookings
   }),
 
   getters: {
-    timeSlots: (state) =>
-      getTimeSlots(state.selectedDate, state.slotDuration, state.dayStartHour),
+    timeSlots: (state) => getTimeSlots(state.selectedDate, state.slotDuration),
   },
 
   actions: {
