@@ -17,6 +17,10 @@ import { computed, reactive, ref } from "vue";
 import dayjs from "dayjs";
 import { cardKey, needsCardCheck } from "./cardCheck";
 
+/** A new patient has no subscription yet, so an insurance booking creates one with the patient. */
+const subscriptionModeFor = (patientMode) =>
+  patientMode === "new" ? "new" : "existing";
+
 const PATIENT_CARD_FIELDS = [
   "first_name",
   "middle_name",
@@ -188,7 +192,7 @@ export function useBookingForm(initial) {
     form.cardStatus = null;
     clearAuthorization();
     form.subscription = null;
-    form.subscriptionMode = "existing";
+    form.subscriptionMode = subscriptionModeFor(form.patientMode);
     form.newSubscription = emptySubscription();
   };
 
@@ -205,7 +209,12 @@ export function useBookingForm(initial) {
     form.cardStatus = null;
     clearAuthorization();
     form.subscription = null;
-    form.subscriptionMode = "existing";
+    form.subscriptionMode = subscriptionModeFor(form.patientMode);
+  };
+
+  const setPatientMode = (mode) => {
+    form.patientMode = mode;
+    form.subscriptionMode = subscriptionModeFor(mode);
   };
 
   const selectPatient = async (name) => {
@@ -567,6 +576,7 @@ export function useBookingForm(initial) {
     canSubmit,
     loadSettings,
     setPayment,
+    setPatientMode,
     selectPatient,
     selectSubscription,
     applySubscription,
