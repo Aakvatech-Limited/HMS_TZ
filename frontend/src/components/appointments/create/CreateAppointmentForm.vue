@@ -15,7 +15,11 @@
       @select-subscription="selectSubscription"
     />
 
-    <PatientSection :form="form" @select-patient="selectPatient" />
+    <PatientSection
+      :form="form"
+      @select-patient="selectPatient"
+      @set-patient-mode="setPatientMode"
+    />
 
     <SubscriptionSection
       v-if="isInsurance"
@@ -83,6 +87,7 @@ const {
   canSubmit,
   loadSettings,
   setPayment,
+  setPatientMode,
   selectPatient,
   selectSubscription,
   checkCard,
