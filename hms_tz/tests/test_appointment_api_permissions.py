@@ -1,6 +1,7 @@
 from unittest.mock import patch
 
 import frappe
+from frappe.custom.doctype.property_setter.property_setter import make_property_setter
 from frappe.permissions import add_user_permission
 from frappe.tests.utils import FrappeTestCase
 from frappe.utils import add_days, nowdate
@@ -171,3 +172,27 @@ class TestAppointmentApiPermissions(FrappeTestCase):
 			room="doctype:Patient Appointment",
 			after_commit=True,
 		)
+
+
+class TestDefaultPrintFormat(FrappeTestCase):
+	def tearDown(self):
+		frappe.set_user("Administrator")
+		frappe.db.rollback()
+		frappe.clear_cache(doctype="ToDo")
+
+	def test_property_setter_sets_the_default(self):
+		make_property_setter(
+			"ToDo", None, "default_print_format", "_Test ToDo Format", "Data", for_doctype=True
+		)
+		frappe.clear_cache(doctype="ToDo")
+
+		self.assertEqual(appointment_api.get_default_print_format("ToDo"), "_Test ToDo Format")
+
+	def test_no_default_is_empty(self):
+		self.assertFalse(appointment_api.get_default_print_format("ToDo"))
+
+	def test_user_without_read_access_is_refused(self):
+		frappe.set_user("Guest")
+
+		with self.assertRaises(frappe.PermissionError):
+			appointment_api.get_default_print_format("Sales Invoice")
