@@ -13,7 +13,10 @@
     @keydown.space.prevent="openFromKeyboard"
   >
     <template v-if="kind === 'appointment'">
-      <AppointmentCard :appointment="appointments[0]" />
+      <AppointmentCard
+        :appointment="appointments[0]"
+        :has-more="appointments.length > 1"
+      />
       <!-- stop: the chip opens the list, not the first appointment -->
       <div v-if="appointments.length > 1" class="more-chip" @click.stop>
         <Popover v-model:show="isListOpen" placement="bottom-end">
