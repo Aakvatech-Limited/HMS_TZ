@@ -40,3 +40,26 @@ STYLE_BY_STATUS.completed = STYLE_BY_STATUS.closed;
 
 export const getStatusStyle = (status) =>
   STYLE_BY_STATUS[status] || UNKNOWN_STATUS;
+
+const PAID = {
+  label: "Paid",
+  icon: "check-circle",
+  badge: "bg-white/70 text-[9px]",
+};
+// Solid badges in colours no status uses, so they stand out on every card.
+const UNPAID = { label: "Unpaid", badge: "bg-pink-600 text-white text-[8px]" };
+const NOT_AUTHORIZED = {
+  label: "Not authorized",
+  badge: "bg-violet-600 text-white text-[8px]",
+};
+
+/** Cash shows Paid or Unpaid; insurance shows Not authorized until it has an authorization number. */
+export const getPaymentMarker = (appointment) => {
+  if (appointment.status === "cancelled") return null;
+  if (appointment.payment === "Cash") {
+    if (appointment.ref_sales_invoice) return PAID;
+    // invoice_appointment never invoices a follow-up, so nothing is due.
+    return appointment.follow_up ? null : UNPAID;
+  }
+  return appointment.authorization_number ? null : NOT_AUTHORIZED;
+};
