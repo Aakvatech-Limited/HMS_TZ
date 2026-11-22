@@ -51,7 +51,9 @@ class Patient(Document):
 	def on_update(self):
 		if self.customer:
 			customer = frappe.get_cached_doc("Customer", self.customer)
-			if self.customer_group:
+			if self.customer_group and not frappe.db.get_value(
+				"Customer Group", self.customer_group, "is_group"
+			):
 				customer.customer_group = self.customer_group
 			if self.territory:
 				customer.territory = self.territory
