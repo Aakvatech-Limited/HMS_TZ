@@ -1492,18 +1492,16 @@ onUnmounted(() => {
   document.removeEventListener("keydown", handleKeyDown);
 });
 
-// Handle keyboard events to prevent closing during loading
+/** Escape closes the Details dialog only; New and Edit keep typed data until Close is clicked. */
 const handleKeyDown = (event) => {
-  if (isCreating.value && (event.key === "Escape" || event.keyCode === 27)) {
-    event.preventDefault();
-    event.stopPropagation();
-    return false;
-  }
+  if (event.key !== "Escape" || event.defaultPrevented) return;
+  if (!localShowDialog.value || !isViewMode.value) return;
+  if (showPaymentDialog.value || showCancelConfirmation.value) return;
+  closeDialog();
 };
 
-// Add keyboard event listener
 onMounted(() => {
-  document.addEventListener("keydown", handleKeyDown, { capture: true });
+  document.addEventListener("keydown", handleKeyDown);
 
   // Fetch user roles when component mounts
   appointmentStore.fetchUserRoles();
