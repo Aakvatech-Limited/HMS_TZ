@@ -2,7 +2,11 @@
   <section class="flex flex-col gap-3 border-t border-gray-200 pt-5">
     <div class="flex items-center justify-between gap-3">
       <h3 class="text-[15px] font-semibold text-gray-900">Patient</h3>
-      <TabButtons :buttons="PATIENT_MODES" v-model="form.patientMode" />
+      <TabButtons
+        :buttons="PATIENT_MODES"
+        :model-value="form.patientMode"
+        @update:model-value="(mode) => emit('set-patient-mode', mode)"
+      />
     </div>
 
     <div
@@ -170,7 +174,7 @@ const NEXT_OF_KIN_FIELDS = [
 ];
 
 const props = defineProps({ form: { type: Object, required: true } });
-const emit = defineEmits(["select-patient"]);
+const emit = defineEmits(["select-patient", "set-patient-mode"]);
 
 const summary = computed(() => patientSummary(props.form.patientDetails));
 const visibleLinkFields = computed(() =>
