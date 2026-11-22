@@ -1,16 +1,20 @@
 <template>
   <Popover placement="bottom-end">
-    <template #target="{ togglePopover, isOpen }">
+    <template #target="{ togglePopover, close, isOpen }">
       <Button
         icon-left="filter"
         :label="activeCount ? `Filters ${activeCount}` : 'Filters'"
         :variant="activeCount ? 'subtle' : 'outline'"
         :aria-expanded="isOpen"
         @click="togglePopover()"
+        @keydown.esc="close()"
       />
     </template>
-    <template #body-main>
-      <div class="flex w-[56rem] max-w-[calc(100vw-2rem)] flex-col gap-4 p-4">
+    <template #body-main="{ close }">
+      <div
+        class="flex w-[56rem] max-w-[calc(100vw-2rem)] flex-col gap-4 p-4"
+        @keydown.esc="close()"
+      >
         <div class="grid gap-4 md:grid-cols-[1fr_1fr_1.3fr]">
           <section :class="CARD_CLASS">
             <h3 class="text-sm font-semibold text-ink-gray-8">
@@ -19,7 +23,6 @@
             <FormControl
               type="text"
               v-model="appointmentStore.filters.patient_name"
-              :debounce="TYPING_DELAY"
               label="Patient Name"
               placeholder="Patient name contains"
             />
@@ -32,7 +35,6 @@
             <FormControl
               type="text"
               v-model="appointmentStore.filters.coverage_plan_name"
-              :debounce="TYPING_DELAY"
               label="Coverage Plan"
               placeholder="Coverage plan contains"
             />
@@ -53,14 +55,12 @@
             <FormControl
               type="text"
               v-model="appointmentStore.filters.appointment_type"
-              :debounce="TYPING_DELAY"
               label="Visit Type"
               placeholder="Visit type contains"
             />
             <FormControl
               type="text"
               v-model="appointmentStore.filters.billing_item"
-              :debounce="TYPING_DELAY"
               label="Billing Item"
               placeholder="Billing item contains"
             />
@@ -75,7 +75,6 @@
             <FormControl
               type="text"
               v-model="practitionerStore.filters.practitioner"
-              :debounce="TYPING_DELAY"
               label="Practitioner Name"
               placeholder="Practitioner contains"
             />
@@ -88,7 +87,6 @@
             <FormControl
               type="text"
               v-model="practitionerStore.filters.department"
-              :debounce="TYPING_DELAY"
               label="Department"
               placeholder="Department contains"
             />
@@ -150,9 +148,6 @@ const STATUS_OPTIONS = [
 const PAYMENT_FILTER_OPTIONS = [ANY, ...PAYMENT_OPTIONS];
 const CARD_CLASS =
   "flex flex-col gap-3 rounded-lg border border-outline-gray-2 p-3";
-
-// Typing waits this long before the whole grid re-renders, as a desk list filter does.
-const TYPING_DELAY = 300;
 
 const appointmentStore = useAppointmentStore();
 const practitionerStore = usePractitionerStore();
