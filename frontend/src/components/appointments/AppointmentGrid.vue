@@ -21,7 +21,9 @@
                 <FeatherIcon name="chevron-left" class="h-4 w-4 text-black" />
               </Button>
 
+              <!-- A new date remounts the picker: frappe-ui keeps it open on Enter and on the old month. -->
               <DatePicker
+                :key="selectedDate"
                 v-model="selectedDate"
                 variant="outline"
                 placeholder="Select Date"
