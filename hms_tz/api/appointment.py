@@ -397,3 +397,13 @@ def validate_practitioner_level(current_practitioner, new_practitioner, inpatien
 		)
 
 	return True
+
+
+@frappe.whitelist()
+def get_default_print_format(doctype):
+	"""The doctype's default print format as the desk uses it, with its Property Setter applied.
+
+	A receptionist has no read access to Property Setter, so the page cannot look it up itself.
+	"""
+	frappe.has_permission(doctype, "read", throw=True)
+	return frappe.get_meta(doctype).default_print_format
