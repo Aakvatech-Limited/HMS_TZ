@@ -199,8 +199,10 @@ import { useSocket } from "@/socket";
 import { useAppointmentStore } from "@/data/appointment";
 import { usePractitionerStore } from "@/data/practitioner";
 import { useDateStore } from "@/data/date";
+import { useRoute, useRouter } from "vue-router";
 import {
   clamp,
+  until,
   useNow,
   useResizeObserver,
   useDebounceFn,
@@ -222,6 +224,8 @@ const practitionerStore = usePractitionerStore();
 const dateStore = useDateStore();
 const { notifications } = useToast();
 const socket = useSocket();
+const route = useRoute();
+const router = useRouter();
 
 const scroller = ref(null);
 const grid = ref(null);
@@ -509,6 +513,24 @@ const viewAppointment = (appointment) => {
   dialogMode.value = "view";
   showAppointmentDialog.value = true;
 };
+
+// A search result sends ?appointment=&company=&date=; the grid moves there and shows it once the day loads.
+const openAppointmentFromSearch = async ({ appointment, company, date }) => {
+  router.replace({ query: {} });
+  selectedCompany.value = company;
+  dateStore.setSelectedDate(date);
+  const found = await until(() =>
+    appointmentStore.appointments.find(({ name }) => name === appointment)
+  ).toBeTruthy({ timeout: 15_000 });
+  if (found) viewAppointment(found);
+  else notifications.error.generic(`Appointment ${appointment} did not load`);
+};
+
+watch(
+  () => route.query.appointment,
+  (appointment) => appointment && openAppointmentFromSearch(route.query),
+  { immediate: true }
+);
 
 const closeAppointmentDialog = () => {
   showAppointmentDialog.value = false;
