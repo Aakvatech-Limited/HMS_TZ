@@ -25,7 +25,7 @@
     </div>
     <div>
       <FieldLabel label="Date" required />
-      <DatePicker v-model="form.appointment_date" placeholder="Date" />
+      <FormControl v-model="form.appointment_date" type="date" :min="today" />
     </div>
     <div>
       <FieldLabel label="Time" required />
@@ -53,10 +53,14 @@
 <script setup>
 import { ref, watch } from "vue";
 import { call } from "frappe-ui";
+import dayjs from "dayjs";
 import Link from "@/components/controls/Link.vue";
 import FieldLabel from "./FieldLabel.vue";
 
 const props = defineProps({ form: { type: Object, required: true } });
+
+// The browser greys out past days; the server still refuses a past appointment time.
+const today = dayjs().format("YYYY-MM-DD");
 
 const practitionerDetails = (option) =>
   [
