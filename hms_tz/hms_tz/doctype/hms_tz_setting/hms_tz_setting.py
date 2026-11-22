@@ -9,7 +9,7 @@ import frappe
 import requests
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import add_to_date, cint, get_datetime, now_datetime
+from frappe.utils import add_to_date, cint, escape_html, get_datetime, now_datetime
 
 from hms_tz.jubilee.doctype.jubilee_response_log.jubilee_response_log import add_jubilee_log
 from hms_tz.nhif.doctype.nhif_response_log.nhif_response_log import add_log
@@ -162,56 +162,58 @@ class HMSTZSetting(Document):
 		# {"Content-Type": "form-data"}
 
 		url = f"{self.jubilee_url}/jubileeapi/Token"
+		response = self.post_jubilee_login(url, headers, payload)
+		if not response.ok:
+			frappe.throw(
+				_("Jubilee Login Failed — Status Code: {0} — Jubilee Response: {1}").format(
+					response.status_code, get_jubilee_error_description(response)
+				),
+				title=_("Jubilee Login Failed"),
+			)
 
-		for i in range(3):
+		data = response.json()
+		add_jubilee_log(
+			request_type="Token",
+			request_url=url,
+			request_header=headers,
+			request_body=payload,
+			response_data=data,
+			status_code=response.status_code,
+			company=self.company,
+		)
+
+		description = data.get("Description")
+		if not isinstance(description, dict) or not description.get("access_token"):
+			frappe.throw(str(data))
+
+		token = description.get("access_token")
+		ttl = max(int(description.get("expires_in", 0)) - int(description.get("issued_at", 0)), 0)
+		expiry_date = add_to_date(now_datetime(), seconds=ttl)
+
+		self.update({"jubilee_token": token, "jubilee_token_expiry": expiry_date})
+		self.db_update()
+		self.reload()
+		self.clear_cache()
+		return token
+
+	def post_jubilee_login(self, url, headers, payload):
+		"""Retry only network failures; a rejected login is returned at once."""
+		for attempt in range(3):
 			try:
-				r = requests.request("POST", url, headers=headers, data=payload, timeout=60)
-				r.raise_for_status()
+				return requests.post(url, headers=headers, data=payload, timeout=60)
+			except (requests.ConnectionError, requests.Timeout):
+				if attempt == 2:
+					raise
+				sleep(3 * attempt + 1)
 
-				data = json.loads(r.text)
 
-				if data:
-					add_jubilee_log(
-						request_type="Token",
-						request_url=url,
-						request_header=headers,
-						request_body=payload,
-						response_data=data,
-						status_code=r.status_code,
-						company=self.company,
-					)
-
-				if data["Description"] and data["Description"].get("access_token"):
-					token = data["Description"].get("access_token")
-					issued_at = data["Description"].get("issued_at", 0)
-					expires_in = data["Description"].get("expires_in", 0)
-					ttl = max(int(expires_in) - int(issued_at), 0)
-					expiry_date = add_to_date(now_datetime(), seconds=ttl)
-
-					self.update({"jubilee_token": token, "jubilee_token_expiry": expiry_date})
-
-					self.db_update()
-					self.reload()
-					self.clear_cache()
-					return token
-				else:
-					add_jubilee_log(
-						request_type="Token",
-						request_url=url,
-						request_header=headers,
-						request_body=payload,
-						response_data=data,
-						status_code=r.status_code,
-						company=self.company,
-					)
-					frappe.throw(str(data))
-
-			except Exception as e:
-				sleep(3 * i + 1)
-				if i != 2:
-					continue
-				else:
-					raise e
+def get_jubilee_error_description(response):
+	try:
+		data = response.json()
+	except ValueError:
+		return escape_html(response.text)
+	description = data.get("Description") if isinstance(data, dict) else None
+	return escape_html(str(description or data))
 
 
 def is_cash_inpatient_deposit_allowed(company):
