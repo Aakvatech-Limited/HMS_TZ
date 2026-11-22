@@ -18,7 +18,7 @@
         ref="searchInput"
         v-model="query"
         type="text"
-        placeholder="Search records, pages..."
+        placeholder="Search patients, appointments, pages..."
         class="search-input"
         @input="onInput"
         @focus="isFocused = true"
@@ -53,18 +53,19 @@
       </div>
 
       <template v-else-if="results.length">
-        <!-- Pages section -->
-        <div v-if="pageResults.length" class="results-section">
-          <div class="results-section-title">Pages</div>
+        <div
+          v-for="section in sections"
+          :key="section.type"
+          class="results-section"
+        >
+          <div class="results-section-title">{{ section.title }}</div>
           <button
-            v-for="(item, idx) in pageResults"
-            :key="'page-' + idx"
+            v-for="item in section.items"
+            :key="item.index"
             class="result-item"
-            :class="{
-              'result-active': selectedIndex === getGlobalIndex('pages', idx),
-            }"
+            :class="{ 'result-active': selectedIndex === item.index }"
             @click="navigateTo(item)"
-            @mouseenter="selectedIndex = getGlobalIndex('pages', idx)"
+            @mouseenter="selectedIndex = item.index"
           >
             <svg
               class="result-icon"
@@ -76,41 +77,7 @@
                 stroke-linecap="round"
                 stroke-linejoin="round"
                 stroke-width="2"
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
-            </svg>
-            <div class="result-text">
-              <span class="result-title">{{ item.label }}</span>
-              <span class="result-subtitle">{{ item.description }}</span>
-            </div>
-          </button>
-        </div>
-
-        <!-- Records section -->
-        <div v-if="recordResults.length" class="results-section">
-          <div class="results-section-title">Records</div>
-          <button
-            v-for="(item, idx) in recordResults"
-            :key="'record-' + idx"
-            class="result-item"
-            :class="{
-              'result-active':
-                selectedIndex === getGlobalIndex('records', idx),
-            }"
-            @click="navigateTo(item)"
-            @mouseenter="selectedIndex = getGlobalIndex('records', idx)"
-          >
-            <svg
-              class="result-icon"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                :d="section.icon"
               />
             </svg>
             <div class="result-text">
@@ -121,6 +88,9 @@
         </div>
       </template>
 
+      <div v-else-if="searchError" class="search-status">
+        Search failed: {{ searchError }}
+      </div>
       <div v-else-if="query.length >= 2" class="search-status">
         No results found
       </div>
@@ -133,8 +103,11 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from "vue";
-import { createResource } from "frappe-ui";
-import { matchPages } from "@/data/search";
+import { useRouter } from "vue-router";
+import { call, createResource } from "frappe-ui";
+import { matchPages, toRecordResults } from "@/data/search";
+
+const router = useRouter();
 
 const containerRef = ref(null);
 const searchInput = ref(null);
@@ -143,6 +116,7 @@ const isFocused = ref(false);
 const isSearching = ref(false);
 const selectedIndex = ref(-1);
 const results = ref([]);
+const searchError = ref("");
 let debounceTimer = null;
 
 // Custom frontend routes (not DocTypes — always available)
@@ -180,29 +154,37 @@ const permittedDoctypesResource = createResource({
   },
 });
 
-// Resource for global search (called on each search query)
-const globalSearchResource = createResource({
-  url: "frappe.utils.global_search.search",
-  auto: false,
-});
-
 async function loadPermittedDoctypes() {
   if (pagesLoaded) return;
   permittedDoctypesResource.fetch();
 }
 
-const pageResults = computed(() =>
-  results.value.filter((r) => r.type === "page")
-);
-const recordResults = computed(() =>
-  results.value.filter((r) => r.type === "record")
+const DOCUMENT_ICON =
+  "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z";
+const SECTIONS = [
+  { type: "page", title: "Pages", icon: DOCUMENT_ICON },
+  {
+    type: "patient",
+    title: "Patients",
+    icon: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z",
+  },
+  {
+    type: "appointment",
+    title: "Appointments",
+    icon: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
+  },
+];
+
+// Rows keep their place in results, so the arrow keys walk the sections in order.
+const sections = computed(() =>
+  SECTIONS.map((section) => ({
+    ...section,
+    items: results.value
+      .map((item, index) => ({ ...item, index }))
+      .filter((item) => item.type === section.type),
+  })).filter((section) => section.items.length)
 );
 const showResults = computed(() => isFocused.value && query.value.length > 0);
-
-function getGlobalIndex(section, localIdx) {
-  if (section === "pages") return localIdx;
-  return pageResults.value.length + localIdx;
-}
 
 function clearSearch() {
   query.value = "";
@@ -225,44 +207,28 @@ function onInput() {
 }
 
 async function search() {
-  const q = query.value.trim().toLowerCase();
+  const q = query.value.trim();
   if (q.length < 2) return;
 
   isSearching.value = true;
-
-  // 1. Filter matching pages from the permission-checked list
-  const matchedPages = matchPages(pages.value, q);
-
-  // 2. Search records via global search (also respects permissions server-side)
-  const records = await searchGlobalRecords(q);
-
-  results.value = [...matchedPages, ...records];
-  isSearching.value = false;
-}
-
-async function searchGlobalRecords(q) {
+  searchError.value = "";
   try {
-    const data = await globalSearchResource.fetch({
-      text: q,
-      start: 0,
-      limit: 8,
-    });
-    if (data) {
-      return data.map((r) => ({
-        label: r.name,
-        description: r.doctype,
-        route: `/app/${toKebabCase(r.doctype)}/${encodeURIComponent(r.name)}`,
-        type: "record",
-      }));
-    }
-  } catch (e) {
-    // Fallback silently
+    // Patients and appointments only: Customer rows from global search left this page.
+    const records = await call(
+      "hms_tz.api.search.search_patients_and_appointments",
+      { txt: q }
+    );
+    if (q !== query.value.trim()) return;
+    results.value = [
+      ...matchPages(pages.value, q),
+      ...toRecordResults(records),
+    ];
+  } catch (error) {
+    results.value = [];
+    searchError.value = error.messages?.[0] || error.message;
+  } finally {
+    isSearching.value = false;
   }
-  return [];
-}
-
-function toKebabCase(str) {
-  return str.replace(/\s+/g, "-").toLowerCase();
 }
 
 function moveSelection(delta) {
@@ -278,7 +244,14 @@ function onEnter() {
 }
 
 function navigateTo(item) {
-  window.location.href = item.route;
+  clearSearch();
+  if (item.type === "appointment") {
+    router.push({ name: "Appointments", query: item.query });
+  } else if (item.type === "patient") {
+    window.open(item.route, "_blank");
+  } else {
+    window.location.href = item.route;
+  }
 }
 
 // Keyboard shortcut: Ctrl+K to focus search
