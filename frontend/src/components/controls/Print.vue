@@ -19,8 +19,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
-import { createResource } from "frappe-ui";
+import { ref, computed } from "vue";
+import { call, createResource } from "frappe-ui";
 import { useToast } from "@/composables/useToast";
 
 // Props
@@ -116,70 +116,18 @@ const isLoading = ref(false);
 const defaultPrintFormat = ref(null);
 const formatFetched = ref(false);
 
-// Create resource to fetch default print format from Property Setter
-const printFormatResource = createResource({
-  url: "frappe.client.get_list",
-  method: "GET",
-  auto: false,
-  makeParams() {
-    return {
-      doctype: "Property Setter",
-      filters: {
-        doc_type: props.doctype,
-        property: "default_print_format",
-        doctype_or_field: "DocType",
-      },
-      fields: ["value"],
-      limit_page_length: 1,
-    };
-  },
-  onSuccess: (data) => {
-    if (data && data.length > 0 && data[0].value) {
-      console.log("Fetched print format from Property Setter:", data);
-      defaultPrintFormat.value = data[0].value;
-      emit("format-fetched", data[0].value);
-    } else {
-      // Fallback logic based on doctype
-      if (props.doctype === "Sales Invoice") {
-        defaultPrintFormat.value = "AV Tax Invoice"; // Specific fallback for Sales Invoice
-      } else {
-        defaultPrintFormat.value = "Standard"; // General fallback
-      }
-      emit("format-fetched", defaultPrintFormat.value);
-    }
-    formatFetched.value = true;
-  },
-  onError: (err) => {
-    console.error("Error fetching default print format:", err);
-    // Fallback logic based on doctype
-    if (props.doctype === "Sales Invoice") {
-      defaultPrintFormat.value = "AV Tax Invoice"; // Specific fallback for Sales Invoice
-    } else {
-      defaultPrintFormat.value = "Standard"; // General fallback
-    }
-    formatFetched.value = true;
-    emit("format-fetched", defaultPrintFormat.value);
-  },
-});
+const fallbackPrintFormat = () =>
+  props.doctype === "Sales Invoice" ? "AV Tax Invoice" : "Standard";
 
-// Methods
+/** The default print format set in the desk; the fallback only when none is set. */
 const fetchDefaultPrintFormat = async () => {
-  if (!props.doctype) {
-    throw new Error("Doctype is required to fetch print format");
-  }
-
-  try {
-    await printFormatResource.submit();
-  } catch (error) {
-    console.error("Failed to fetch print format:", error);
-    // Set fallback format based on doctype
-    if (props.doctype === "Sales Invoice") {
-      defaultPrintFormat.value = "AV Tax Invoice"; // Specific fallback for Sales Invoice
-    } else {
-      defaultPrintFormat.value = "Standard"; // General fallback
-    }
-    formatFetched.value = true;
-  }
+  const printFormat = await call(
+    "hms_tz.api.appointment.get_default_print_format",
+    { doctype: props.doctype }
+  );
+  defaultPrintFormat.value = printFormat || fallbackPrintFormat();
+  formatFetched.value = true;
+  emit("format-fetched", defaultPrintFormat.value);
 };
 
 const handlePrint = async () => {
@@ -235,10 +183,7 @@ const handlePrint = async () => {
       letter_head = props.noLetterhead;
     }
 
-    // Use the print format from Property Setter or fall back to "AV Tax Invoice" for Sales Invoice
-    const print_format =
-      defaultPrintFormat.value ||
-      (props.doctype === "Sales Invoice" ? "AV Tax Invoice" : "Standard");
+    const print_format = defaultPrintFormat.value;
 
     // Construct URL exactly like the working load_print_page function
     const baseUrl = window.location.origin;
@@ -287,14 +232,6 @@ const handlePrint = async () => {
     isLoading.value = false;
   }
 };
-
-// Lifecycle
-onMounted(() => {
-  // Pre-fetch the default print format when component mounts
-  if (props.doctype) {
-    fetchDefaultPrintFormat();
-  }
-});
 
 // Expose methods for parent components
 defineExpose({
