@@ -1,5 +1,22 @@
 import frappe
 from frappe.permissions import get_doctypes_with_read
+from frappe.utils import add_days, today
+
+from hms_tz.api.appointment_insurance import search_patients
+
+PATIENT_ROWS = 5
+APPOINTMENT_ROWS = 10
+RECENT_DAYS = 30
+APPOINTMENT_FIELDS = [
+	"name",
+	"patient",
+	"patient_name",
+	"practitioner_name",
+	"appointment_date",
+	"appointment_time",
+	"status",
+	"company",
+]
 
 
 @frappe.whitelist()
@@ -37,3 +54,23 @@ def get_permitted_doctypes():
 
 	result.sort(key=lambda x: x["label"])
 	return result
+
+
+@frappe.whitelist()
+def search_patients_and_appointments(txt):
+	"""Patients matching the text as the booking dialog finds them (ID, name, mobile also as 07..., card no),
+	and their appointments from RECENT_DAYS ago on. get_list keeps both to what the user may read."""
+	patients = search_patients(txt, page_length=PATIENT_ROWS)
+	if not patients:
+		return {"patients": [], "appointments": []}
+	appointments = frappe.get_list(
+		"Patient Appointment",
+		fields=APPOINTMENT_FIELDS,
+		filters={
+			"patient": ["in", [patient.value for patient in patients]],
+			"appointment_date": [">=", add_days(today(), -RECENT_DAYS)],
+		},
+		order_by="appointment_date desc, appointment_time desc",
+		limit=APPOINTMENT_ROWS,
+	)
+	return {"patients": patients, "appointments": appointments}
