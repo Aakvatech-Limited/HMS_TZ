@@ -490,6 +490,9 @@ export function useBookingForm(initial) {
     const errors = [];
     if (!form.practitioner) errors.push("Practitioner is required");
     if (!form.appointment_date) errors.push("Date is required");
+    // A typed date skips the picker's min, and the server checks the date only after a new patient is saved.
+    else if (form.appointment_date < dayjs().format("YYYY-MM-DD"))
+      errors.push("Date cannot be in the past");
     if (!form.appointment_time) errors.push("Time is required");
     if (!form.appointment_type) errors.push("Visit type is required");
     if (cardNeedsCheck.value)
