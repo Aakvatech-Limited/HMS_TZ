@@ -171,21 +171,21 @@ class TestIssueServicePocReference(FrappeTestCase):
 
 		self.calls.issue_approved_service.assert_called_once()
 
-	def test_delivery_note_quantity_not_matching_approval_is_not_issued(self):
-		for name, qty in (("_Test POC DN 5", 7), ("_Test POC DN 6", 14)):
-			self.insert_delivery_note(name, qty=qty, approved_qty=10)
+	def test_delivery_note_quantity_above_approval_is_not_issued(self):
+		self.insert_delivery_note("_Test POC DN 6", qty=14, approved_qty=10)
 
-			with self.assertRaises(frappe.ValidationError):
-				issue("Delivery Note", name, "Medication", "")
+		with self.assertRaises(frappe.ValidationError):
+			issue("Delivery Note", "_Test POC DN 6", "Medication", "")
 
 		self.calls.issue_approved_service.assert_not_called()
 
-	def test_delivery_note_quantity_matching_approval_is_issued(self):
-		self.insert_delivery_note("_Test POC DN 7", qty=10, approved_qty=10)
+	def test_delivery_note_quantity_within_approval_is_issued(self):
+		for name, qty in (("_Test POC DN 5", 7), ("_Test POC DN 7", 10)):
+			self.insert_delivery_note(name, qty=qty, approved_qty=10)
 
-		issue("Delivery Note", "_Test POC DN 7", "Medication", "")
+			issue("Delivery Note", name, "Medication", "")
 
-		self.assertEqual(self.calls.issue_approved_service.call_args.kwargs["qty"], 10)
+			self.assertEqual(self.calls.issue_approved_service.call_args.kwargs["qty"], qty)
 
 	def test_issued_service_is_counted_on_its_approval(self):
 		self.insert_radiology("_Test POC RE 8", poc_reference_no="POC-OLD")

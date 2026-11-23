@@ -132,13 +132,13 @@ frappe.ui.form.on("Delivery Note", {
         row.is_restricted &&
         !row.service_reference_no &&
         row.approved_qty &&
-        row.qty != row.approved_qty
+        row.qty > row.approved_qty
     );
     if (unapproved_qty_row) {
       frappe.msgprint({
-        title: __("Quantity Does Not Match Approval"),
+        title: __("Quantity Above Approved Qty"),
         message: __(
-          "Approved quantity for <b>{0} (line {1})</b> is <b>{2}</b> but the quantity is <b>{3}</b>. Change the quantity through a Medication Change Request before issuing.",
+          "Approved quantity for <b>{0} (Row {1})</b> is <b>{2}</b> but the Item quantity is <b>{3}</b>. Ask the practitioner to change the quantity through a Medication Change Request.",
           [
             unapproved_qty_row.item_code,
             unapproved_qty_row.idx,
