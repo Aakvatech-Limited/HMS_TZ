@@ -7,7 +7,8 @@
  "field_order": [
   "hms_tz_setting",
   "settings_complete",
-  "steps"
+  "steps",
+  "run_steps"
  ],
  "fields": [
   {
@@ -31,12 +32,18 @@
    "fieldtype": "Table",
    "label": "Steps",
    "options": "Setup Status Item"
+  },
+  {
+   "fieldname": "run_steps",
+   "fieldtype": "Table",
+   "label": "Run Steps",
+   "options": "Setup Run Step"
   }
  ],
  "in_create": 1,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-11-23 20:00:00.000000",
+ "modified": "2026-11-23 21:00:00.000000",
  "modified_by": "Administrator",
  "module": "Hms Tz",
  "name": "Setup Status",

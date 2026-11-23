@@ -11,6 +11,12 @@
           icon-left="grid"
           :route="{ name: 'Rooms', query: { company } }"
         />
+        <Button
+          v-if="company"
+          label="Run setup"
+          icon-left="play"
+          :route="{ name: 'SetupRun', query: { company } }"
+        />
         <div class="w-72">
           <Link
             doctype="Company"
