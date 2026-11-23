@@ -84,17 +84,24 @@ class TestSetupRunner(FrappeTestCase):
 		setup_runner.run_setup(COMPANY, from_step="flaky")
 		self.assertEqual([row.status for row in self.get_steps().values()], ["Done", "Done", "Done"])
 
-	def test_setup_stays_locked_without_rooms_or_complete_settings(self):
-		status = get_setup_status(COMPANY)
-		status.get_step("Healthcare Service Unit").completed = 0
-		status.save()
-		with self.assertRaises(frappe.ValidationError):
-			setup_runner.start_setup(COMPANY)
-		complete_setup_step(COMPANY, "Healthcare Service Unit")
+	def test_setup_stays_locked_until_settings_are_complete(self):
 		get_setup_status(COMPANY).set_settings_complete(False)
 		with self.assertRaises(frappe.ValidationError):
 			setup_runner.start_setup(COMPANY)
 		self.enqueue.assert_not_called()
+
+	def test_steps_that_need_rooms_wait_for_a_room(self):
+		status = get_setup_status(COMPANY)
+		status.get_step("Healthcare Service Unit").completed = 0
+		status.save()
+		steps = [{**STEPS[0], "needs_rooms": False}, *STEPS[1:]]
+		with patch.object(setup_runner, "SETUP_RUNNER_STEPS", steps):
+			setup_runner.start_setup(COMPANY)
+			setup_runner.run_setup(COMPANY)
+		rows = self.get_steps()
+		self.assertEqual(rows["count"].status, "Done")
+		self.assertEqual(rows["flaky"].status, "Failed")
+		self.assertIn("room", rows["flaky"].error)
 
 	def test_a_running_setup_is_not_started_twice(self):
 		with patch.object(setup_runner, "is_setup_running", return_value=True):
