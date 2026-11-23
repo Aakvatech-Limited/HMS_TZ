@@ -1,0 +1,38 @@
+[
+ {
+  "card_type_name": "NHIF Beneficiary Card",
+  "card_type_id": "NHIFCard",
+  "verifier_name": "National Health Insurance Fund",
+  "verifier_id": "NHIF"
+ },
+ {
+  "card_type_name": "NIDA ID",
+  "card_type_id": "NationalID",
+  "verifier_name": "National Health Insurance Fund",
+  "verifier_id": "NHIF"
+ },
+ {
+  "card_type_name": "Passport No",
+  "card_type_id": "PassportNo",
+  "verifier_name": "Non-Resident",
+  "verifier_id": "NON-RESIDENT"
+ },
+ {
+  "card_type_name": "WCF Notification Number",
+  "card_type_id": "NotificationNo",
+  "verifier_name": "Workers Compensation Fund",
+  "verifier_id": "WCF"
+ },
+ {
+  "card_type_name": "ZAN ID",
+  "card_type_id": "100000001",
+  "verifier_name": "Zanzibar Health Services Fund",
+  "verifier_id": "ZHSF"
+ },
+ {
+  "card_type_name": "ZHSF Beneficiary Card",
+  "card_type_id": "100000005",
+  "verifier_name": "Zanzibar Health Services Fund",
+  "verifier_id": "ZHSF"
+ }
+]
