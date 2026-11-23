@@ -103,6 +103,12 @@
                 }}</span>
               </div>
               <div
+                v-if="step.status === 'Running' || step.status === 'Done'"
+                class="mt-2 pl-7"
+              >
+                <Progress size="sm" :value="getStepPercent(step)" />
+              </div>
+              <div
                 v-if="step.status === 'Failed'"
                 class="ml-7 mt-2 flex flex-wrap items-center justify-between gap-3"
               >
@@ -132,9 +138,15 @@
 <script setup>
 import Link from "@/components/controls/Link.vue";
 import { serverErrorText, useToast } from "@/composables/useToast";
-import { getLockReason, getStepState } from "@/data/setupRun";
+import {
+  applyStepProgress,
+  getLockReason,
+  getStepPercent,
+  getStepState,
+} from "@/data/setupRun";
+import { useSocket } from "@/socket";
 import { Progress, call, createResource, usePageMeta } from "frappe-ui";
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 usePageMeta(() => ({ title: "Run setup - HMS TZ" }));
@@ -213,7 +225,14 @@ watch(
     if (isRunning) pollTimer = setInterval(() => run.reload(), POLL_MS);
   }
 );
-onBeforeUnmount(() => clearInterval(pollTimer));
+// Live step progress from the setup job; polling above is the fallback without a socket.
+const socket = useSocket();
+const onProgress = (message) => applyStepProgress(run.data, message);
+onMounted(() => socket?.on("hms_tz_setup_progress", onProgress));
+onBeforeUnmount(() => {
+  clearInterval(pollTimer);
+  socket?.off("hms_tz_setup_progress", onProgress);
+});
 
 function selectCompany(value) {
   company.value = value;
