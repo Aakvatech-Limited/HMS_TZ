@@ -352,6 +352,9 @@ before_tests = "hms_tz.install.before_tests"
 #
 # auto_cancel_exempted_doctypes = ["Auto Repeat"]
 
+# Kept when Global Search Settings are reset to the app defaults.
+global_search_doctypes = {"Default": [{"doctype": "Healthcare Insurance Subscription"}]}
+
 website_route_rules = [
 	{"from_route": "/frontend/<path:app_path>", "to_route": "frontend"},
 ]
