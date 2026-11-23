@@ -1,0 +1,25 @@
+[
+ {
+  "ward_type_name": "General Ward",
+  "ward_type_id": 0,
+  "notification_required_after": 0
+ },
+ {
+  "ward_type_name": "HDU",
+  "ward_type_id": 23,
+  "alias": "HDU_WARD",
+  "notification_required_after": 5
+ },
+ {
+  "ward_type_name": "ICU",
+  "ward_type_id": 22,
+  "alias": "ICU_WARD",
+  "notification_required_after": 5
+ },
+ {
+  "ward_type_name": "Normal Ward",
+  "ward_type_id": 21,
+  "alias": "NORMAL_WARD",
+  "notification_required_after": 10
+ }
+]
