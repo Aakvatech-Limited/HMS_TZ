@@ -348,6 +348,7 @@
    "fieldname": "opd_cash_pharmacy",
    "fieldtype": "Link",
    "label": "OPD Cash Pharmacy",
+   "link_filters": "[[\"Healthcare Service Unit\", \"company\", \"=\", \"eval: doc.company\"], [\"Healthcare Service Unit\", \"disabled\", \"=\", 0], [\"Healthcare Service Unit\", \"service_unit_type\", \"=\", \"Pharmacy\"]]",
    "mandatory_depends_on": "eval:doc.auto_set_pharmacy_on_patient_encounter == 1",
    "options": "Healthcare Service Unit"
   },
@@ -356,6 +357,7 @@
    "fieldname": "opd_insurance_pharmacy",
    "fieldtype": "Link",
    "label": "OPD Insurance Pharmacy",
+   "link_filters": "[[\"Healthcare Service Unit\", \"company\", \"=\", \"eval: doc.company\"], [\"Healthcare Service Unit\", \"disabled\", \"=\", 0], [\"Healthcare Service Unit\", \"service_unit_type\", \"=\", \"Pharmacy\"]]",
    "mandatory_depends_on": "eval:doc.auto_set_pharmacy_on_patient_encounter == 1",
    "options": "Healthcare Service Unit"
   },
@@ -364,6 +366,7 @@
    "fieldname": "ipd_cash_pharmacy",
    "fieldtype": "Link",
    "label": "IPD Cash Pharmacy",
+   "link_filters": "[[\"Healthcare Service Unit\", \"company\", \"=\", \"eval: doc.company\"], [\"Healthcare Service Unit\", \"disabled\", \"=\", 0], [\"Healthcare Service Unit\", \"service_unit_type\", \"=\", \"Pharmacy\"]]",
    "mandatory_depends_on": "eval: doc.auto_set_pharmacy_on_patient_encounter == 1",
    "options": "Healthcare Service Unit"
   },
@@ -372,6 +375,7 @@
    "fieldname": "ipd_insurance_pharmacy",
    "fieldtype": "Link",
    "label": "IPD Insurance Pharmacy",
+   "link_filters": "[[\"Healthcare Service Unit\", \"company\", \"=\", \"eval: doc.company\"], [\"Healthcare Service Unit\", \"disabled\", \"=\", 0], [\"Healthcare Service Unit\", \"service_unit_type\", \"=\", \"Pharmacy\"]]",
    "mandatory_depends_on": "eval: doc.auto_set_pharmacy_on_patient_encounter == 1",
    "options": "Healthcare Service Unit"
   },
@@ -661,6 +665,7 @@
    "fieldname": "nhif_customer_name",
    "fieldtype": "Link",
    "label": "NHIF Customer Name",
+   "link_filters": "[[\"Customer\", \"disabled\", \"=\", 0], [\"Customer\", \"name\", \"like\", \"%NHIF%\"]]",
    "mandatory_depends_on": "eval: doc.enable_nhif_api == 1",
    "options": "Customer",
    "search_index": 1
@@ -671,6 +676,7 @@
    "fieldname": "jubilee_customer_name",
    "fieldtype": "Link",
    "label": "Jubilee Customer Name",
+   "link_filters": "[[\"Customer\", \"disabled\", \"=\", 0], [\"Customer\", \"name\", \"like\", \"%Jubilee%\"]]",
    "mandatory_depends_on": "eval: doc.enable_jubilee_api == 1",
    "options": "Customer",
    "search_index": 1
@@ -741,7 +747,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-11-19 10:54:19.507188",
+ "modified": "2026-11-23 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Hms Tz",
  "name": "HMS TZ Setting",
