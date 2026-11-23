@@ -51,6 +51,21 @@ class SetupStatus(Document):
 				return row
 		frappe.throw(_("{0} is not a setup step").format(document_type))
 
+	def set_settings_complete(self, is_complete):
+		if self.settings_complete != int(is_complete):
+			self.settings_complete = int(is_complete)
+			self.save(ignore_permissions=True)
+
+	def validate_settings_complete(self):
+		"""Gate for every setup stage after the settings page."""
+		if not self.settings_complete:
+			frappe.throw(
+				_("Complete the settings page of {0} before the next setup stage.").format(
+					self.hms_tz_setting
+				),
+				title=_("Settings Page Incomplete"),
+			)
+
 	def mark_steps_with_records(self):
 		"""Tick each open step whose DocType already has a record for the setting's company."""
 		company = frappe.db.get_value("HMS TZ Setting", self.hms_tz_setting, "company")

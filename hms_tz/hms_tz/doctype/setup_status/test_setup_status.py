@@ -4,7 +4,14 @@
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from hms_tz.api.setup import get_company_setup, get_setting_fields, save_billing, save_setting
+from hms_tz.api.setup import (
+	get_company_setup,
+	get_setting_fields,
+	get_settings_groups,
+	is_rule_true,
+	save_billing,
+	save_setting,
+)
 from hms_tz.hms_tz.doctype.setup_status.setup_status import SETUP_STEPS, complete_setup_step
 
 SETTING = "_Test Setup Status Company"
@@ -114,3 +121,46 @@ class TestSetupStatus(FrappeTestCase):
 		setting = frappe.get_doc("HMS TZ Setting", company)
 		self.assertEqual(setting.facility_code, "0042")
 		self.assertFalse(setting.nhif_token)
+
+	def get_missing(self, setting=None, billing=None):
+		values = {"HMS TZ Setting": setting or {}, "Healthcare Settings": billing or {}}
+		return {
+			group["label"]: group["missing"] for group in get_settings_groups(get_setting_fields(), values)
+		}
+
+	def test_details_group_lists_the_missing_facility_code(self):
+		self.assertIn("Facility Code", self.get_missing()["Details"])
+		self.assertNotIn("Facility Code", self.get_missing({"facility_code": "0042"})["Details"])
+
+	def test_connection_groups_need_values_only_when_switched_on(self):
+		self.assertEqual(self.get_missing()["NHIF"], [])
+		self.assertEqual(self.get_missing()["Jubilee"], [])
+		missing = self.get_missing({"enable_nhif_api": 1, "nhif_user": "user", "enable_jubilee_api": 1})
+		self.assertIn("NHIF Client Secret", missing["NHIF"])
+		self.assertNotIn("NHIF User", missing["NHIF"])
+		self.assertIn("Jubilee User", missing["Jubilee"])
+
+	def test_billing_group_needs_the_registration_item_when_the_fee_is_collected(self):
+		self.assertEqual(self.get_missing()["Billing"], [])
+		missing = self.get_missing(billing={"collect_registration_fee": 1, "registration_fee": 500})
+		self.assertEqual(missing["Billing"], ["Registration Item"])
+
+	def test_settings_complete_follows_the_missing_values(self):
+		frappe.db.set_single_value(
+			"Healthcare Settings", {"collect_registration_fee": 0, "enable_free_follow_ups": 0}
+		)
+		self.assertTrue(get_company_setup(SETTING)["settings_complete"])
+		self.get_status().validate_settings_complete()
+
+		frappe.db.set_value("HMS TZ Setting", SETTING, "enable_nhif_api", 1)
+		setup = get_company_setup(SETTING)
+		self.assertFalse(setup["settings_complete"])
+		self.assertFalse(self.get_status().settings_complete)
+		with self.assertRaises(frappe.ValidationError):
+			self.get_status().validate_settings_complete()
+
+	def test_desk_rules_are_read_on_the_server(self):
+		self.assertTrue(is_rule_true("eval: doc.a == 1 && !doc.b", {"a": 1, "b": 0}))
+		self.assertFalse(is_rule_true("eval:doc.a == 1 || doc.b != 0", {"a": 0, "b": 0}))
+		self.assertTrue(is_rule_true("a", {"a": 1}))
+		self.assertTrue(is_rule_true(None, {}))

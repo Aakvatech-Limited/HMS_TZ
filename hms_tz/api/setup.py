@@ -1,4 +1,7 @@
+import re
+
 import frappe
+from frappe.utils import cstr
 
 from hms_tz.hms_tz.doctype.setup_status.setup_status import get_setup_status
 
@@ -21,17 +24,23 @@ FIELD_KEYS += ("depends_on", "mandatory_depends_on", "link_filters")
 
 @frappe.whitelist()
 def get_company_setup(company):
-	"""The company's setting, billing values and setup steps; the steps are empty until the setting exists."""
+	"""The company's values, what each settings group still misses, and the setup steps once the setting exists."""
 	frappe.has_permission(SETTING_DOCTYPE, "read", throw=True)
 	setting = frappe.db.get_value(SETTING_DOCTYPE, {"company": company})
 	values = {SETTING_DOCTYPE: get_setting_values(setting), BILLING_DOCTYPE: get_billing_values(company)}
+	groups = get_settings_groups(get_setting_fields(), values)
+	setup = {"setting": setting, "values": values, "groups": groups, "settings_complete": False, "steps": []}
 	if not setting:
-		return {"setting": None, "steps": [], "values": values}
+		return setup
 
 	status = get_setup_status(setting)
 	status.mark_steps_with_records()
-	steps = [{"document_type": row.document_type, "completed": row.completed} for row in status.steps]
-	return {"setting": setting, "steps": steps, "values": values}
+	status.set_settings_complete(not any(group["missing"] for group in groups))
+	setup["settings_complete"] = bool(status.settings_complete)
+	setup["steps"] = [
+		{"document_type": row.document_type, "completed": row.completed} for row in status.steps
+	]
+	return setup
 
 
 @frappe.whitelist()
@@ -158,3 +167,39 @@ def set_company_account(settings, table, company, account):
 def pick(values, fieldnames):
 	"""Only known editable fields reach the documents."""
 	return {fieldname: values[fieldname] for fieldname in fieldnames if fieldname in values}
+
+
+def get_settings_groups(fields, values):
+	"""Each settings tab with the labels of its shown required fields that have no value."""
+	groups = [{"label": "Details", "missing": []}]
+	section_shown = True
+	for field in fields:
+		doc = values.get(field["doctype"]) or {}
+		if field["fieldtype"] == "Tab Break":
+			groups.append({"label": field["label"], "missing": []})
+			section_shown = True
+		elif field["fieldtype"] == "Section Break":
+			section_shown = is_rule_true(field.get("depends_on"), doc)
+		elif field["fieldtype"] != "Column Break" and section_shown and is_missing(field, doc):
+			groups[-1]["missing"].append(field["label"])
+	return groups
+
+
+def is_missing(field, doc):
+	shown = is_rule_true(field.get("depends_on"), doc)
+	rule = field.get("mandatory_depends_on")
+	required = field.get("reqd") or (rule and is_rule_true(rule, doc))
+	return bool(shown and required and not cstr(doc.get(field["fieldname"])).strip())
+
+
+def is_rule_true(rule, doc):
+	"""Desk depends_on rule: "eval:" JS using ==, &&, || and !, or a fieldname that must be set."""
+	if not rule:
+		return True
+	if not rule.startswith("eval:"):
+		return bool(doc.get(rule))
+	expression = (
+		rule[5:].replace("===", "==").replace("!==", "!=").replace("&&", " and ").replace("||", " or ")
+	)
+	expression = re.sub(r"!(?!=)", " not ", expression)
+	return bool(frappe.safe_eval(expression.strip(), None, {"doc": frappe._dict(doc)}))
