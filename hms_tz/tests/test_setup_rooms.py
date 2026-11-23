@@ -1,7 +1,14 @@
 import frappe
 from frappe.tests.utils import FrappeTestCase
+from frappe.utils.csvutils import to_csv
 
-from hms_tz.api.rooms import get_company_rooms, get_room_fields, save_room
+from hms_tz.api.rooms import (
+	download_rooms_template,
+	get_company_rooms,
+	get_room_fields,
+	import_rooms,
+	save_room,
+)
 from hms_tz.hms_tz.doctype.setup_status.setup_status import get_setup_status
 
 COMPANY = "_Test Company"
@@ -11,7 +18,8 @@ ROOM = "_Test Setup Room"
 
 class TestSetupRooms(FrappeTestCase):
 	def setUp(self):
-		frappe.delete_doc_if_exists("Healthcare Service Unit", f"{ROOM} - _TC")
+		for name in (ROOM, f"{ROOM} A", f"{ROOM} B", f"{ROOM} C"):
+			frappe.delete_doc_if_exists("Healthcare Service Unit", f"{name} - _TC")
 		frappe.delete_doc_if_exists("Setup Status", COMPANY)
 		frappe.delete_doc_if_exists("HMS TZ Setting", COMPANY)
 		frappe.db.set_single_value(
@@ -72,3 +80,75 @@ class TestSetupRooms(FrappeTestCase):
 		get_company_rooms(COMPANY)
 		with self.assertRaises(frappe.ValidationError):
 			save_room(COMPANY, self.room_values(service_unit_type=None))
+
+	def upload(self, *rows):
+		header = ["Service Unit", "Service Unit Type", "Room Type", "Warehouse"]
+		content = to_csv([header, *[list(row) for row in rows]])
+		file = frappe.get_doc(
+			{"doctype": "File", "file_name": "rooms.csv", "content": content, "is_private": 1}
+		)
+		return file.insert().file_url
+
+	def room_names(self):
+		return {room.name for room in get_company_rooms(COMPANY)["rooms"]}
+
+	def get_template_rooms(self, sample_rooms):
+		download_rooms_template(COMPANY, sample_rooms=sample_rooms, file_type="CSV")
+		header, *rows = [line for line in frappe.response["result"].splitlines() if line]
+		self.assertIn("Service Unit Type", header)
+		return rows
+
+	def test_template_holds_only_the_asked_number_of_sample_rooms(self):
+		get_company_rooms(COMPANY)
+		for name in (f"{ROOM} A", f"{ROOM} B", f"{ROOM} C"):
+			save_room(COMPANY, self.room_values(healthcare_service_unit_name=name))
+		self.assertEqual(self.get_template_rooms("0"), [])
+		self.assertEqual(len(self.get_template_rooms("2")), 2)
+		self.assertGreaterEqual(len(self.get_template_rooms("all")), 3)
+
+	def test_valid_import_adds_every_row(self):
+		get_company_rooms(COMPANY)
+		file_url = self.upload(
+			(f"{ROOM} A", UNIT_TYPE, self.room_type, "_Test Warehouse - _TC"),
+			(f"{ROOM} B", UNIT_TYPE, self.room_type, ""),
+		)
+		result = import_rooms(COMPANY, file_url)
+		self.assertEqual((result["added"], result["changed"], result["errors"]), (2, 0, []))
+		self.assertTrue({f"{ROOM} A - _TC", f"{ROOM} B - _TC"} <= self.room_names())
+		self.assertTrue(get_setup_status(COMPANY).get_step("Healthcare Service Unit").completed)
+
+	def test_invalid_rows_are_reported_and_the_rest_imported(self):
+		get_company_rooms(COMPANY)
+		file_url = self.upload(
+			(f"{ROOM} A", "No Such Type", self.room_type, ""),
+			(f"{ROOM} B", UNIT_TYPE, self.room_type, "_Test Warehouse 2 - _TC1"),
+			(f"{ROOM} C", UNIT_TYPE, self.room_type, "No Such Warehouse"),
+			(ROOM, UNIT_TYPE, self.room_type, ""),
+		)
+		result = import_rooms(COMPANY, file_url)
+		self.assertEqual(result["added"], 1)
+		self.assertEqual([error["row"] for error in result["errors"]], [2, 3, 4])
+		self.assertIn("No Such Type", result["errors"][0]["message"])
+		self.assertIn("_Test Company 1", result["errors"][1]["message"])
+		self.assertIn("No Such Warehouse", result["errors"][2]["message"])
+		self.assertNotIn(f"{ROOM} A - _TC", self.room_names())
+
+	def test_repeated_import_changes_rooms_instead_of_adding_them(self):
+		get_company_rooms(COMPANY)
+		rows = [(f"{ROOM} A", UNIT_TYPE, self.room_type, ""), (f"{ROOM} B", UNIT_TYPE, self.room_type, "")]
+		import_rooms(COMPANY, self.upload(*rows))
+		rooms_after_first_import = self.room_names()
+		rows[0] = (f"{ROOM} A", UNIT_TYPE, self.room_type, "_Test Warehouse - _TC")
+		result = import_rooms(COMPANY, self.upload(*rows))
+		self.assertEqual((result["added"], result["changed"], result["errors"]), (0, 2, []))
+		self.assertEqual(self.room_names(), rooms_after_first_import)
+		self.assertEqual(
+			frappe.db.get_value("Healthcare Service Unit", f"{ROOM} A - _TC", "warehouse"),
+			"_Test Warehouse - _TC",
+		)
+
+	def test_import_stays_locked_until_settings_are_complete(self):
+		frappe.db.set_value("HMS TZ Setting", COMPANY, "enable_nhif_api", 1)
+		get_company_rooms(COMPANY)
+		with self.assertRaises(frappe.ValidationError):
+			import_rooms(COMPANY, self.upload((f"{ROOM} A", UNIT_TYPE, self.room_type, "")))
