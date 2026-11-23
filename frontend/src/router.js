@@ -24,6 +24,11 @@ const routes = [
     component: () => import("@/pages/OTRoster.vue"),
   },
   {
+    path: "/setup",
+    name: "Setup",
+    component: () => import("@/pages/Setup.vue"),
+  },
+  {
     name: "Login",
     path: "/account/login",
     component: () => import("@/pages/Login.vue"),
