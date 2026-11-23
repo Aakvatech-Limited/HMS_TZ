@@ -34,6 +34,7 @@
       class="form-control"
       :value="data[section.doctype][field.name]"
       :doctype="field.options"
+      :filters="field.filters || {}"
       @change="(value) => (data[section.doctype][field.name] = value)"
       :placeholder="field.placeholder || field.label"
       :onCreate="field.create"
@@ -52,6 +53,12 @@
     <FormControl
       v-else-if="['Small Text', 'Text', 'Long Text'].includes(field.type)"
       type="textarea"
+      :placeholder="field.placeholder || field.label"
+      v-model="data[section.doctype][field.name]"
+    />
+    <FormControl
+      v-else-if="field.type === 'Password'"
+      type="password"
       :placeholder="field.placeholder || field.label"
       v-model="data[section.doctype][field.name]"
     />
