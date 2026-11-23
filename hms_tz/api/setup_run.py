@@ -46,5 +46,5 @@ def get_standard_record_counts(company):
 		"insurers": frappe.db.count("Healthcare Insurance Company", {"company": company}),
 		"plans": frappe.db.count("Healthcare Insurance Coverage Plan", {"company": company}),
 		"schedules": frappe.db.count("Practitioner Schedule"),
-		"room_types": frappe.db.count("Healthcare Service Unit Type"),
+		"room_types": frappe.db.count("Healthcare Room Type"),
 	}
