@@ -4,13 +4,21 @@
       class="flex flex-wrap items-center justify-between gap-4 border-b bg-white px-6 py-4"
     >
       <h1 class="text-xl font-semibold text-gray-900">HMS TZ Setup</h1>
-      <div class="w-72">
-        <Link
-          doctype="Company"
-          :value="company"
-          placeholder="Select company"
-          @change="selectCompany"
+      <div class="flex items-center gap-3">
+        <Button
+          v-if="company"
+          label="Rooms"
+          icon-left="grid"
+          :route="{ name: 'Rooms', query: { company } }"
         />
+        <div class="w-72">
+          <Link
+            doctype="Company"
+            :value="company"
+            placeholder="Select company"
+            @change="selectCompany"
+          />
+        </div>
       </div>
     </header>
 
