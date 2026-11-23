@@ -51,7 +51,7 @@ def update_approval_status(doc, appointment, data, dni_id=None):
 	# Only the pharmacy issues the approved quantity, so other departments do not see the warning
 	if doc.doctype == "Delivery Note":
 		for document in approved:
-			if document.parent == doc.name and document.approved_qty != document.qty:
+			if document.parent == doc.name and document.qty > document.approved_qty:
 				frappe.msgprint(
 					get_approved_qty_message(
 						f"{document.item_code} on {document.parent}", document.approved_qty, document.qty
@@ -296,25 +296,17 @@ def give_approval(line, documents, used_units):
 
 
 def validate_approved_qty(item, label):
-	"""Medication is issued only at the approved quantity; other quantities need a Medication Change Request"""
-	if item.approved_qty and item.qty != item.approved_qty:
+	"""Medication above the approved quantity needs a Medication Change Request before it is issued"""
+	if item.approved_qty and item.qty > item.approved_qty:
 		frappe.throw(
 			get_approved_qty_message(label, item.approved_qty, item.qty),
-			title=_("Quantity Does Not Match Approval"),
+			title=_("Quantity Above Approved Qty"),
 		)
 
 
 def get_approved_qty_message(item, approved_qty, qty):
-	message = (
-		f"Approved quantity for <b>{item}</b> is <b>{approved_qty:g}</b> but the quantity is <b>{qty:g}</b>. "
-	)
-	if qty < approved_qty:
-		return (
-			message
-			+ f"Change the quantity to <b>{approved_qty:g}</b> through a Medication Change Request before issuing."
-		)
-
-	return message + (
+	return (
+		f"Approved quantity for <b>{item}</b> is <b>{approved_qty:g}</b> but the Item quantity is <b>{qty:g}</b>. "
 		"Ask the practitioner to change the quantity through a Medication Change Request. "
 		f"The practitioner may prescribe the other <b>{qty - approved_qty:g}</b> as a new drug prescription "
 		"paid by cash or by another payment method."
