@@ -4,7 +4,7 @@
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from hms_tz.nhif.api.setup_status import SETUP_DOCTYPES
+from hms_tz.hms_tz.doctype.setup_status.setup_status import SETUP_DOCTYPES
 
 SETTING = "_Test Setup Status Company"
 
@@ -15,7 +15,7 @@ class TestSetupStatus(FrappeTestCase):
 			frappe.get_doc({"doctype": "HMS TZ Setting", "company": SETTING, "facility_code": "TEST"}).insert(
 				ignore_links=True
 			)
-		frappe.db.delete("Setup Status", SETTING)
+		frappe.delete_doc_if_exists("Setup Status", SETTING)
 
 	def new_status(self):
 		return frappe.get_doc({"doctype": "Setup Status", "hms_tz_setting": SETTING})
