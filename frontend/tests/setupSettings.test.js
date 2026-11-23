@@ -8,29 +8,38 @@ import {
   toSettingValues,
 } from "../src/data/setupSettings.js";
 
+const SETTING = "HMS TZ Setting";
+const BILLING = "Healthcare Settings";
 const NHIF_ON = "eval: doc.enable_nhif_api == 1";
+
+const setting = (field) => ({ ...field, doctype: SETTING });
+const billing = (field) => ({ ...field, doctype: BILLING });
+
 const FIELDS = [
-  { fieldname: "company", fieldtype: "Link", label: "Company", reqd: 1 },
-  { fieldname: "facility_code", fieldtype: "Data", label: "Facility Code" },
-  {
+  setting({
+    fieldname: "facility_code",
+    fieldtype: "Data",
+    label: "Facility Code",
+  }),
+  setting({
     fieldname: "encounter_section",
     fieldtype: "Section Break",
     label: "Encounter",
-  },
-  {
+  }),
+  setting({
     fieldname: "notes_length",
     fieldtype: "Int",
     label: "Notes Length",
     default: "20",
-  },
-  { fieldname: "column_break", fieldtype: "Column Break" },
-  {
+  }),
+  setting({ fieldname: "column_break", fieldtype: "Column Break" }),
+  setting({
     fieldname: "limit_action",
     fieldtype: "Select",
     label: "Limit Action",
     options: "\nWarn\nStop",
-  },
-  {
+  }),
+  setting({
     fieldname: "cash_pharmacy",
     fieldtype: "Link",
     label: "Cash Pharmacy",
@@ -39,55 +48,83 @@ const FIELDS = [
       ["Healthcare Service Unit", "company", "=", "eval: doc.company"],
       ["Healthcare Service Unit", "disabled", "=", 0],
     ]),
-  },
-  { fieldname: "nhif_tab", fieldtype: "Tab Break", label: "NHIF" },
-  {
+  }),
+  setting({ fieldname: "nhif_tab", fieldtype: "Tab Break", label: "NHIF" }),
+  setting({
     fieldname: "enable_nhif_api",
     fieldtype: "Check",
     label: "Enable NHIF API",
     default: "0",
-  },
-  {
+  }),
+  setting({
     fieldname: "nhif_user",
     fieldtype: "Data",
     label: "NHIF User",
     depends_on: NHIF_ON,
-  },
-  {
-    fieldname: "get_nhif_token",
-    fieldtype: "Button",
-    label: "Get NHIF Token",
-  },
-  {
-    fieldname: "nhif_token",
-    fieldtype: "Small Text",
-    label: "NHIF Token",
-    read_only: 1,
-  },
-  {
+  }),
+  setting({
     fieldname: "dates_section",
     fieldtype: "Section Break",
     label: "Submit Dates",
     depends_on: NHIF_ON,
-  },
-  {
+  }),
+  setting({
     fieldname: "submit_claim_month",
     fieldtype: "Int",
     label: "Submit Claim Month",
-  },
-  { fieldname: "jubilee_tab", fieldtype: "Tab Break", label: "Jubilee" },
-  { fieldname: "jubilee_user", fieldtype: "Data", label: "Jubilee User" },
+  }),
+  setting({
+    fieldname: "jubilee_tab",
+    fieldtype: "Tab Break",
+    label: "Jubilee",
+  }),
+  setting({
+    fieldname: "jubilee_user",
+    fieldtype: "Data",
+    label: "Jubilee User",
+  }),
+  billing({
+    fieldname: "billing_tab",
+    fieldtype: "Tab Break",
+    label: "Billing",
+  }),
+  billing({
+    fieldname: "sb_op_settings",
+    fieldtype: "Section Break",
+    label: "Outpatient Settings",
+  }),
+  billing({
+    fieldname: "collect_registration_fee",
+    fieldtype: "Check",
+    label: "Collect Fee",
+  }),
+  billing({
+    fieldname: "registration_fee",
+    fieldtype: "Currency",
+    label: "Registration Fee",
+    depends_on: "collect_registration_fee",
+  }),
+  billing({
+    fieldname: "income_account",
+    fieldtype: "Link",
+    label: "Income Account",
+    options: "Account",
+    link_filters: JSON.stringify([
+      ["Account", "company", "=", "eval: doc.company"],
+    ]),
+  }),
 ];
 
 const tabs = getSettingTabs(FIELDS);
 const fieldNames = (sections) =>
   sections.flatMap((section) => section.fields.map((field) => field.name));
+const form = (values) => toSettingForm(FIELDS, values);
 
 describe("setup settings form", () => {
-  test("tab breaks split the fields into Details, NHIF and Jubilee tabs", () => {
+  test("tab breaks give Details, NHIF, Jubilee and Billing tabs", () => {
     assert.deepEqual(
       tabs.map((tab) => tab.label),
-      ["Details", "NHIF", "Jubilee"]
+      ["Details", "NHIF", "Jubilee", "Billing"]
     );
     assert.deepEqual(
       tabs[0].sections.map((section) => section.label),
@@ -95,24 +132,34 @@ describe("setup settings form", () => {
     );
   });
 
-  test("company, buttons and read-only fields are left out", () => {
-    const names = fieldNames(
-      getVisibleSections(tabs[1], { enable_nhif_api: true }, "Clinic")
+  test("each section binds to the DocType of its fields", () => {
+    assert.deepEqual(
+      tabs.map((tab) => tab.sections[0].doctype),
+      [SETTING, SETTING, SETTING, BILLING]
     );
-    assert.deepEqual(names, [
+  });
+
+  test("depends_on hides fields and sections while the switch is off", () => {
+    const off = getVisibleSections(tabs[1], form(), "Clinic");
+    assert.deepEqual(fieldNames(off), ["enable_nhif_api"]);
+    const data = form();
+    data[SETTING].enable_nhif_api = true;
+    const on = getVisibleSections(tabs[1], data, "Clinic");
+    assert.deepEqual(fieldNames(on), [
       "enable_nhif_api",
       "nhif_user",
       "submit_claim_month",
     ]);
-    const details = fieldNames(getVisibleSections(tabs[0], {}, "Clinic"));
-    assert.ok(!details.includes("company"));
   });
 
-  test("depends_on hides fields and sections while the switch is off", () => {
-    const names = fieldNames(
-      getVisibleSections(tabs[1], { enable_nhif_api: false }, "Clinic")
-    );
-    assert.deepEqual(names, ["enable_nhif_api"]);
+  test("billing fields read their own DocType values", () => {
+    const data = form({ [BILLING]: { collect_registration_fee: 1 } });
+    const names = fieldNames(getVisibleSections(tabs[3], data, "Clinic"));
+    assert.deepEqual(names, [
+      "collect_registration_fee",
+      "registration_fee",
+      "income_account",
+    ]);
   });
 
   test("a plain fieldname rule needs that field set", () => {
@@ -127,7 +174,11 @@ describe("setup settings form", () => {
   });
 
   test("link filters read eval values from the doc", () => {
-    const [encounter] = getVisibleSections(tabs[0], {}, "Clinic").slice(-1);
+    const [account] = getVisibleSections(tabs[3], form(), "Clinic")
+      .at(-1)
+      .fields.slice(-1);
+    assert.deepEqual(account.filters, { company: ["=", "Clinic"] });
+    const encounter = getVisibleSections(tabs[0], form(), "Clinic").at(-1);
     const pharmacy = encounter.fields.find(
       (field) => field.name === "cash_pharmacy"
     );
@@ -138,37 +189,34 @@ describe("setup settings form", () => {
   });
 
   test("select options become a list", () => {
-    const [encounter] = getVisibleSections(tabs[0], {}, "Clinic").slice(-1);
+    const encounter = getVisibleSections(tabs[0], form(), "Clinic").at(-1);
     const action = encounter.fields.find(
       (field) => field.name === "limit_action"
     );
     assert.deepEqual(action.options, ["", "Warn", "Stop"]);
   });
 
-  test("a new setting starts from the DocType defaults", () => {
-    const form = toSettingForm(FIELDS, null);
-    assert.equal(form.notes_length, "20");
-    assert.equal(form.enable_nhif_api, false);
-    assert.equal(form.nhif_user, "");
-    assert.ok(!("company" in form) && !("nhif_token" in form));
+  test("a DocType without saved values starts from its defaults", () => {
+    const data = form({
+      [SETTING]: null,
+      [BILLING]: { registration_fee: 500 },
+    });
+    assert.equal(data[SETTING].notes_length, "20");
+    assert.equal(data[SETTING].enable_nhif_api, false);
+    assert.equal(data[SETTING].nhif_user, "");
+    assert.equal(data[BILLING].registration_fee, 500);
+    assert.ok(!("nhif_tab" in data[SETTING]));
   });
 
-  test("a saved setting fills the form and checks become booleans", () => {
-    const form = toSettingForm(FIELDS, {
-      facility_code: "0042",
-      enable_nhif_api: 1,
+  test("saved values are grouped by DocType and checks become 1 or 0", () => {
+    const data = form({
+      [SETTING]: { facility_code: "0042", enable_nhif_api: 1 },
     });
-    assert.equal(form.facility_code, "0042");
-    assert.equal(form.enable_nhif_api, true);
-  });
-
-  test("saved values turn checks into 1 or 0", () => {
-    const values = toSettingValues(FIELDS, {
-      facility_code: "0042",
-      enable_nhif_api: true,
-    });
-    assert.equal(values.facility_code, "0042");
-    assert.equal(values.enable_nhif_api, 1);
-    assert.ok(!("get_nhif_token" in values));
+    data[BILLING].collect_registration_fee = true;
+    const values = toSettingValues(FIELDS, data);
+    assert.equal(values[SETTING].facility_code, "0042");
+    assert.equal(values[SETTING].enable_nhif_api, 1);
+    assert.equal(values[BILLING].collect_registration_fee, 1);
+    assert.ok(!("billing_tab" in values[BILLING]));
   });
 });

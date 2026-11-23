@@ -4,7 +4,7 @@
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from hms_tz.api.setup import get_company_setup, get_setting_fields
+from hms_tz.api.setup import get_company_setup, get_setting_fields, save_billing, save_setting
 from hms_tz.hms_tz.doctype.setup_status.setup_status import SETUP_STEPS, complete_setup_step
 
 SETTING = "_Test Setup Status Company"
@@ -72,7 +72,9 @@ class TestSetupStatus(FrappeTestCase):
 			complete_setup_step(SETTING, "ToDo")
 
 	def test_company_without_setting_has_no_steps(self):
-		self.assertEqual(get_company_setup("_Test Company Without Setting"), {"setting": None, "steps": []})
+		setup = get_company_setup("_Test Company Without Setting")
+		self.assertEqual((setup["setting"], setup["steps"]), (None, []))
+		self.assertIsNone(setup["values"]["HMS TZ Setting"])
 
 	def test_company_setup_returns_steps_of_its_setting(self):
 		setup = get_company_setup(SETTING)
@@ -81,6 +83,34 @@ class TestSetupStatus(FrappeTestCase):
 
 	def test_setting_fields_follow_the_doctype_layout(self):
 		fields = {field["fieldname"]: field for field in get_setting_fields()}
-		self.assertEqual(next(iter(fields)), "company")
 		self.assertEqual(fields["nhif_tab"]["fieldtype"], "Tab Break")
 		self.assertIn("eval: doc.company", fields["opd_cash_pharmacy"]["link_filters"])
+		for left_out in ("company", "get_nhif_token", "nhif_token"):
+			self.assertNotIn(left_out, fields)
+
+	def test_billing_tab_comes_from_healthcare_settings(self):
+		fields = {field["fieldname"]: field for field in get_setting_fields()}
+		self.assertEqual(fields["billing_tab"]["doctype"], "Healthcare Settings")
+		self.assertEqual(fields["registration_fee"]["doctype"], "Healthcare Settings")
+		self.assertEqual(fields["income_account"]["options"], "Account")
+		self.assertIn("eval: doc.company", fields["income_account"]["link_filters"])
+
+	def test_billing_sets_only_the_company_account_row(self):
+		other = {"company": "_Test Company 1", "account": "Sales - _TC1"}
+		settings = frappe.get_single("Healthcare Settings")
+		settings.set("income_account", [other])
+		settings.save()
+		save_billing("_Test Company", {"income_account": "Sales - _TC", "registration_fee": 500})
+		settings = frappe.get_single("Healthcare Settings")
+		rows = {row.company: row.account for row in settings.income_account}
+		self.assertEqual(rows, {"_Test Company 1": "Sales - _TC1", "_Test Company": "Sales - _TC"})
+		self.assertEqual(settings.registration_fee, 500)
+
+	def test_save_creates_the_setting_and_ignores_fields_the_page_does_not_edit(self):
+		company = "_Test Company 2"
+		frappe.delete_doc_if_exists("Setup Status", company)
+		frappe.delete_doc_if_exists("HMS TZ Setting", company)
+		save_setting(company, {"facility_code": "0042", "nhif_token": "forged"})
+		setting = frappe.get_doc("HMS TZ Setting", company)
+		self.assertEqual(setting.facility_code, "0042")
+		self.assertFalse(setting.nhif_token)
