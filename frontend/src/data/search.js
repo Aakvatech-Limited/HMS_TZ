@@ -59,3 +59,19 @@ export const toRecordResults = ({ patients, appointments }) => [
     },
   })),
 ];
+
+// Patients and appointments have their own sections, with the appointment opening on the grid.
+const OWN_SECTION_DOCTYPES = ["Patient", "Patient Appointment"];
+
+/** Global search rows of every other doctype the user may read; each opens in the desk. */
+export const toOtherRecordResults = (rows) =>
+  rows
+    .filter(({ doctype }) => !OWN_SECTION_DOCTYPES.includes(doctype))
+    .map(({ doctype, name }) => ({
+      type: "record",
+      label: name,
+      description: doctype,
+      route: `/app/${doctype
+        .replace(/\s+/g, "-")
+        .toLowerCase()}/${encodeURIComponent(name)}`,
+    }));
