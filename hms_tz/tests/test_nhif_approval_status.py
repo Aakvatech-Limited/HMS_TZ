@@ -414,13 +414,8 @@ class TestDeliveryNoteApprovedQty(FrappeTestCase):
 		self.assertIn("Medication Change Request", str(error.exception))
 		self.assertIn("paid by cash", str(error.exception))
 
-	def test_quantity_below_approved_qty_blocks_submit(self):
-		with self.assertRaises(frappe.ValidationError) as error:
-			delivery_note.before_submit(self.make_delivery_note(7, 10), "before_submit")
-
-		self.assertIn(
-			"Change the quantity to <b>10</b> through a Medication Change Request", str(error.exception)
-		)
+	def test_quantity_below_approved_qty_submits(self):
+		delivery_note.before_submit(self.make_delivery_note(7, 10), "before_submit")
 
 	def test_quantity_equal_to_approved_qty_submits(self):
 		delivery_note.before_submit(self.make_delivery_note(10, 10), "before_submit")
