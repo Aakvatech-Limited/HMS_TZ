@@ -1,0 +1,102 @@
+[
+ {
+  "scheme_id": "1001",
+  "scheme_name": "Standard NHIF Benefit Scheme"
+ },
+ {
+  "scheme_id": "1002",
+  "scheme_name": "Ngorongoro Benefit Scheme"
+ },
+ {
+  "scheme_id": "1003",
+  "scheme_name": "Serengeti Benefit Scheme"
+ },
+ {
+  "scheme_id": "1004",
+  "scheme_name": "Toto Afya Kadi Benefit Scheme"
+ },
+ {
+  "scheme_id": "1005",
+  "scheme_name": "Student Benefit Scheme"
+ },
+ {
+  "scheme_id": "1006",
+  "scheme_name": "Najali Benefit Scheme"
+ },
+ {
+  "scheme_id": "1007",
+  "scheme_name": "Wekeza Benefit Scheme"
+ },
+ {
+  "scheme_id": "1008",
+  "scheme_name": "Timiza Benefit Scheme"
+ },
+ {
+  "scheme_id": "1009",
+  "scheme_name": "NSSF Benefit Scheme"
+ },
+ {
+  "scheme_id": "1010",
+  "scheme_name": "TRA Benefit Scheme"
+ },
+ {
+  "scheme_id": "1011",
+  "scheme_name": "Tarangire Benefit Scheme"
+ },
+ {
+  "scheme_id": "1012",
+  "scheme_name": "Mikumi Benefit Scheme"
+ },
+ {
+  "scheme_id": "1013",
+  "scheme_name": "Tanzanite Benefit Scheme"
+ },
+ {
+  "scheme_id": "1014",
+  "scheme_name": "Essential Benefit Scheme"
+ },
+ {
+  "scheme_id": "1099",
+  "scheme_name": "Tourist Benefit Scheme (CHAN)"
+ },
+ {
+  "scheme_id": "2001",
+  "scheme_name": "Bunge Health Insurance Scheme"
+ },
+ {
+  "scheme_id": "3001",
+  "scheme_name": "BoT Health Insurance Scheme"
+ },
+ {
+  "scheme_id": "4001",
+  "scheme_name": "Option One"
+ },
+ {
+  "scheme_id": "5001",
+  "scheme_name": "Option Two"
+ },
+ {
+  "scheme_id": "6001",
+  "scheme_name": "Option Three"
+ },
+ {
+  "scheme_id": "7001",
+  "scheme_name": "CRDB Health Insurance Scheme"
+ },
+ {
+  "scheme_id": "8001",
+  "scheme_name": "NMB Health Insurance Scheme"
+ },
+ {
+  "scheme_id": "9001",
+  "scheme_name": "DCB Health Insurance Scheme"
+ },
+ {
+  "scheme_id": "10001",
+  "scheme_name": "WVT Health Insurance Scheme"
+ },
+ {
+  "scheme_id": "100100",
+  "scheme_name": "ZSSF"
+ }
+]
