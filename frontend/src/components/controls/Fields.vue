@@ -63,7 +63,7 @@
       v-model="data[section.doctype][field.name]"
     />
     <FormControl
-      v-else-if="['Int'].includes(field.type)"
+      v-else-if="['Int', 'Float', 'Currency'].includes(field.type)"
       type="number"
       :placeholder="field.placeholder || field.label"
       v-model="data[section.doctype][field.name]"
