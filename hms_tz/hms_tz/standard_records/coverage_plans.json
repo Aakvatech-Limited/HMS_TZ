@@ -1,0 +1,147 @@
+[
+ {
+  "insurance_company": "NHIF Insurance",
+  "coverage_plan_name": "NHIF - Standard",
+  "nhif_scheme_id": "1001"
+ },
+ {
+  "insurance_company": "NHIF Insurance",
+  "coverage_plan_name": "NHIF - Ngorongoro",
+  "nhif_scheme_id": "1002"
+ },
+ {
+  "insurance_company": "NHIF Insurance",
+  "coverage_plan_name": "NHIF - Serengeti",
+  "nhif_scheme_id": "1003"
+ },
+ {
+  "insurance_company": "NHIF Insurance",
+  "coverage_plan_name": "NHIF - Toto Afya",
+  "nhif_scheme_id": "1004"
+ },
+ {
+  "insurance_company": "NHIF Insurance",
+  "coverage_plan_name": "NHIF - Student",
+  "nhif_scheme_id": "1005"
+ },
+ {
+  "insurance_company": "NHIF Insurance",
+  "coverage_plan_name": "NHIF - Najali Afya",
+  "nhif_scheme_id": "1006"
+ },
+ {
+  "insurance_company": "NHIF Insurance",
+  "coverage_plan_name": "NHIF - Wekeza Afya",
+  "nhif_scheme_id": "1007"
+ },
+ {
+  "insurance_company": "NHIF Insurance",
+  "coverage_plan_name": "NHIF - Timiza Afya",
+  "nhif_scheme_id": "1008"
+ },
+ {
+  "insurance_company": "NHIF Insurance",
+  "coverage_plan_name": "NHIF - NSSF",
+  "nhif_scheme_id": "1009"
+ },
+ {
+  "insurance_company": "NHIF Insurance",
+  "coverage_plan_name": "NHIF - TRA",
+  "nhif_scheme_id": "1010"
+ },
+ {
+  "insurance_company": "NHIF Insurance",
+  "coverage_plan_name": "NHIF - Tarangire",
+  "nhif_scheme_id": "1011"
+ },
+ {
+  "insurance_company": "NHIF Insurance",
+  "coverage_plan_name": "NHIF - Mikumi",
+  "nhif_scheme_id": "1012"
+ },
+ {
+  "insurance_company": "NHIF Insurance",
+  "coverage_plan_name": "NHIF - Tanzanite",
+  "nhif_scheme_id": "1013"
+ },
+ {
+  "insurance_company": "NHIF Insurance",
+  "coverage_plan_name": "NHIF - Essential",
+  "nhif_scheme_id": "1014"
+ },
+ {
+  "insurance_company": "NHIF Insurance",
+  "coverage_plan_name": "NHIF - Tourist",
+  "nhif_scheme_id": "1099"
+ },
+ {
+  "insurance_company": "NHIF Insurance",
+  "coverage_plan_name": "NHIF - Bunge",
+  "nhif_scheme_id": "2001"
+ },
+ {
+  "insurance_company": "NHIF Insurance",
+  "coverage_plan_name": "NHIF - BOT",
+  "nhif_scheme_id": "3001"
+ },
+ {
+  "insurance_company": "NHIF Insurance",
+  "coverage_plan_name": "NHIF - Supplementary Option 1",
+  "nhif_scheme_id": "4001"
+ },
+ {
+  "insurance_company": "NHIF Insurance",
+  "coverage_plan_name": "NHIF - Supplementary Option 2",
+  "nhif_scheme_id": "5001"
+ },
+ {
+  "insurance_company": "NHIF Insurance",
+  "coverage_plan_name": "NHIF - Supplementary Option 3",
+  "nhif_scheme_id": "6001"
+ },
+ {
+  "insurance_company": "NHIF Insurance",
+  "coverage_plan_name": "NHIF - CRDB",
+  "nhif_scheme_id": "7001"
+ },
+ {
+  "insurance_company": "NHIF Insurance",
+  "coverage_plan_name": "NHIF - NMB",
+  "nhif_scheme_id": "8001"
+ },
+ {
+  "insurance_company": "NHIF Insurance",
+  "coverage_plan_name": "NHIF - DCB",
+  "nhif_scheme_id": "9001"
+ },
+ {
+  "insurance_company": "NHIF Insurance",
+  "coverage_plan_name": "NHIF - WVT",
+  "nhif_scheme_id": "10001"
+ },
+ {
+  "insurance_company": "NHIF Insurance",
+  "coverage_plan_name": "NHIF - ZSSF",
+  "nhif_scheme_id": "100100"
+ },
+ {
+  "insurance_company": "Jubilee Insurance",
+  "coverage_plan_name": "Jubilee Insurance"
+ },
+ {
+  "insurance_company": "Strategis Insurance",
+  "coverage_plan_name": "Strategis Insurance"
+ },
+ {
+  "insurance_company": "GA Insurance",
+  "coverage_plan_name": "GA Insurance"
+ },
+ {
+  "insurance_company": "Britam Insurance",
+  "coverage_plan_name": "Britam Insurance"
+ },
+ {
+  "insurance_company": "Assemble Insurance",
+  "coverage_plan_name": "Assemble Insurance"
+ }
+]
