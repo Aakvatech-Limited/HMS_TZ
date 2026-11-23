@@ -1,0 +1,29 @@
+[
+ {
+  "room_type_name": "Consultation",
+  "room_type_id": 101
+ },
+ {
+  "room_type_name": "General",
+  "room_type_id": 1,
+  "alias": "GENERAL"
+ },
+ {
+  "room_type_name": "Observation room",
+  "room_type_id": 21
+ },
+ {
+  "room_type_name": "Phlebotomy/Sample Collection Room",
+  "room_type_id": 20
+ },
+ {
+  "room_type_name": "Private",
+  "room_type_id": 2,
+  "alias": "PRIVATE"
+ },
+ {
+  "room_type_name": "VIP",
+  "room_type_id": 3,
+  "alias": "VIP"
+ }
+]
