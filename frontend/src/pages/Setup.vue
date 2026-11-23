@@ -52,28 +52,78 @@
             </div>
           </section>
 
-          <aside v-if="setting" class="h-fit rounded-lg border bg-white p-6">
-            <div class="mb-4 flex items-baseline justify-between">
-              <h2 class="text-lg font-semibold text-gray-900">Setup steps</h2>
-              <span class="text-sm text-gray-600">
-                {{ completedCount }} of {{ steps.length }} done
-              </span>
-            </div>
-            <ul class="space-y-2">
-              <li
-                v-for="step in steps"
-                :key="step.document_type"
-                class="flex items-center gap-2 text-base"
-                :class="step.completed ? 'text-gray-900' : 'text-gray-500'"
+          <aside class="h-fit space-y-6">
+            <section class="rounded-lg border bg-white p-6">
+              <div class="mb-4 flex items-baseline justify-between">
+                <h2 class="text-lg font-semibold text-gray-900">Settings</h2>
+                <span class="text-sm text-gray-600">
+                  {{ completeGroupCount }} of {{ groups.length }} complete
+                </span>
+              </div>
+              <ul class="space-y-3">
+                <li v-for="group in groups" :key="group.label">
+                  <div class="flex items-center gap-2 text-base text-gray-900">
+                    <FeatherIcon
+                      :name="
+                        group.missing.length ? 'alert-circle' : 'check-circle'
+                      "
+                      class="h-4 w-4 shrink-0"
+                      :class="
+                        group.missing.length
+                          ? 'text-orange-500'
+                          : 'text-green-600'
+                      "
+                    />
+                    {{ group.label }}
+                  </div>
+                  <p
+                    v-if="group.missing.length"
+                    class="ml-6 mt-1 text-sm text-gray-600"
+                  >
+                    Missing: {{ group.missing.join(", ") }}
+                  </p>
+                </li>
+              </ul>
+              <p class="mt-4 text-sm text-gray-600">
+                Checked against the saved values.
+              </p>
+            </section>
+
+            <section v-if="setting" class="rounded-lg border bg-white p-6">
+              <div class="mb-4 flex items-baseline justify-between">
+                <h2 class="text-lg font-semibold text-gray-900">
+                  Setup steps
+                </h2>
+                <span class="text-sm text-gray-600">
+                  {{ completedCount }} of {{ steps.length }} done
+                </span>
+              </div>
+              <p
+                v-if="!setup.data.settings_complete"
+                class="mb-4 flex items-start gap-2 text-sm text-gray-600"
               >
-                <FeatherIcon
-                  :name="step.completed ? 'check-circle' : 'circle'"
-                  class="h-4 w-4 shrink-0"
-                  :class="step.completed ? 'text-green-600' : 'text-gray-400'"
-                />
-                {{ step.document_type }}
-              </li>
-            </ul>
+                <FeatherIcon name="lock" class="mt-0.5 h-4 w-4 shrink-0" />
+                Later setup stages stay locked until every settings group is
+                complete.
+              </p>
+              <ul class="space-y-2">
+                <li
+                  v-for="step in steps"
+                  :key="step.document_type"
+                  class="flex items-center gap-2 text-base"
+                  :class="step.completed ? 'text-gray-900' : 'text-gray-500'"
+                >
+                  <FeatherIcon
+                    :name="step.completed ? 'check-circle' : 'circle'"
+                    class="h-4 w-4 shrink-0"
+                    :class="
+                      step.completed ? 'text-green-600' : 'text-gray-400'
+                    "
+                  />
+                  {{ step.document_type }}
+                </li>
+              </ul>
+            </section>
           </aside>
         </div>
       </template>
@@ -121,6 +171,10 @@ const setup = createResource({
 
 const setting = computed(() => setup.data?.setting);
 const steps = computed(() => setup.data?.steps || []);
+const groups = computed(() => setup.data?.groups || []);
+const completeGroupCount = computed(
+  () => groups.value.filter((group) => !group.missing.length).length
+);
 const completedCount = computed(
   () => steps.value.filter((step) => step.completed).length
 );
