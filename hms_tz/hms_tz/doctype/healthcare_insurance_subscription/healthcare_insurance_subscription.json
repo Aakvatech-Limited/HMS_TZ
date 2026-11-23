@@ -63,6 +63,7 @@
    "fetch_from": "patient.patient_name",
    "fieldname": "patient_name",
    "fieldtype": "Data",
+   "in_global_search": 1,
    "label": "Patient Name"
   },
   {
@@ -74,6 +75,7 @@
    "fetch_from": "patient.mobile",
    "fieldname": "mobile_number",
    "fieldtype": "Data",
+   "in_global_search": 1,
    "label": "Mobile Number",
    "read_only": 1
   },
@@ -157,7 +159,7 @@
  ],
  "is_submittable": 1,
  "links": [],
- "modified": "2021-04-27 12:15:56.157954",
+ "modified": "2026-11-23 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Hms Tz",
  "name": "Healthcare Insurance Subscription",

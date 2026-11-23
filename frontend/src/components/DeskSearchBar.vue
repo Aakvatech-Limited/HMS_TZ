@@ -105,7 +105,11 @@
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { call, createResource } from "frappe-ui";
-import { matchPages, toRecordResults } from "@/data/search";
+import {
+  matchPages,
+  toOtherRecordResults,
+  toRecordResults,
+} from "@/data/search";
 
 const router = useRouter();
 
@@ -159,6 +163,8 @@ async function loadPermittedDoctypes() {
   permittedDoctypesResource.fetch();
 }
 
+// Global search fills this many rows before Patient and Patient Appointment rows are dropped.
+const OTHER_RECORD_ROWS = 12;
 const DOCUMENT_ICON =
   "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z";
 const SECTIONS = [
@@ -173,6 +179,7 @@ const SECTIONS = [
     title: "Appointments",
     icon: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
   },
+  { type: "record", title: "Other records", icon: DOCUMENT_ICON },
 ];
 
 // Rows keep their place in results, so the arrow keys walk the sections in order.
@@ -213,15 +220,19 @@ async function search() {
   isSearching.value = true;
   searchError.value = "";
   try {
-    // Patients and appointments only: Customer rows from global search left this page.
-    const records = await call(
-      "hms_tz.api.search.search_patients_and_appointments",
-      { txt: q }
-    );
+    const [records, otherRecords] = await Promise.all([
+      call("hms_tz.api.search.search_patients_and_appointments", { txt: q }),
+      call("frappe.utils.global_search.search", {
+        text: q,
+        start: 0,
+        limit: OTHER_RECORD_ROWS,
+      }),
+    ]);
     if (q !== query.value.trim()) return;
     results.value = [
       ...matchPages(pages.value, q),
       ...toRecordResults(records),
+      ...toOtherRecordResults(otherRecords),
     ];
   } catch (error) {
     results.value = [];
@@ -247,7 +258,8 @@ function navigateTo(item) {
   clearSearch();
   if (item.type === "appointment") {
     router.push({ name: "Appointments", query: item.query });
-  } else if (item.type === "patient") {
+  } else if (item.type === "patient" || item.type === "record") {
+    // A new tab keeps the appointments page open.
     window.open(item.route, "_blank");
   } else {
     window.location.href = item.route;

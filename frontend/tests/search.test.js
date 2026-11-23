@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { matchPages, splitPage, toRecordResults } from "../src/data/search.js";
+import {
+  matchPages,
+  splitPage,
+  toOtherRecordResults,
+  toRecordResults,
+} from "../src/data/search.js";
 
 const page = (label) => ({ label, description: `${label} List` });
 const PAGES = [
@@ -88,4 +93,27 @@ test("an appointment row names its date and time and points the grid at it", () 
     company: "Shree Hindu Mandal Hospital - Mwanza",
     date: "2026-11-22",
   });
+});
+
+test("other global search rows open their desk form; patients and appointments are left to their own sections", () => {
+  const rows = toOtherRecordResults([
+    { doctype: "Customer", name: "Ian Biteme" },
+    { doctype: "Patient", name: "HLC-PAT-52566" },
+    { doctype: "Patient Appointment", name: "HLC-APP-2026-00028" },
+    { doctype: "Healthcare Insurance Subscription", name: "HIS-2026-00002" },
+  ]);
+  assert.deepEqual(rows, [
+    {
+      type: "record",
+      label: "Ian Biteme",
+      description: "Customer",
+      route: "/app/customer/Ian%20Biteme",
+    },
+    {
+      type: "record",
+      label: "HIS-2026-00002",
+      description: "Healthcare Insurance Subscription",
+      route: "/app/healthcare-insurance-subscription/HIS-2026-00002",
+    },
+  ]);
 });
