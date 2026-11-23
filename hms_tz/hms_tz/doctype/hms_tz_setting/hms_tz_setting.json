@@ -575,6 +575,7 @@
    "fieldtype": "Column Break"
   },
   {
+   "depends_on": "eval: doc.enable_nhif_api == 1",
    "fieldname": "biometrics_section",
    "fieldtype": "Section Break",
    "label": "Biometrics"
@@ -747,7 +748,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-11-23 10:00:00.000000",
+ "modified": "2026-11-23 20:10:00.000000",
  "modified_by": "Administrator",
  "module": "Hms Tz",
  "name": "HMS TZ Setting",
