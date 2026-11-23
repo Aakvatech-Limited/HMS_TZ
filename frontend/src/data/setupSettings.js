@@ -1,16 +1,10 @@
 export const SETTING_DOCTYPE = "HMS TZ Setting";
 
-// Company comes from the page picker; buttons, tokens and hidden fields stay on the desk form.
-const isEditable = (field) =>
-  field.fieldname !== "company" &&
-  field.fieldtype !== "Button" &&
-  !field.hidden &&
-  !field.read_only;
-
 const isLayoutBreak = (field) =>
   ["Tab Break", "Section Break", "Column Break"].includes(field.fieldtype);
 
 const newSection = (field) => ({
+  doctype: field.doctype,
   label: field.label || field.fieldname,
   hideLabel: !field.label,
   depends_on: field.depends_on,
@@ -27,21 +21,28 @@ export const evaluateDependsOn = (expression, doc) => {
 const evaluate = (expression, doc) =>
   new Function("doc", `return (${expression.slice(5)});`)(doc);
 
-/** Tabs of sections in DocType order; the fields before the first tab break form the Details tab. */
+/** Tabs of sections in server order; the fields before the first tab break form the Details tab. */
 export const getSettingTabs = (fields) => {
   const tabs = [
-    { label: "Details", sections: [newSection({ fieldname: "details" })] },
+    {
+      label: "Details",
+      sections: [
+        newSection({ fieldname: "details", doctype: SETTING_DOCTYPE }),
+      ],
+    },
   ];
   for (const field of fields) {
     const tab = tabs.at(-1);
     if (field.fieldtype === "Tab Break") {
       tabs.push({
         label: field.label,
-        sections: [newSection({ fieldname: field.fieldname })],
+        sections: [
+          newSection({ fieldname: field.fieldname, doctype: field.doctype }),
+        ],
       });
     } else if (field.fieldtype === "Section Break") {
       tab.sections.push(newSection(field));
-    } else if (!isLayoutBreak(field) && isEditable(field)) {
+    } else if (!isLayoutBreak(field)) {
       tab.sections.at(-1).fields.push(field);
     }
   }
@@ -80,44 +81,63 @@ const toControl = (field, doc) => ({
   filters: getLinkFilters(field, doc),
 });
 
-/** FieldMap sections of one tab, showing only what the doc's depends_on rules allow. */
-export const getVisibleSections = (tab, form, company) => {
-  const doc = { ...form, company };
-  return tab.sections
-    .filter((section) => evaluateDependsOn(section.depends_on, doc))
+/** FieldMap sections of one tab, showing only what each doc's depends_on rules allow. */
+export const getVisibleSections = (tab, data, company) =>
+  tab.sections
     .map((section) => ({
+      section,
+      doc: { ...data[section.doctype], company },
+    }))
+    .filter(({ section, doc }) => evaluateDependsOn(section.depends_on, doc))
+    .map(({ section, doc }) => ({
       ...section,
-      doctype: SETTING_DOCTYPE,
       columns: 3,
       fields: section.fields
         .filter((field) => evaluateDependsOn(field.depends_on, doc))
         .map((field) => toControl(field, doc)),
     }))
     .filter((section) => section.fields.length);
-};
 
-const editableFields = (fields) =>
-  fields.filter((field) => !isLayoutBreak(field) && isEditable(field));
+const valueFields = (fields, doctype) =>
+  fields.filter((field) => field.doctype === doctype && !isLayoutBreak(field));
 
-/** Form values from a saved setting, or DocType defaults for a new one; checks become booleans. */
-export const toSettingForm = (fields, setting) =>
+const doctypesOf = (fields) => [
+  ...new Set(fields.map((field) => field.doctype)),
+];
+
+const toFormValue = (field, value) =>
+  field.fieldtype === "Check" ? Boolean(Number(value)) : value ?? "";
+
+/** Form values per DocType from saved values; a DocType without saved values starts from its defaults. */
+export const toSettingForm = (fields, values = {}) =>
   Object.fromEntries(
-    editableFields(fields).map((field) => {
-      const value = setting ? setting[field.fieldname] : field.default;
-      return [
-        field.fieldname,
-        field.fieldtype === "Check" ? Boolean(Number(value)) : value ?? "",
-      ];
-    })
+    doctypesOf(fields).map((doctype) => [
+      doctype,
+      Object.fromEntries(
+        valueFields(fields, doctype).map((field) => [
+          field.fieldname,
+          toFormValue(
+            field,
+            values[doctype] ? values[doctype][field.fieldname] : field.default
+          ),
+        ])
+      ),
+    ])
   );
 
-/** Values to save; checks become 1 or 0. */
-export const toSettingValues = (fields, form) =>
+/** Values to save per DocType; checks become 1 or 0. */
+export const toSettingValues = (fields, data) =>
   Object.fromEntries(
-    editableFields(fields).map((field) => [
-      field.fieldname,
-      field.fieldtype === "Check"
-        ? Number(Boolean(form[field.fieldname]))
-        : form[field.fieldname],
+    doctypesOf(fields).map((doctype) => [
+      doctype,
+      Object.fromEntries(
+        valueFields(fields, doctype).map((field) => {
+          const value = data[doctype][field.fieldname];
+          return [
+            field.fieldname,
+            field.fieldtype === "Check" ? Number(Boolean(value)) : value,
+          ];
+        })
+      ),
     ])
   );
