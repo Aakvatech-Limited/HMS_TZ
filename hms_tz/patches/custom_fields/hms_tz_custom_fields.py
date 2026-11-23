@@ -539,6 +539,7 @@ def execute():
 				label="Coverage Plan Card Number",
 				fieldname="coverage_plan_card_number",
 				insert_after="coverage_plan_name",
+				in_global_search=1,
 			),
 			dict(
 				fieldtype="Data",
