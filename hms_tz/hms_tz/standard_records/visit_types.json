@@ -1,0 +1,90 @@
+[
+ {
+  "appointment_type": "Direct Cash",
+  "source": "Direct",
+  "visit_type_id": "1"
+ },
+ {
+  "appointment_type": "Emergency Case",
+  "source": "Direct",
+  "visit_type_id": "2",
+  "visit_type_name_alias": "EMERGENCY_CASE",
+  "required_input": "NHIF CardNo",
+  "maximum_visit_per_month": "3",
+  "requires_remarks": 1,
+  "description": "This must only be used under emergency situation. If used, service provider must give reasons of at least 30 characters"
+ },
+ {
+  "appointment_type": "Follow-Up Visit",
+  "source": "Direct",
+  "visit_type_id": "9",
+  "visit_type_name_alias": "FOLLOW_UP_VISIT",
+  "required_input": "NHIF Card No"
+ },
+ {
+  "appointment_type": "Ground Ambulance/Air Evacuation",
+  "source": "Direct",
+  "visit_type_id": "11",
+  "visit_type_name_alias": "AMBULANCE_EVACUATION",
+  "required_input": "NHIF CardNo",
+  "requires_remarks": 1
+ },
+ {
+  "appointment_type": "Investigation Only",
+  "source": "Direct",
+  "visit_type_id": "5",
+  "visit_type_name_alias": "INVESTIGATION_ONLY",
+  "required_input": "Authorization No",
+  "maximum_visit_per_month": "-1",
+  "requires_remarks": 1,
+  "has_no_consultation_charges_for_insurance": 1,
+  "description": "This must be used for patient who come for diagnostic examination only. If used, service must ensure that only investigation services are billed (No consultation, no medicines, no procedures etc.)"
+ },
+ {
+  "appointment_type": "Medicine Only",
+  "source": "Direct",
+  "visit_type_id": "7",
+  "visit_type_name_alias": "MEDICINE_ONLY",
+  "required_input": "Authorization No.",
+  "maximum_visit_per_month": "-1",
+  "has_no_consultation_charges_for_insurance": 1,
+  "description": "This must be used for patient who come for re-fill of medicines/drugs only. If used, service provider must ensure that only medicines/drugs are billed (No consultation, no investigations, no procedures etc.)"
+ },
+ {
+  "appointment_type": "New case Visit:",
+  "source": "Direct",
+  "visit_type_id": "10",
+  "visit_type_name_alias": "NEW_CASE_VISIT",
+  "required_input": "NHIF Card No"
+ },
+ {
+  "appointment_type": "Normal Visit",
+  "source": "Direct",
+  "visit_type_id": "1",
+  "visit_type_name_alias": "NORMAL_VISIT",
+  "required_input": "NHIF CardNo",
+  "maximum_visit_per_month": "3",
+  "description": "Patient is eligible for full treatment"
+ },
+ {
+  "appointment_type": "Other Visit",
+  "source": "Direct",
+  "visit_type_id": "8",
+  "visit_type_name_alias": "REPETITIVE_VISIT",
+  "required_input": "NHIF Card No.",
+  "maximum_visit_per_month": "-1",
+  "requires_remarks": 1,
+  "description": "This must be used for repetitive visit such as dialysis, physiotherapy, radiotherapy, chemotherapy etc. If used, service provider must not bill consultation, medicines/drugs, investigation etc."
+ },
+ {
+  "appointment_type": "Referral  Case",
+  "source": "External Referral",
+  "visit_type_id": "3",
+  "visit_type_name_alias": "REFERRAL",
+  "required_input": "ReferralNo",
+  "maximum_visit_per_month": "-1",
+  "requires_remarks": 1,
+  "requires_referral_no": 1,
+  "description": "This can only be used for patient referred from other health facility. If used, service provider must enter valid referralNo"
+ }
+]

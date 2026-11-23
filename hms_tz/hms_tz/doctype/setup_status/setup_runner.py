@@ -3,27 +3,30 @@ from frappe import _
 from frappe.utils.background_jobs import is_job_enqueued
 
 from hms_tz.hms_tz.doctype.setup_status.setup_status import get_setup_status
+from hms_tz.hms_tz.standard_records.standard_records import get_standard_record_steps
 
-# Steps that Start setup runs in order. Each method takes (hms_tz_setting, progress) and returns
-# a short text of what it created. A step must only add what is missing, so it is safe to run again.
-SETUP_RUNNER_STEPS = []
+# Steps that Start setup runs in order. Each method takes (hms_tz_setting, progress, **kwargs) and
+# returns a short text of what it holds or created. A step must only add what is missing, so it is
+# safe to run again. A step runs only once a room exists unless it sets "needs_rooms": False.
+SETUP_RUNNER_STEPS = [*get_standard_record_steps()]
 
 ROOMS_STEP = "Healthcare Service Unit"
+PROGRESS_EVENT = "hms_tz_setup_progress"
 
 
 class StepProgress:
 	"""Progress of one running step, committed so the setup page shows it while the job runs."""
 
-	def __init__(self, row_name):
-		self.row_name = row_name
+	def __init__(self, row):
+		self.row = row
 		self.done = 0
 
 	def set_total(self, total):
-		set_run_step(self.row_name, total=total)
+		set_run_step(self.row, total=total)
 
 	def advance(self, count=1):
 		self.done += count
-		set_run_step(self.row_name, done=self.done)
+		set_run_step(self.row, done=self.done)
 
 
 def get_runner_step(key):
@@ -58,8 +61,6 @@ def start_setup(setting, from_step=None):
 	"""Queue the runner from the first step, or from from_step to try a failed step again."""
 	status = get_setup_status(setting)
 	status.validate_settings_complete()
-	if not status.get_step(ROOMS_STEP).completed:
-		frappe.throw(_("Add at least one room before running the setup."), title=_("No Rooms"))
 	if is_setup_running(setting):
 		frappe.throw(_("The setup of {0} is already running.").format(setting))
 	if from_step:
@@ -93,9 +94,12 @@ def run_setup(setting, from_step=None):
 
 
 def run_step(setting, row):
-	set_run_step(row.name, status="Running", done=0, total=0, result=None, error=None)
+	set_run_step(row, status="Running", done=0, total=0, result=None, error=None)
+	step = get_runner_step(row.step)
 	try:
-		result = frappe.get_attr(get_runner_step(row.step)["method"])(setting, StepProgress(row.name))
+		if step.get("needs_rooms", True) and not get_setup_status(setting).get_step(ROOMS_STEP).completed:
+			frappe.throw(_("Add at least one room on the rooms screen, then try again."))
+		result = frappe.get_attr(step["method"])(setting, StepProgress(row), **step.get("kwargs", {}))
 	except Exception as error:
 		frappe.db.rollback()
 		frappe.log_error(
@@ -103,12 +107,15 @@ def run_step(setting, row):
 			reference_doctype="Setup Status",
 			reference_name=setting,
 		)
-		set_run_step(row.name, status="Failed", error=str(error) or type(error).__name__)
+		set_run_step(row, status="Failed", error=str(error) or type(error).__name__)
 		return False
-	set_run_step(row.name, status="Done", result=result)
+	set_run_step(row, status="Done", result=result)
 	return True
 
 
-def set_run_step(row_name, **values):
-	frappe.db.set_value("Setup Run Step", row_name, values)
+def set_run_step(row, **values):
+	"""Save a step's progress and push it to the setup page of the user who started the run."""
+	frappe.db.set_value("Setup Run Step", row.name, values)
 	frappe.db.commit()  # nosemgrep: the setup page reads step progress while the job runs
+	message = {"setting": row.parent, "step": row.step, **values}
+	frappe.publish_realtime(PROGRESS_EVENT, message, user=frappe.session.user)

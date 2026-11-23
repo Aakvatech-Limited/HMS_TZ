@@ -4,6 +4,7 @@
 import time
 
 import frappe
+from frappe import _
 from frappe.model.document import Document
 from frappe.utils import nowdate, nowtime
 
@@ -19,6 +20,9 @@ except ImportError:
 		get_income_account,
 		get_receivable_account,
 	)
+
+# Standard visit type of the setup page that package appointments use, for cash and insurance.
+PACKAGE_VISIT_TYPE = "Normal Visit"
 
 
 class HealthcarePackageOrder(Document):
@@ -77,9 +81,7 @@ class HealthcarePackageOrder(Document):
 				frappe.throw("Please make payment for this order")
 
 	def create_appointemnts(self):
-		appointment_type = frappe.get_cached_value(
-			"Appointment Type", {"visit_type_id": "1-Normal Visit"}, "name"
-		)
+		appointment_type = self.get_appointment_type()
 
 		# create appointment with no consultation fee
 		non_consultation_appointment = create_single_appointment(
@@ -91,6 +93,11 @@ class HealthcarePackageOrder(Document):
 		for row in self.consultations:
 			consultation_appointment = create_single_appointment(self, row, appointment_type, True)
 			row.appointment = consultation_appointment
+
+	def get_appointment_type(self):
+		if not frappe.db.exists("Appointment Type", PACKAGE_VISIT_TYPE):
+			frappe.throw(_("Create the {0} visit type before ordering a package.").format(PACKAGE_VISIT_TYPE))
+		return PACKAGE_VISIT_TYPE
 
 	def create_encounters(self):
 		if self.non_consultation_appointment:

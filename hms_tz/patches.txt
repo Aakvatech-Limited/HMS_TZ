@@ -69,3 +69,4 @@ hms_tz.patches.trim_delivery_note_versions
 hms_tz.patches.trim_nhif_patient_claim_versions
 hms_tz.patches.drop_stored_previous_encounter_details
 hms_tz.patches.add_insurance_subscription_to_global_search
+hms_tz.patches.custom_fields.visit_type_id_as_data

@@ -1,0 +1,24 @@
+[
+ {
+  "schedule_name": "Weekdays 08:00 - 17:00",
+  "slot_minutes": 60,
+  "hours": [
+   {"days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"], "from_time": "08:00:00", "to_time": "17:00:00"}
+  ]
+ },
+ {
+  "schedule_name": "Weekdays and Saturday",
+  "slot_minutes": 60,
+  "hours": [
+   {"days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"], "from_time": "08:00:00", "to_time": "17:00:00"},
+   {"days": ["Saturday"], "from_time": "08:00:00", "to_time": "13:00:00"}
+  ]
+ },
+ {
+  "schedule_name": "24 Hours",
+  "slot_minutes": 60,
+  "hours": [
+   {"days": ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"], "from_time": "00:00:00", "to_time": "23:59:59"}
+  ]
+ }
+]

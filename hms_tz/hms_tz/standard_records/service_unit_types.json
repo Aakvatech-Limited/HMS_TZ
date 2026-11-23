@@ -1,0 +1,112 @@
+[
+ {
+  "service_unit_type": "Accomodation Charges",
+  "inpatient_occupancy": 1,
+  "is_billable": 1,
+  "item_code": "Accomodation Charges",
+  "item_group": "Services",
+  "uom": "Day",
+  "no_of_hours": 24,
+  "ward_type": "General Ward",
+  "is_service_chargeable": 1,
+  "is_consultancy_chargeable": 1,
+  "description": "Accomodation Charges"
+ },
+ {
+  "service_unit_type": "HDU Service Charges",
+  "inpatient_occupancy": 1,
+  "is_billable": 1,
+  "item_code": "HDU Service Charges",
+  "item_group": "Services",
+  "uom": "Day",
+  "no_of_hours": 24,
+  "ward_type": "HDU",
+  "is_service_chargeable": 1,
+  "is_consultancy_chargeable": 1,
+  "description": "HDU Service Charges"
+ },
+ {
+  "service_unit_type": "ICU Service Charges",
+  "inpatient_occupancy": 1,
+  "is_billable": 1,
+  "item_code": "ICU Service Charges",
+  "item_group": "Services",
+  "uom": "Day",
+  "no_of_hours": 24,
+  "description": "ICU Service Charges",
+  "ward_type": "ICU"
+ },
+ {
+  "service_unit_type": "Operation Theatre",
+  "allow_appointments": 1,
+  "allow_procedures": 1,
+  "is_service_chargeable": 1,
+  "is_consultancy_chargeable": 1,
+  "ward_type": "General Ward"
+ },
+ {
+  "service_unit_type": "Private Room Charges",
+  "inpatient_occupancy": 1,
+  "is_billable": 1,
+  "item_code": "Private Room Charges",
+  "item_group": "Services",
+  "uom": "Day",
+  "no_of_hours": 24,
+  "is_service_chargeable": 1,
+  "is_consultancy_chargeable": 1,
+  "description": "Private Room Charges",
+  "ward_type": "General Ward"
+ },
+ {
+  "service_unit_type": "VIP Room Charges",
+  "inpatient_occupancy": 1,
+  "is_billable": 1,
+  "item_code": "VIP Room Charges",
+  "item_group": "Services",
+  "uom": "Day",
+  "no_of_hours": 24,
+  "is_service_chargeable": 1,
+  "is_consultancy_chargeable": 1,
+  "description": "VIP Room Charges",
+  "ward_type": "General Ward"
+ },
+ {
+  "service_unit_type": "Eye",
+  "allow_appointments": 1,
+  "allow_procedures": 1,
+  "is_service_chargeable": 1,
+  "is_consultancy_chargeable": 1,
+  "ward_type": "General Ward"
+ },
+ {
+  "service_unit_type": "Laboratary",
+  "allow_appointments": 1,
+  "is_service_chargeable": 1,
+  "is_consultancy_chargeable": 1,
+  "ward_type": "General Ward"
+ },
+ {
+  "service_unit_type": "Nursing",
+  "allow_appointments": 1,
+  "overlap_appointments": 1,
+  "allow_procedures": 1,
+  "is_service_chargeable": 1,
+  "is_consultancy_chargeable": 1,
+  "ward_type": "General Ward"
+ },
+ {
+  "service_unit_type": "Radiology",
+  "allow_appointments": 1,
+  "is_service_chargeable": 1,
+  "is_consultancy_chargeable": 1,
+  "ward_type": "General Ward"
+ },
+ {
+  "service_unit_type": "Pharmacy",
+  "allow_appointments": 1,
+  "is_service_chargeable": 1,
+  "is_consultancy_chargeable": 1,
+  "description": "Pharmacy",
+  "ward_type": "General Ward"
+ }
+]

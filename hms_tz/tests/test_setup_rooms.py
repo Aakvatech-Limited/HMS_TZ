@@ -76,6 +76,23 @@ class TestSetupRooms(FrappeTestCase):
 		room = frappe.get_doc("Healthcare Service Unit", name)
 		self.assertEqual((room.healthcare_service_unit_name, room.disabled), (unit_name, 1))
 
+	def test_overlapping_type_needs_a_capacity(self):
+		overlap_type = "_Test Setup Overlap Type"
+		if not frappe.db.exists("Healthcare Service Unit Type", overlap_type):
+			values = {"service_unit_type": overlap_type, "allow_appointments": 1, "overlap_appointments": 1}
+			frappe.get_doc({"doctype": "Healthcare Service Unit Type", **values}).insert(
+				ignore_mandatory=True
+			)
+		get_company_rooms(COMPANY)
+		with self.assertRaisesRegex(frappe.ValidationError, "Capacity"):
+			save_room(COMPANY, self.room_values(service_unit_type=overlap_type))
+		name = save_room(
+			COMPANY, self.room_values(service_unit_type=overlap_type, total_service_unit_capacity=3)
+		)
+		self.assertEqual(
+			frappe.db.get_value("Healthcare Service Unit", name, "total_service_unit_capacity"), 3
+		)
+
 	def test_room_needs_a_service_unit_type(self):
 		get_company_rooms(COMPANY)
 		with self.assertRaises(frappe.ValidationError):
