@@ -22,6 +22,8 @@ ROOM_EXTRA_FIELDS = {
 		],
 	},
 	"disabled": {},
+	# Required when the Service Unit Type allows overlapping appointments.
+	"total_service_unit_capacity": {},
 }
 
 
