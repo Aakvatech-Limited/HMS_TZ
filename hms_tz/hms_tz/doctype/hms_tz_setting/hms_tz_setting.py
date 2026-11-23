@@ -11,6 +11,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import add_to_date, cint, escape_html, get_datetime, now_datetime
 
+from hms_tz.hms_tz.doctype.setup_status.setup_status import complete_setup_step
 from hms_tz.jubilee.doctype.jubilee_response_log.jubilee_response_log import add_jubilee_log
 from hms_tz.nhif.doctype.nhif_response_log.nhif_response_log import add_log
 
@@ -21,6 +22,9 @@ class HMSTZSetting(Document):
 
 	def before_save(self):
 		self.validate_api_urls()
+
+	def after_insert(self):
+		complete_setup_step(self.name, "HMS TZ Setting")
 
 	def validate_appointment_slot_duration(self):
 		"""Slots must tile an hour so every hour, including the 07:00 first row, starts a slot."""
