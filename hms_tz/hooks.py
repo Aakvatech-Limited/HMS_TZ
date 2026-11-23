@@ -137,6 +137,9 @@ doc_events = {
 	"Code Value": {
 		"autoname": "hms_tz.nhif.api.code_value.autoname",
 	},
+	"Setup Status": {
+		"before_insert": "hms_tz.nhif.api.setup_status.add_missing_steps",
+	},
 	"Patient Appointment": {
 		"onload": "hms_tz.nhif.api.patient_appointment.onload",
 		"before_insert": "hms_tz.nhif.api.patient_appointment.before_insert",
