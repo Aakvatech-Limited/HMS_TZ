@@ -1,5 +1,3 @@
-export const SETTING_DOCTYPE = "HMS TZ Setting";
-
 const isLayoutBreak = (field) =>
   ["Tab Break", "Section Break", "Column Break"].includes(field.fieldtype);
 
@@ -27,7 +25,7 @@ export const getSettingTabs = (fields) => {
     {
       label: "Details",
       sections: [
-        newSection({ fieldname: "details", doctype: SETTING_DOCTYPE }),
+        newSection({ fieldname: "details", doctype: fields[0]?.doctype }),
       ],
     },
   ];
@@ -79,6 +77,7 @@ const toControl = (field, doc) => ({
     (field.mandatory_depends_on &&
       evaluateDependsOn(field.mandatory_depends_on, doc)),
   filters: getLinkFilters(field, doc),
+  read_only: field.read_only,
 });
 
 /** FieldMap sections of one tab, showing only what each doc's depends_on rules allow. */
