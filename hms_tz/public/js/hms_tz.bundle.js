@@ -2,6 +2,7 @@ import "./fingerprint/fingerprint.js";
 import "./facial/facial_recognition.js";
 import "./biometric/capture_biometric.js";
 import "./signature/signature.js";
+import "./signature/signature_control.js";
 import "./request_approval.js";
 import "./service_dialog.js";
 import "./unissued_services.js";

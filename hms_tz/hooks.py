@@ -134,6 +134,14 @@ on_session_creation = "hms_tz.api.login.on_session_creation"
 # Hook on document methods and events
 
 doc_events = {
+	# Signature fields stored once on disk, referenced from documents (hms_tz/signatures.py).
+	# On every doctype, as Signature fields also come as custom fields; out-of-scope doctypes are skipped.
+	"*": {
+		"validate": "hms_tz.signatures.dehydrate",
+		"before_update_after_submit": "hms_tz.signatures.dehydrate",
+		"onload": "hms_tz.signatures.hydrate",
+		"before_print": "hms_tz.signatures.hydrate",
+	},
 	"Code Value": {
 		"autoname": "hms_tz.nhif.api.code_value.autoname",
 	},
@@ -324,6 +332,8 @@ scheduler_events = {
 
 jinja = {
 	"methods": [
+		# for print formats that read a signature from another document
+		"hms_tz.signatures.resolve_signature",
 		"hms_tz.nhif.api.healthcare_utils.get_item_rate",
 	]
 }

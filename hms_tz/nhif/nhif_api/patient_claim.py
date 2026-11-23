@@ -6,6 +6,7 @@ from frappe import _
 from frappe.utils import add_to_date, escape_html, flt, get_datetime, get_fullname
 
 from hms_tz.nhif.doctype.nhif_response_log.nhif_response_log import add_log
+from hms_tz.signatures import get_value_to_save, resolve_signature
 
 # (connect, read) seconds; the user waits on a frozen screen during SignFolio
 SIGN_FOLIO_TIMEOUT = (10, 60)
@@ -72,7 +73,7 @@ def sign_folio(
 	}
 
 	if signature_method == "signature":
-		payload["SignatureData"] = signature.replace("data:image/png;base64,", "")
+		payload["SignatureData"] = resolve_signature(signature).replace("data:image/png;base64,", "")
 		payload["SignatureMethod"] = "SIGNATURE"
 		# payload["FpCode"] = ""
 	else:
@@ -143,7 +144,7 @@ def sign_folio(
 
 		values = {"folio_signed": 1, "signed_amount": amount_claimed}
 		if signature_method == "signature":
-			values["patient_signature"] = signature
+			values["patient_signature"] = get_value_to_save(signature)
 		doc.db_set(values)
 
 		doc.add_comment(
@@ -302,7 +303,7 @@ def get_payload(doc):
 			{
 				"Signatory": "PATIENT",
 				"SignatoryID": doc.cardno.strip(),
-				"SignatureData": doc.patient_signature,
+				"SignatureData": resolve_signature(doc.patient_signature),
 				"DateCreated": date_created,
 				"CreatedBy": doc.item_crt_by,
 				"LastModified": date_modified,
@@ -319,7 +320,7 @@ def get_payload(doc):
 				{
 					"Signatory": "MCT",
 					"SignatoryID": d.mct_code,
-					"SignatureData": signature,
+					"SignatureData": resolve_signature(signature),
 					"DateCreated": date_created,
 					"CreatedBy": doc.item_crt_by,
 					"LastModified": date_modified,
