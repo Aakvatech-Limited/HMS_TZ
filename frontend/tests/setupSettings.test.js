@@ -219,4 +219,19 @@ describe("setup settings form", () => {
     assert.equal(values[BILLING].collect_registration_fee, 1);
     assert.ok(!("billing_tab" in values[BILLING]));
   });
+  test("a single-DocType field list binds its first section to that DocType", () => {
+    const room = (field) => ({ ...field, doctype: "Healthcare Service Unit" });
+    const [tab] = getSettingTabs([
+      room({
+        fieldname: "unit_name",
+        fieldtype: "Data",
+        label: "Room",
+        reqd: 1,
+      }),
+    ]);
+    const data = { "Healthcare Service Unit": { unit_name: "OPD 1" } };
+    const [section] = getVisibleSections(tab, data, "Clinic");
+    assert.equal(section.doctype, "Healthcare Service Unit");
+    assert.equal(section.fields[0].name, "unit_name");
+  });
 });
