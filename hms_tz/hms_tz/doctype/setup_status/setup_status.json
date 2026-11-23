@@ -6,6 +6,7 @@
  "engine": "InnoDB",
  "field_order": [
   "hms_tz_setting",
+  "settings_complete",
   "steps"
  ],
  "fields": [
@@ -19,6 +20,13 @@
    "unique": 1
   },
   {
+   "default": "0",
+   "fieldname": "settings_complete",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Settings Page Complete"
+  },
+  {
    "fieldname": "steps",
    "fieldtype": "Table",
    "label": "Steps",
@@ -28,7 +36,7 @@
  "in_create": 1,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-11-23 12:00:00.000000",
+ "modified": "2026-11-23 20:00:00.000000",
  "modified_by": "Administrator",
  "module": "Hms Tz",
  "name": "Setup Status",
