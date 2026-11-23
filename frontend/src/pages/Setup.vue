@@ -22,7 +22,7 @@
         v-else-if="fields.error || setup.error"
         :message="fields.error || setup.error"
       />
-      <LoadingText v-else-if="!fields.data || !setup.data" />
+      <LoadingText v-else-if="!formReady" />
 
       <template v-else>
         <Alert v-if="!setting" title="Create the HMS TZ Setting first">
@@ -36,9 +36,7 @@
               <template #tab-panel="{ tab }">
                 <div class="p-6">
                   <FieldMap
-                    :sections="
-                      getVisibleSections(tab, data[SETTING_DOCTYPE], company)
-                    "
+                    :sections="getVisibleSections(tab, data, company)"
                     :data="data"
                   />
                 </div>
@@ -88,7 +86,6 @@ import FieldMap from "@/components/controls/FieldMap.vue";
 import Link from "@/components/controls/Link.vue";
 import { serverErrorText, useToast } from "@/composables/useToast";
 import {
-  SETTING_DOCTYPE,
   getSettingTabs,
   getVisibleSections,
   toSettingForm,
@@ -105,7 +102,8 @@ const router = useRouter();
 const { showSuccess, showError } = useToast();
 
 const company = ref(route.query.company || "");
-const data = reactive({ [SETTING_DOCTYPE]: {} });
+const data = reactive({});
+const formReady = ref(false);
 const saving = ref(false);
 const tabIndex = ref(0);
 
@@ -129,38 +127,26 @@ const completedCount = computed(
 const tabs = computed(() => getSettingTabs(fields.data || []));
 
 async function loadSetting(result) {
-  const saved = result.setting
-    ? await call("frappe.client.get", {
-        doctype: SETTING_DOCTYPE,
-        name: result.setting,
-      })
-    : null;
   await fields.promise;
-  data[SETTING_DOCTYPE] = toSettingForm(fields.data, saved);
+  Object.assign(data, toSettingForm(fields.data, result.values));
+  formReady.value = true;
 }
 
 function selectCompany(value) {
   company.value = value;
   router.replace({ query: { company: value } });
+  formReady.value = false;
   setup.reset();
   setup.fetch();
 }
 
 async function save() {
   saving.value = true;
-  const values = toSettingValues(fields.data, data[SETTING_DOCTYPE]);
   try {
-    if (setting.value) {
-      await call("frappe.client.set_value", {
-        doctype: SETTING_DOCTYPE,
-        name: setting.value,
-        fieldname: values,
-      });
-    } else {
-      await call("frappe.client.insert", {
-        doc: { doctype: SETTING_DOCTYPE, company: company.value, ...values },
-      });
-    }
+    await call("hms_tz.api.setup.save_company_setup", {
+      company: company.value,
+      values: toSettingValues(fields.data, data),
+    });
     showSuccess(
       setting.value ? "HMS TZ Setting saved" : "HMS TZ Setting created"
     );
