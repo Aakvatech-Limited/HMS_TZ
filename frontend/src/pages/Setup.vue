@@ -31,6 +31,12 @@
         />
         <Button
           v-if="company"
+          label="Visit types"
+          icon-left="calendar"
+          :route="{ name: 'VisitTypes', query: { company } }"
+        />
+        <Button
+          v-if="company"
           label="Coverages"
           icon-left="check-square"
           :route="{ name: 'Coverages', query: { company } }"

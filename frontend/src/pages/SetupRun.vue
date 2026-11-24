@@ -31,6 +31,11 @@
           :route="{ name: 'CoveragePlans', query: { company } }"
         />
         <Button
+          label="Visit types"
+          icon-left="calendar"
+          :route="{ name: 'VisitTypes', query: { company } }"
+        />
+        <Button
           label="Coverages"
           icon-left="check-square"
           :route="{ name: 'Coverages', query: { company } }"
