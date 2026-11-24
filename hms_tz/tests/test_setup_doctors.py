@@ -114,7 +114,7 @@ class TestSetupDoctors(FrappeTestCase):
 		name = save_company_record("doctors", COMPANY, self.doctor_values())
 		frappe.db.set_value("Healthcare Practitioner", name, "practitioner_role", "Nurse")
 		self.assertNotIn("MCT-1", self.doctor_codes())
-		with self.assertRaisesRegex(frappe.ValidationError, "is not a doctor of"):
+		with self.assertRaisesRegex(frappe.ValidationError, "is not one of the doctors of"):
 			save_company_record("doctors", COMPANY, self.doctor_values(), name=name)
 
 	def test_doctors_stay_locked_until_settings_are_complete(self):
