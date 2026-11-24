@@ -33,6 +33,8 @@ class CompanyRecords:
 	list_filters = ()
 	# Most records the list shows at once; None shows all.
 	page_length = None
+	# Whether saving ticks the Setup Status step named after the DocType; False for a DocType with no step.
+	has_setup_step = True
 
 	def __init__(self, company):
 		self.company = company
@@ -100,7 +102,8 @@ class CompanyRecords:
 		"""Add a record, or change one of the company's records, and tick the DocType's setup step."""
 		setting = self.unlocked_setting
 		name = self.save_record(values, name)
-		complete_setup_step(setting, self.doctype)
+		if self.has_setup_step:
+			complete_setup_step(setting, self.doctype)
 		return name
 
 	def save_record(self, values, name=None):
@@ -160,7 +163,7 @@ class CompanyRecords:
 		result = {"added": 0, "changed": 0, "errors": []}
 		for payload in import_file.get_payloads_for_import():
 			self.import_row(payload, result)
-		if result["added"] or result["changed"]:
+		if self.has_setup_step and (result["added"] or result["changed"]):
 			complete_setup_step(setting, self.doctype)
 		return result
 
