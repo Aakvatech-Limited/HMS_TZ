@@ -2,6 +2,7 @@ import frappe
 from frappe import _
 from frappe.utils.background_jobs import is_job_enqueued
 
+from hms_tz.hms_tz.doctype.setup_status.foundation import FOUNDATION_STEP
 from hms_tz.hms_tz.doctype.setup_status.setup_status import get_setup_status
 from hms_tz.hms_tz.standard_records.standard_records import get_standard_record_steps
 
@@ -9,7 +10,7 @@ from hms_tz.hms_tz.standard_records.standard_records import get_standard_record_
 # returns a short text of what it holds. A step must only add what is missing and never change
 # existing records, so it is safe to run again; it counts what it adds with progress.advance(added=).
 # A step runs only once a room exists unless it sets "needs_rooms": False.
-SETUP_RUNNER_STEPS = [*get_standard_record_steps()]
+SETUP_RUNNER_STEPS = [FOUNDATION_STEP, *get_standard_record_steps()]
 
 # Other installed apps add steps of the same shape to their hooks.py; they run after the HMS TZ steps:
 # hms_tz_setup_steps = [{"key": "clinic_rules", "label": "Clinic rules", "method": "app.setup.set_rules"}]
