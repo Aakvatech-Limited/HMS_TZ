@@ -5,7 +5,9 @@ import {
   getActionOptions,
   getCountText,
   getDialogFields,
+  getRunRows,
   isGroupRunning,
+  isRunActive,
 } from "../src/data/setupRecords.js";
 
 const doctors = { label: "doctor", plural_label: "doctors" };
@@ -33,7 +35,7 @@ describe("setup records screen", () => {
     assert.deepEqual(readOnly(true), [true, false]);
   });
 
-  test("an action dropdown runs the clicked action and spins while it runs", () => {
+  test("an action dropdown queues the clicked action and spins while one runs", () => {
     const group = {
       label: "NHIF actions",
       actions: [
@@ -41,15 +43,40 @@ describe("setup records screen", () => {
         { key: "nhif_items", label: "Get NHIF Items" },
       ],
     };
+    const runs = { nhif_items: { status: "Running" } };
     const ran = [];
-    const options = getActionOptions(group, (action) => ran.push(action.key));
-    assert.deepEqual(
-      options.map((option) => option.label),
-      ["Get NHIF Schemes", "Get NHIF Items"]
+    const options = getActionOptions(group, runs, (action) =>
+      ran.push(action.key)
     );
-    options[1].onClick();
-    assert.deepEqual(ran, ["nhif_items"]);
-    assert.equal(isGroupRunning(group, "nhif_items"), true);
-    assert.equal(isGroupRunning(group, "jubilee_packages"), false);
+    assert.deepEqual(
+      options.map((option) => [option.label, option.disabled]),
+      [
+        ["Get NHIF Schemes", false],
+        ["Get NHIF Items", true],
+      ]
+    );
+    options[0].onClick();
+    assert.deepEqual(ran, ["nhif_schemes"]);
+    assert.equal(isGroupRunning(group, runs), true);
+    assert.equal(
+      isGroupRunning(group, { nhif_items: { status: "Done" } }),
+      false
+    );
+  });
+
+  test("every action is listed with its last run, or none when it never ran", () => {
+    const groups = [
+      { label: "Jubilee actions", actions: [{ key: "a" }, { key: "b" }] },
+    ];
+    const rows = getRunRows(groups, { b: { status: "Failed" } });
+    assert.deepEqual(
+      rows.map((row) => [row.key, row.run?.status ?? null]),
+      [
+        ["a", null],
+        ["b", "Failed"],
+      ]
+    );
+    assert.equal(isRunActive({ status: "Queued" }), true);
+    assert.equal(isRunActive(null), false);
   });
 });
