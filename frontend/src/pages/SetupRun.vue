@@ -30,6 +30,11 @@
           icon-left="file-text"
           :route="{ name: 'CoveragePlans', query: { company } }"
         />
+        <Button
+          label="Visit types"
+          icon-left="calendar"
+          :route="{ name: 'VisitTypes', query: { company } }"
+        />
         <div class="w-72">
           <Link
             doctype="Company"
