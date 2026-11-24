@@ -18,6 +18,7 @@ class CompanyRecords:
 	"""
 
 	doctype = None
+	# None for a DocType shared by all companies; the company then only unlocks the screen.
 	company_field = "company"
 	label = None
 	plural_label = None
@@ -52,6 +53,8 @@ class CompanyRecords:
 
 	@property
 	def filters(self):
+		if not self.company_field:
+			return dict(self.fixed_values)
 		return {self.company_field: self.company, **self.fixed_values}
 
 	@property
