@@ -5,6 +5,7 @@ import {
   getActionOptions,
   getCountText,
   getDialogFields,
+  getDialogTitle,
   getRunRows,
   isGroupRunning,
   isRunActive,
@@ -13,6 +14,23 @@ import {
 const doctors = { label: "doctor", plural_label: "doctors" };
 
 describe("setup records screen", () => {
+  test("a read-only screen shows every dialog field read only and views records", () => {
+    const fields = getDialogFields([{ fieldname: "timestamp" }], true, true);
+    assert.equal(fields[0].read_only, true);
+    const updates = {
+      label: "NHIF update",
+      title_field: "name",
+      is_read_only: 1,
+    };
+    assert.equal(getDialogTitle(updates, { name: "NU-1" }), "View NU-1");
+    const plans = { label: "plan", title_field: "plan_name" };
+    assert.equal(
+      getDialogTitle(plans, { name: "P", plan_name: "Gold" }),
+      "Change Gold"
+    );
+    assert.equal(getDialogTitle(plans, null), "Add plan");
+  });
+
   test("the screen title starts with a capital", () => {
     assert.equal(capitalize("doctors"), "Doctors");
     assert.equal(capitalize(), "");
