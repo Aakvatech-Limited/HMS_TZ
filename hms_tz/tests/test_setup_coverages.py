@@ -84,7 +84,14 @@ class TestSetupCoverages(FrappeTestCase):
 		self.assertEqual(fields["healthcare_service_template"]["fieldtype"], "Dynamic Link")
 		self.assertNotIn("company", fields)
 		filters = {field["fieldname"]: field["reqd"] for field in screen["list_filters"]}
-		self.assertEqual(filters, {"healthcare_service": 0, "healthcare_insurance_coverage_plan": 0})
+		self.assertEqual(
+			filters,
+			{
+				"healthcare_service": 0,
+				"healthcare_service_template": 0,
+				"healthcare_insurance_coverage_plan": 0,
+			},
+		)
 
 	def test_a_new_coverage_gets_the_company_and_ticks_the_step(self):
 		name = self.save(self.coverage_values(maximum_quantity=3))
@@ -109,6 +116,9 @@ class TestSetupCoverages(FrappeTestCase):
 		records = get_company_records(SCREEN, COMPANY, filters)["records"]
 		self.assertEqual([record.healthcare_service_template for record in records], [self.templates[1]])
 		self.assertEqual(len(get_company_records(SCREEN, COMPANY)["records"]), 2)
+		filters = frappe.as_json({"healthcare_service_template": self.templates[0]})
+		records = get_company_records(SCREEN, COMPANY, filters)["records"]
+		self.assertEqual([record.healthcare_insurance_coverage_plan for record in records], [self.plan])
 		with self.assertRaisesRegex(frappe.ValidationError, "cannot filter the coverages"):
 			get_company_records(SCREEN, COMPANY, frappe.as_json({"is_active": 1}))
 
