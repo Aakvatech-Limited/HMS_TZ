@@ -20,6 +20,11 @@
           icon-left="users"
           :route="{ name: 'Doctors', query: { company } }"
         />
+        <Button
+          label="Insurers"
+          icon-left="shield"
+          :route="{ name: 'InsuranceCompanies', query: { company } }"
+        />
         <div class="w-72">
           <Link
             doctype="Company"

@@ -2,10 +2,11 @@ import frappe
 from frappe import _
 
 from hms_tz.api.setup import get_company_setup
+from hms_tz.hms_tz.setup_screens.insurance_company import InsuranceCompany
 from hms_tz.hms_tz.setup_screens.practitioner import Practitioner
 
 # Setup screens of company records, by the key the page route passes.
-SCREENS = {"doctors": Practitioner}
+SCREENS = {"doctors": Practitioner, "insurance_companies": InsuranceCompany}
 
 
 def get_screen(screen, company=None):
