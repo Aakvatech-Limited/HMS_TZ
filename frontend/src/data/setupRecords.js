@@ -9,11 +9,21 @@ export const getCountText = (count, screen, hasMore = false) => {
 };
 
 /** Dialog fields; a set_only_once field, such as the one that names the record, is read only when changing it. */
-export const getDialogFields = (fields, isEditing) =>
+export const getDialogFields = (fields, isEditing, isReadOnly = false) =>
   fields.map((field) => ({
     ...field,
-    read_only: field.read_only || (isEditing && Boolean(field.set_only_once)),
+    read_only:
+      isReadOnly ||
+      field.read_only ||
+      (isEditing && Boolean(field.set_only_once)),
   }));
+
+/** Dialog title: "View" on a read-only screen, "Change" for a record, else "Add" with the screen label. */
+export const getDialogTitle = (screen, record) => {
+  if (!record) return `Add ${screen.label}`;
+  const name = record[screen.title_field] || record.name;
+  return `${screen.is_read_only ? "View" : "Change"} ${name}`;
+};
 
 const ACTIVE_STATUSES = ["Queued", "Running"];
 
