@@ -92,6 +92,17 @@ def get_setup_status(hms_tz_setting):
 	)
 
 
+def mark_company_status(company, fieldname):
+	"""Tick one check of the company's Setup Status, such as nhif_prices_processed."""
+	setting = frappe.db.get_value("HMS TZ Setting", {"company": company})
+	if not setting:
+		return
+	status = get_setup_status(setting)
+	if not status.get(fieldname):
+		status.set(fieldname, 1)
+		status.save(ignore_permissions=True)
+
+
 def complete_setup_step(hms_tz_setting, document_type):
 	"""Tick one setup step of a setting."""
 	status = get_setup_status(hms_tz_setting)
