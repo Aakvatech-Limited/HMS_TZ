@@ -186,6 +186,9 @@ doc_events = {
 		"on_update_after_submit": "hms_tz.nhif.api.insurance_subscription.on_update_after_submit",
 		"validate": "hms_tz.nhif.api.insurance_subscription.validate",
 	},
+	"Healthcare Practitioner": {
+		"before_insert": "hms_tz.nhif.api.practitioner.before_insert",
+	},
 	"Practitioner Availability": {
 		"validate": "hms_tz.nhif.api.practitioner_availability.validate",
 		"on_trash": "hms_tz.nhif.api.practitioner_availability.on_trash",
