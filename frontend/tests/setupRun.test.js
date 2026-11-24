@@ -4,6 +4,7 @@ import {
   applyStepProgress,
   getLockReason,
   getRunReport,
+  getStepOwner,
   getStepPercent,
   getStepState,
 } from "../src/data/setupRun.js";
@@ -116,5 +117,15 @@ describe("setup run page", () => {
       total: 10,
     });
     assert.equal(run.steps[1].status, "Waiting");
+  });
+
+  test("a step another app registered shows that app", () => {
+    assert.equal(
+      getStepOwner({ app: "polyclinic_tz", app_title: "Polyclinic" }),
+      "Polyclinic step"
+    );
+    assert.equal(getStepOwner({ app: "polyclinic_tz" }), "polyclinic_tz step");
+    assert.equal(getStepOwner({ app: "hms_tz", app_title: "HMS TZ" }), "");
+    assert.equal(getStepOwner({}), "");
   });
 });
