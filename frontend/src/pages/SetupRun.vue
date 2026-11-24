@@ -50,6 +50,11 @@
           icon-left="refresh-cw"
           :route="{ name: 'NHIFUpdates', query: { company } }"
         />
+        <Button
+          label="Jubilee updates"
+          icon-left="rotate-cw"
+          :route="{ name: 'JubileeUpdates', query: { company } }"
+        />
         <div class="w-72">
           <Link
             doctype="Company"

@@ -76,6 +76,12 @@ const routes = [
     props: { screen: "nhif_updates" },
   },
   {
+    path: "/setup/jubilee-updates",
+    name: "JubileeUpdates",
+    component: () => import("@/pages/SetupRecords.vue"),
+    props: { screen: "jubilee_updates" },
+  },
+  {
     path: "/setup/run",
     name: "SetupRun",
     component: () => import("@/pages/SetupRun.vue"),

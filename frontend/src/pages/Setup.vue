@@ -55,6 +55,12 @@
         />
         <Button
           v-if="company"
+          label="Jubilee updates"
+          icon-left="rotate-cw"
+          :route="{ name: 'JubileeUpdates', query: { company } }"
+        />
+        <Button
+          v-if="company"
           label="Run setup"
           icon-left="play"
           :route="{ name: 'SetupRun', query: { company } }"
