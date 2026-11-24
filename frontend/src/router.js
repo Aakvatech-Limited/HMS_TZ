@@ -40,6 +40,12 @@ const routes = [
     props: { screen: "doctors" },
   },
   {
+    path: "/setup/insurance-companies",
+    name: "InsuranceCompanies",
+    component: () => import("@/pages/SetupRecords.vue"),
+    props: { screen: "insurance_companies" },
+  },
+  {
     path: "/setup/run",
     name: "SetupRun",
     component: () => import("@/pages/SetupRun.vue"),
