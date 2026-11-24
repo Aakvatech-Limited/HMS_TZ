@@ -2,6 +2,7 @@ import frappe
 from frappe import _
 
 from hms_tz.api.setup import get_company_setup
+from hms_tz.hms_tz.setup_screens.appointment_type import AppointmentType
 from hms_tz.hms_tz.setup_screens.coverage_plan import CoveragePlan
 from hms_tz.hms_tz.setup_screens.insurance_company import InsuranceCompany
 from hms_tz.hms_tz.setup_screens.practitioner import Practitioner
@@ -11,6 +12,7 @@ SCREENS = {
 	"doctors": Practitioner,
 	"insurance_companies": InsuranceCompany,
 	"coverage_plans": CoveragePlan,
+	"visit_types": AppointmentType,
 }
 
 
