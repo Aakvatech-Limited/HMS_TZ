@@ -18,6 +18,7 @@ from hms_tz.api.insurance import (
 	get_packages_for_price_list,
 	handle_insurance_prices,
 )
+from hms_tz.hms_tz.doctype.setup_status.setup_status import mark_company_status
 from hms_tz.jubilee.doctype.jubilee_response_log.jubilee_response_log import add_jubilee_log
 
 
@@ -36,7 +37,7 @@ def enqueue_get_jubilee_price_packages(company):
 @frappe.whitelist()
 def process_jubilee_records(company):
 	enqueue(
-		method=process_jubilee_prices,
+		method=run_jubilee_prices,
 		queue="default",
 		timeout=3600,
 		is_async=True,
@@ -45,13 +46,25 @@ def process_jubilee_records(company):
 	frappe.msgprint("Processing Jubilee prices via backaground job", alert=True)
 
 	enqueue(
-		method=process_jubilee_coverages,
+		method=run_jubilee_coverages,
 		queue="default",
 		timeout=3600,
 		is_async=True,
 		company=company,
 	)
 	frappe.msgprint("Processing Jubilee Coverages via backaground job", alert=True)
+
+
+def run_jubilee_prices(company):
+	"""Background job: process all Jubilee prices of the company, then tick Jubilee Prices Processed."""
+	process_jubilee_prices(company)
+	mark_company_status(company, "jubilee_prices_processed")
+
+
+def run_jubilee_coverages(company):
+	"""Background job: process all Jubilee coverages of the company, then tick Jubilee Coverages Processed."""
+	process_jubilee_coverages(company)
+	mark_company_status(company, "jubilee_coverages_processed")
 
 
 def get_price_package(company):
