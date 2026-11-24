@@ -84,7 +84,7 @@ class CompanyRecords:
 	def save_record(self, values, name=None):
 		doc = frappe.get_doc(self.doctype, name) if name else frappe.new_doc(self.doctype)
 		if name and any(doc.get(field) != value for field, value in self.filters.items()):
-			frappe.throw(_("{0} is not a {1} of {2}.").format(name, self.label, self.company))
+			frappe.throw(_("{0} is not one of the {1} of {2}.").format(name, self.plural_label, self.company))
 		# A template may leave out optional columns; those keep their current or default values.
 		doc.update({fieldname: values[fieldname] for fieldname in self.fieldnames if fieldname in values})
 		doc.update(self.filters)
