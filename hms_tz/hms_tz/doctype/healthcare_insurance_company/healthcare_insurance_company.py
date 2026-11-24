@@ -9,6 +9,19 @@ from frappe.model.document import Document
 
 
 class HealthcareInsuranceCompany(Document):
+	def autoname(self):
+		"""Name a new insurer "<name> - <company abbr>", like the standard insurers; inserts with a set name keep it."""
+		if not self.company:
+			frappe.throw(_("Set the Company of {0} before saving it.").format(self.insurance_company_name))
+		suffix = f" - {frappe.get_cached_value('Company', self.company, 'abbr')}"
+		name = self.insurance_company_name
+		self.name = name if name.endswith(suffix) else f"{name}{suffix}"
+		if frappe.db.exists("Healthcare Insurance Company", self.name):
+			frappe.throw(
+				_("{0} already has an insurance company named {1}.").format(self.company, self.name),
+				frappe.DuplicateEntryError,
+			)
+
 	def after_insert(self):
 		create_customer(self)
 		self.reload()
