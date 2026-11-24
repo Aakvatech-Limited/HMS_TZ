@@ -14,13 +14,14 @@ from hms_tz.hms_tz.standard_records.standard_records import (
 
 class FakeProgress:
 	def __init__(self):
-		self.total = self.done = 0
+		self.total = self.done = self.added = 0
 
 	def set_total(self, total):
 		self.total = total
 
-	def advance(self, count=1):
+	def advance(self, count=1, added=0):
 		self.done += count
+		self.added += added
 
 
 def create_for(company):
@@ -29,7 +30,7 @@ def create_for(company):
 	for group in STANDARD_RECORDS:
 		progress = FakeProgress()
 		result = StandardRecords(company, progress).create(group["doctype"])
-		results[group["doctype"]] = (result, progress.done, progress.total)
+		results[group["doctype"]] = (result, progress.done, progress.total, progress.added)
 	return results
 
 
@@ -107,7 +108,7 @@ class TestStandardRecordCreation(FrappeTestCase):
 		self.assertEqual(
 			results["Healthcare Insurance Coverage Plan"][0], f"{len(self.plans)} coverage plans"
 		)
-		for _result, done, total in results.values():
+		for _result, done, total, _added in results.values():
 			self.assertEqual(done, total)
 
 	def test_company_records_carry_the_company_abbreviation(self):
@@ -130,9 +131,23 @@ class TestStandardRecordCreation(FrappeTestCase):
 	def test_running_again_adds_nothing(self):
 		create_for("_Test Company")
 		count = frappe.db.count("Healthcare Insurance Coverage Plan", {"company": "_Test Company"})
-		create_for("_Test Company")
+		results = create_for("_Test Company")
 		self.assertEqual(
 			frappe.db.count("Healthcare Insurance Coverage Plan", {"company": "_Test Company"}), count
+		)
+		self.assertEqual({doctype: result[3] for doctype, result in results.items() if result[3]}, {})
+
+	def test_running_again_keeps_manual_edits_and_adds_back_deleted_records(self):
+		create_for("_Test Company")
+		frappe.db.set_value("Appointment Type", "Direct Cash", "visit_type_id", "99")
+		frappe.delete_doc(
+			"Healthcare Card Verifier", load_records("card_verifiers.json")[-1]["card_type_name"]
+		)
+		results = create_for("_Test Company")
+		self.assertEqual(frappe.db.get_value("Appointment Type", "Direct Cash", "visit_type_id"), "99")
+		self.assertEqual(
+			{doctype: result[3] for doctype, result in results.items() if result[3]},
+			{"Healthcare Card Verifier": 1},
 		)
 
 	def test_a_second_company_gets_its_own_insurers_and_plans(self):
