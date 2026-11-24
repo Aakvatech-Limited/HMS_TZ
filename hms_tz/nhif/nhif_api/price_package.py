@@ -16,6 +16,7 @@ from hms_tz.api.insurance import (
 	get_packages_for_price_list,
 	handle_insurance_prices,
 )
+from hms_tz.hms_tz.doctype.setup_status.setup_status import mark_company_status
 from hms_tz.nhif.doctype.nhif_custom_excluded_services.nhif_custom_excluded_services import (
 	get_custom_excluded_services,
 )
@@ -51,7 +52,7 @@ def enqueue_get_nhif_copayment_items(company):
 def process_nhif_records(company):
 	facility_code = frappe.get_cached_value("HMS TZ Setting", company, "facility_code")
 	enqueue(
-		method=process_nhif_prices,
+		method=run_nhif_prices,
 		queue="long",
 		timeout=3600,
 		is_async=True,
@@ -61,7 +62,7 @@ def process_nhif_records(company):
 	frappe.msgprint("Processing NHIF prices via background job", alert=True)
 
 	enqueue(
-		method=process_nhif_coverages,
+		method=run_nhif_coverages,
 		queue="long",
 		timeout=10000000,
 		is_async=True,
@@ -69,6 +70,18 @@ def process_nhif_records(company):
 		facility_code=facility_code,
 	)
 	frappe.msgprint("Processing NHIF Coverages via background job", alert=True)
+
+
+def run_nhif_prices(company, facility_code):
+	"""Background job: process all NHIF prices of the company, then tick NHIF Prices Processed."""
+	process_nhif_prices(company, facility_code)
+	mark_company_status(company, "nhif_prices_processed")
+
+
+def run_nhif_coverages(company, facility_code):
+	"""Background job: process all NHIF coverages of the company, then tick NHIF Coverages Processed."""
+	process_nhif_coverages(company, facility_code)
+	mark_company_status(company, "nhif_coverages_processed")
 
 
 @frappe.whitelist()
