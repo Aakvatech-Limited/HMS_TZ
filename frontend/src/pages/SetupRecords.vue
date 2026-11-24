@@ -71,7 +71,20 @@
             <h2 class="text-lg font-semibold text-gray-900">
               {{ getCountText(records.data.records.length, screen.data) }}
             </h2>
-            <div class="flex items-center gap-2">
+            <div class="flex flex-wrap items-center gap-2">
+              <Dropdown
+                v-for="group in records.data.action_groups"
+                :key="group.label"
+                :options="getActionOptions(group, runAction)"
+              >
+                <Button
+                  :label="group.label"
+                  icon-left="list"
+                  icon-right="chevron-down"
+                  :loading="isGroupRunning(group, runningAction)"
+                  :disabled="Boolean(runningAction)"
+                />
+              </Dropdown>
               <Dropdown :options="templateOptions">
                 <Button
                   label="Download template"
@@ -174,8 +187,10 @@ import Link from "@/components/controls/Link.vue";
 import { serverErrorText, useToast } from "@/composables/useToast";
 import {
   capitalize,
+  getActionOptions,
   getCountText,
   getDialogFields,
+  isGroupRunning,
 } from "@/data/setupRecords";
 import {
   getSettingTabs,
@@ -209,6 +224,7 @@ const dialogOpen = ref(false);
 const editing = ref(null);
 const saving = ref(false);
 const importing = ref(false);
+const runningAction = ref(null);
 const importResult = ref(null);
 
 const screen = createResource({
@@ -312,6 +328,22 @@ function downloadTemplate(samples) {
     `/api/method/${API}.download_records_template?${query}`,
     "_blank"
   );
+}
+
+async function runAction(action) {
+  runningAction.value = action.key;
+  try {
+    await call(`${API}.run_screen_action`, {
+      screen: props.screen,
+      company: company.value,
+      action: action.key,
+    });
+    showSuccess(`${action.label}: done`);
+  } catch (error) {
+    showError(serverErrorText(error));
+  } finally {
+    runningAction.value = null;
+  }
 }
 
 async function importFile(file) {
