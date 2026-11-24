@@ -4,7 +4,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from hms_tz.api.setup_records import get_company_records, run_screen_action
-from hms_tz.hms_tz.insurance_actions import INSURANCE_ACTIONS
+from hms_tz.hms_tz.setup_screens.insurance_company import INSURANCE_ACTIONS
 
 SCREEN = "insurance_companies"
 COMPANY = "_Test Company"
