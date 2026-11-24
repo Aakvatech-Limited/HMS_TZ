@@ -44,6 +44,7 @@ def get_company_records(screen, company):
 		"setting": setup["setting"],
 		"settings_complete": setup["settings_complete"],
 		"records": records.records,
+		"action_groups": records.action_groups,
 	}
 
 
@@ -65,3 +66,11 @@ def download_records_template(screen, company, samples="0", file_type="Excel"):
 def import_company_records(screen, company, file_url):
 	"""Add or change the company's records from a filled template."""
 	return get_screen(screen, company).import_file(file_url)
+
+
+@frappe.whitelist(methods=["POST"])
+def run_screen_action(screen, company, action):
+	"""Run one action of the screen's action dropdowns for the company."""
+	records = get_screen(screen, company)
+	frappe.has_permission(records.doctype, "write", throw=True)
+	return records.run_action(action)
