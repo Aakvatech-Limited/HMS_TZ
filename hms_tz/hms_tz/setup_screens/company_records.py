@@ -7,6 +7,7 @@ from frappe.core.doctype.data_import.importer import ImportFile
 from frappe.utils import cint, strip_html
 
 from hms_tz.api.setup import FIELD_KEYS, is_missing
+from hms_tz.hms_tz.doctype.setup_action_run.setup_action_run import queue_action_run
 from hms_tz.hms_tz.doctype.setup_status.setup_status import complete_setup_step, get_setup_status
 
 
@@ -104,9 +105,18 @@ class CompanyRecords:
 		"""Dropdowns of actions the screen offers for the company, as [{"label", "actions": [{"key", "label"}]}]."""
 		return []
 
-	def run_action(self, key):
-		"""Run one action of action_groups; a screen with actions overrides it."""
+	@property
+	def action_runs(self):
+		"""The latest background run of each action of the screen, keyed by action."""
+		return {}
+
+	def get_action(self, key):
+		"""One action of action_groups with its method, kwargs and doctype; a screen with actions overrides it."""
 		frappe.throw(_("The {0} screen has no action {1}.").format(self.plural_label, key))
+
+	def run_action(self, key):
+		"""Queue one action as a background job; its run is kept on the company's Setup Status."""
+		queue_action_run(self.company, self.get_action(key))
 
 	def validate(self, doc):
 		"""Screen rules beyond the required fields; a subclass overrides it."""
