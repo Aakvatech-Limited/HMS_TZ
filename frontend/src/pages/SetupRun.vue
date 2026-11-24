@@ -35,6 +35,11 @@
           icon-left="calendar"
           :route="{ name: 'VisitTypes', query: { company } }"
         />
+        <Button
+          label="Coverages"
+          icon-left="check-square"
+          :route="{ name: 'Coverages', query: { company } }"
+        />
         <div class="w-72">
           <Link
             doctype="Company"

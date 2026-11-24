@@ -3,6 +3,7 @@ from frappe import _
 
 from hms_tz.api.setup import get_company_setup
 from hms_tz.hms_tz.setup_screens.appointment_type import AppointmentType
+from hms_tz.hms_tz.setup_screens.coverage import Coverage
 from hms_tz.hms_tz.setup_screens.coverage_plan import CoveragePlan
 from hms_tz.hms_tz.setup_screens.insurance_company import InsuranceCompany
 from hms_tz.hms_tz.setup_screens.practitioner import Practitioner
@@ -13,6 +14,7 @@ SCREENS = {
 	"insurance_companies": InsuranceCompany,
 	"coverage_plans": CoveragePlan,
 	"visit_types": AppointmentType,
+	"coverages": Coverage,
 }
 
 
@@ -24,7 +26,7 @@ def get_screen(screen, company=None):
 
 @frappe.whitelist()
 def get_screen_fields(screen):
-	"""The screen's labels and its fields in form order."""
+	"""The screen's labels, its fields in form order and the fields its list can be filtered by."""
 	records = get_screen(screen)
 	frappe.has_permission(records.doctype, "read", throw=True)
 	return {
@@ -33,19 +35,20 @@ def get_screen_fields(screen):
 		"plural_label": records.plural_label,
 		"title_field": records.title_field,
 		"fields": records.fields,
+		"list_filters": records.list_filter_fields,
 	}
 
 
 @frappe.whitelist()
-def get_company_records(screen, company):
-	"""The company's records of the screen and whether its settings are complete, which unlocks adding."""
+def get_company_records(screen, company, list_filters=None):
+	"""The company's records of the screen matching the list filters, and whether its settings are complete."""
 	records = get_screen(screen, company)
 	frappe.has_permission(records.doctype, "read", throw=True)
 	setup = get_company_setup(company)
 	return {
 		"setting": setup["setting"],
 		"settings_complete": setup["settings_complete"],
-		"records": records.records,
+		**records.get_records(frappe.parse_json(list_filters)),
 		"action_groups": records.action_groups,
 		"action_runs": records.action_runs,
 	}

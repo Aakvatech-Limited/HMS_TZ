@@ -234,4 +234,37 @@ describe("setup settings form", () => {
     assert.equal(section.doctype, "Healthcare Service Unit");
     assert.equal(section.fields[0].name, "unit_name");
   });
+  test("a dynamic link is a link of the DocType its options field holds", () => {
+    const coverage = (field) => ({
+      ...field,
+      doctype: "Healthcare Service Insurance Coverage",
+    });
+    const [tab] = getSettingTabs([
+      coverage({
+        fieldname: "healthcare_service",
+        fieldtype: "Select",
+        options: "\nMedication\nLab Test Template",
+      }),
+      coverage({
+        fieldname: "healthcare_service_template",
+        fieldtype: "Dynamic Link",
+        options: "healthcare_service",
+      }),
+    ]);
+    const template = (service) =>
+      getVisibleSections(
+        tab,
+        {
+          "Healthcare Service Insurance Coverage": {
+            healthcare_service: service,
+          },
+        },
+        "Clinic"
+      )[0].fields[1];
+    assert.deepEqual(
+      [template("Medication").type, template("Medication").options],
+      ["Link", "Medication"]
+    );
+    assert.equal(template("").type, "Data");
+  });
 });

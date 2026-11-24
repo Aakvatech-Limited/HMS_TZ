@@ -22,6 +22,10 @@ describe("setup records screen", () => {
     assert.equal(getCountText(1, doctors), "1 doctor");
     assert.equal(getCountText(0, doctors), "0 doctors");
     assert.equal(getCountText(3, doctors), "3 doctors");
+    assert.equal(
+      getCountText(500, doctors, true),
+      "First 500 doctors, filter to see the others"
+    );
   });
 
   test("the naming field is read only only when changing a record", () => {
