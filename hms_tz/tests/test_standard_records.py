@@ -1,6 +1,7 @@
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
+from hms_tz.hms_tz.doctype.setup_status.foundation import INSURANCE_ACCOUNTS, Foundation
 from hms_tz.hms_tz.standard_records.standard_records import (
 	INSURERS_FILE,
 	PLANS_FILE,
@@ -26,12 +27,20 @@ class FakeProgress:
 
 def create_for(company):
 	"""Run every standard group the way the setup runner does; return each group's result and progress."""
+	add_insurance_accounts(company)
 	results = {}
 	for group in STANDARD_RECORDS:
 		progress = FakeProgress()
 		result = StandardRecords(company, progress).create(group["doctype"])
 		results[group["doctype"]] = (result, progress.done, progress.total, progress.added)
 	return results
+
+
+def add_insurance_accounts(company):
+	"""The insurance accounts that the foundation step creates before the insurers step."""
+	foundation = Foundation(company, FakeProgress())
+	for account in INSURANCE_ACCOUNTS.values():
+		foundation.create_account(account)
 
 
 class TestStandardRecordFiles(FrappeTestCase):
@@ -157,9 +166,19 @@ class TestStandardRecordCreation(FrappeTestCase):
 		plan_name = f"{self.first_nhif_plan['coverage_plan_name']} - _TC1"
 		self.assertTrue(frappe.db.exists("Healthcare Insurance Coverage Plan", plan_name))
 
-	def test_missing_company_accounts_stop_the_insurers_step(self):
-		frappe.db.set_value("Company", "_Test Company 2", "write_off_account", None)
-		frappe.clear_document_cache("Company", "_Test Company 2")
+	def test_new_insurers_use_the_foundation_insurance_accounts(self):
+		add_insurance_accounts("_Test Company")
+		row = load_records(INSURERS_FILE)[0]
+		values = StandardRecords("_Test Company", FakeProgress()).get_insurer_values(row)
+		names = {
+			fieldname: frappe.db.get_value("Account", values[fieldname], "account_name")
+			for fieldname in INSURANCE_ACCOUNTS
+		}
+		self.assertEqual(
+			names, {fieldname: account["account_name"] for fieldname, account in INSURANCE_ACCOUNTS.items()}
+		)
+
+	def test_missing_insurance_accounts_stop_the_insurers_step(self):
+		frappe.db.delete("Account", {"company": "_Test Company 2", "account_name": "Rejected Claims"})
 		with self.assertRaises(frappe.ValidationError):
 			StandardRecords("_Test Company 2", FakeProgress()).create("Healthcare Insurance Company")
-		frappe.clear_document_cache("Company", "_Test Company 2")

@@ -2,7 +2,8 @@ import os
 from datetime import datetime, timedelta
 
 import frappe
-from frappe import _
+
+from hms_tz.hms_tz.doctype.setup_status.foundation import get_insurance_accounts
 
 DATA_DIR = os.path.dirname(__file__)
 
@@ -132,21 +133,10 @@ class StandardRecords:
 		return f"{name} - {self.abbr}"
 
 	def get_insurer_values(self, row):
-		receivable, write_off = frappe.get_cached_value(
-			"Company", self.company, ["default_receivable_account", "write_off_account"]
-		)
-		if not (receivable and write_off):
-			frappe.throw(
-				_("Set the Default Receivable Account and Write Off Account of {0} first.").format(
-					self.company
-				)
-			)
 		return {
 			"insurance_company_name": self.get_company_name(row["insurance_company_name"]),
 			"company": self.company,
-			"billed_but_not_claimed_account": receivable,
-			"approved_claim_receivable_account": receivable,
-			"rejected_claims_account": write_off,
+			**get_insurance_accounts(self.company),
 		}
 
 	def get_plan_values(self, row):
