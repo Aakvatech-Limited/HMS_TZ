@@ -3,6 +3,7 @@ import { describe, test } from "node:test";
 import {
   applyStepProgress,
   getLockReason,
+  getRunReport,
   getStepPercent,
   getStepState,
 } from "../src/data/setupRun.js";
@@ -35,12 +36,45 @@ describe("setup run page", () => {
     );
   });
 
-  test("a done step shows what it created", () => {
+  test("a done step shows what it holds and what it added", () => {
     assert.equal(
-      getStepState({ status: "Done", result: "9 types" }),
-      "9 types"
+      getStepState({ status: "Done", result: "9 types", added: 2 }),
+      "9 types, 2 added"
     );
-    assert.equal(getStepState({ status: "Done" }), "done");
+    assert.equal(
+      getStepState({ status: "Done", result: "9 types", added: 0 }),
+      "9 types, nothing missing"
+    );
+    assert.equal(getStepState({ status: "Done" }), "done, nothing missing");
+  });
+
+  test("the run report waits until every step is done", () => {
+    assert.equal(getRunReport([]), "");
+    assert.equal(
+      getRunReport([
+        { status: "Done", added: 1 },
+        { status: "Failed", added: 0 },
+      ]),
+      ""
+    );
+  });
+
+  test("the run report says nothing was missing or what was added", () => {
+    const steps = [
+      { label: "Visit types", status: "Done", added: 0 },
+      { label: "Card verifiers", status: "Done", added: 0 },
+    ];
+    assert.match(getRunReport(steps), /^Nothing missing/);
+    steps[1].added = 1;
+    assert.equal(
+      getRunReport(steps),
+      "The last run added 1 missing record: Card verifiers."
+    );
+    steps[0].added = 2;
+    assert.equal(
+      getRunReport(steps),
+      "The last run added 3 missing records: Visit types, Card verifiers."
+    );
   });
 
   test("other steps show their status", () => {

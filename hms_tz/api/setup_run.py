@@ -9,7 +9,7 @@ from hms_tz.hms_tz.doctype.setup_status.setup_runner import (
 )
 from hms_tz.hms_tz.doctype.setup_status.setup_status import get_setup_status
 
-STEP_FIELDS = ("step", "label", "status", "done", "total", "result", "error")
+STEP_FIELDS = ("step", "label", "status", "done", "total", "added", "result", "error")
 
 
 @frappe.whitelist()

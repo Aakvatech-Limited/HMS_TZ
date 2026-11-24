@@ -123,12 +123,16 @@
             </li>
           </ul>
 
-          <p
-            v-if="isFinished"
-            class="border-t px-6 py-4 text-base text-gray-900"
+          <div
+            v-if="runReport"
+            class="space-y-1 border-t px-6 py-4 text-base text-gray-900"
           >
-            Next: download insurer prices and coverage from the Insurance page.
-          </p>
+            <p>{{ runReport }}</p>
+            <p>
+              Next: download insurer prices and coverage from the Insurance
+              page.
+            </p>
+          </div>
         </section>
       </template>
     </main>
@@ -141,6 +145,7 @@ import { serverErrorText, useToast } from "@/composables/useToast";
 import {
   applyStepProgress,
   getLockReason,
+  getRunReport,
   getStepPercent,
   getStepState,
 } from "@/data/setupRun";
@@ -188,9 +193,7 @@ const progress = computed(() =>
     ? Math.round((doneCount.value / steps.value.length) * 100)
     : 0
 );
-const isFinished = computed(
-  () => steps.value.length > 0 && doneCount.value === steps.value.length
-);
+const runReport = computed(() => getRunReport(steps.value));
 
 const lockReason = computed(() => getLockReason(run.data));
 

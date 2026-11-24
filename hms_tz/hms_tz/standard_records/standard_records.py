@@ -116,8 +116,7 @@ class StandardRecords:
 		rows = load_records(group["file"])
 		self.progress.set_total(len(rows))
 		for row in rows:
-			self.insert(doctype, self.get_values(doctype, row))
-			self.progress.advance()
+			self.progress.advance(added=int(self.insert(doctype, self.get_values(doctype, row))))
 		return f"{len(rows)} {group['label']}"
 
 	def get_values(self, doctype, row):
@@ -160,9 +159,12 @@ class StandardRecords:
 		}
 
 	def insert(self, doctype, values):
+		"""Create the record when it is missing and return whether it was created; never change an existing one."""
 		name = values[get_group(doctype)["name_field"]]
-		if not frappe.db.exists(doctype, name):
-			frappe.get_doc({"doctype": doctype, **values}).insert(ignore_permissions=True, set_name=name)
+		if frappe.db.exists(doctype, name):
+			return False
+		frappe.get_doc({"doctype": doctype, **values}).insert(ignore_permissions=True, set_name=name)
+		return True
 
 
 def get_schedule_values(row):

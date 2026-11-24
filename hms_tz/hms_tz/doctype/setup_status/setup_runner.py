@@ -6,8 +6,9 @@ from hms_tz.hms_tz.doctype.setup_status.setup_status import get_setup_status
 from hms_tz.hms_tz.standard_records.standard_records import get_standard_record_steps
 
 # Steps that Start setup runs in order. Each method takes (hms_tz_setting, progress, **kwargs) and
-# returns a short text of what it holds or created. A step must only add what is missing, so it is
-# safe to run again. A step runs only once a room exists unless it sets "needs_rooms": False.
+# returns a short text of what it holds. A step must only add what is missing and never change
+# existing records, so it is safe to run again; it counts what it adds with progress.advance(added=).
+# A step runs only once a room exists unless it sets "needs_rooms": False.
 SETUP_RUNNER_STEPS = [*get_standard_record_steps()]
 
 ROOMS_STEP = "Healthcare Service Unit"
@@ -20,13 +21,16 @@ class StepProgress:
 	def __init__(self, row):
 		self.row = row
 		self.done = 0
+		self.added = 0
 
 	def set_total(self, total):
 		set_run_step(self.row, total=total)
 
-	def advance(self, count=1):
+	def advance(self, count=1, added=0):
+		"""Move on by count records, of which added were missing and created now."""
 		self.done += count
-		set_run_step(self.row, done=self.done)
+		self.added += added
+		set_run_step(self.row, done=self.done, added=self.added)
 
 
 def get_runner_step(key):
@@ -70,7 +74,7 @@ def start_setup(setting, from_step=None):
 	keys = [row.step for row in status.run_steps]
 	start = keys.index(from_step) if from_step else 0
 	for row in status.run_steps[start:]:
-		row.update({"status": "Waiting", "done": 0, "total": 0, "result": None, "error": None})
+		row.update({"status": "Waiting", "done": 0, "total": 0, "added": 0, "result": None, "error": None})
 	status.save(ignore_permissions=True)
 	frappe.enqueue(
 		"hms_tz.hms_tz.doctype.setup_status.setup_runner.run_setup",
@@ -94,7 +98,7 @@ def run_setup(setting, from_step=None):
 
 
 def run_step(setting, row):
-	set_run_step(row, status="Running", done=0, total=0, result=None, error=None)
+	set_run_step(row, status="Running", done=0, total=0, added=0, result=None, error=None)
 	step = get_runner_step(row.step)
 	try:
 		if step.get("needs_rooms", True) and not get_setup_status(setting).get_step(ROOMS_STEP).completed:

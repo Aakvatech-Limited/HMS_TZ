@@ -11,12 +11,13 @@ from hms_tz.hms_tz.doctype.setup_status.setup_status import complete_setup_step,
 
 COMPANY = "_Test Company"
 BROKEN = {"is_broken": True}
+ADDED = {"count": 2}
 
 
 def count_three(setting, progress):
 	progress.set_total(3)
-	for _record in range(3):
-		progress.advance()
+	for record in range(3):
+		progress.advance(added=int(record < ADDED["count"]))
 	return "3 records"
 
 
@@ -44,6 +45,7 @@ STEPS = [
 class TestSetupRunner(FrappeTestCase):
 	def setUp(self):
 		BROKEN["is_broken"] = True
+		ADDED["count"] = 2
 		frappe.delete_doc_if_exists("Setup Status", COMPANY)
 		frappe.delete_doc_if_exists("HMS TZ Setting", COMPANY)
 		frappe.db.set_single_value(
@@ -122,3 +124,18 @@ class TestSetupRunner(FrappeTestCase):
 		self.assertTrue(run["settings_complete"] and run["has_rooms"])
 		self.assertEqual([step["step"] for step in run["steps"]], ["count", "flaky", "last"])
 		self.assertIn("insurers", run["standard_records"])
+
+	def test_each_step_reports_what_it_added_and_a_rerun_resets_the_count(self):
+		BROKEN["is_broken"] = False
+		setup_runner.start_setup(COMPANY)
+		setup_runner.run_setup(COMPANY)
+		self.assertEqual(self.get_steps()["count"].added, 2)
+		ADDED["count"] = 0
+		setup_runner.start_setup(COMPANY)
+		self.assertEqual(self.get_steps()["count"].added, 0)
+		setup_runner.run_setup(COMPANY)
+		self.assertEqual(
+			{row.step: row.added for row in self.get_steps().values()},
+			dict.fromkeys(["count", "flaky", "last"], 0),
+		)
+		self.assertEqual(get_setup_run(COMPANY)["steps"][0]["added"], 0)
