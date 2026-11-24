@@ -31,6 +31,12 @@
         />
         <Button
           v-if="company"
+          label="Coverages"
+          icon-left="check-square"
+          :route="{ name: 'Coverages', query: { company } }"
+        />
+        <Button
+          v-if="company"
           label="Run setup"
           icon-left="play"
           :route="{ name: 'SetupRun', query: { company } }"
