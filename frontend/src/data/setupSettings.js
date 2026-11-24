@@ -64,14 +64,23 @@ export const getLinkFilters = (field, doc) =>
     )
   );
 
+const getOptions = (field, doc) => {
+  if (field.fieldtype === "Select") return (field.options || "").split("\n");
+  if (field.fieldtype === "Dynamic Link") return doc[field.options];
+  return field.options;
+};
+
+/** A Dynamic Link is a Link of the DocType its options field holds, or plain text until that is set. */
+const getControlType = (field, doc) => {
+  if (field.fieldtype !== "Dynamic Link") return field.fieldtype;
+  return doc[field.options] ? "Link" : "Data";
+};
+
 const toControl = (field, doc) => ({
   name: field.fieldname,
   label: field.label,
-  type: field.fieldtype,
-  options:
-    field.fieldtype === "Select"
-      ? (field.options || "").split("\n")
-      : field.options,
+  type: getControlType(field, doc),
+  options: getOptions(field, doc),
   reqd:
     field.reqd ||
     (field.mandatory_depends_on &&
