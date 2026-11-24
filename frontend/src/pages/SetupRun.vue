@@ -25,6 +25,11 @@
           icon-left="shield"
           :route="{ name: 'InsuranceCompanies', query: { company } }"
         />
+        <Button
+          label="Plans"
+          icon-left="file-text"
+          :route="{ name: 'CoveragePlans', query: { company } }"
+        />
         <div class="w-72">
           <Link
             doctype="Company"

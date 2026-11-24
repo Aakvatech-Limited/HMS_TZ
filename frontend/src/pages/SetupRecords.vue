@@ -172,7 +172,11 @@
 import FieldMap from "@/components/controls/FieldMap.vue";
 import Link from "@/components/controls/Link.vue";
 import { serverErrorText, useToast } from "@/composables/useToast";
-import { capitalize, getCountText } from "@/data/setupRecords";
+import {
+  capitalize,
+  getCountText,
+  getDialogFields,
+} from "@/data/setupRecords";
 import {
   getSettingTabs,
   getVisibleSections,
@@ -224,7 +228,11 @@ usePageMeta(() => ({ title: `${title.value} - HMS TZ` }));
 
 const dialogSections = computed(() => {
   const doctype = screen.data?.doctype;
-  const [tab] = getSettingTabs(screen.data?.fields || []);
+  const fields = getDialogFields(
+    screen.data?.fields || [],
+    Boolean(editing.value)
+  );
+  const [tab] = getSettingTabs(fields);
   if (!tab || !data[doctype]) return [];
   return getVisibleSections(tab, data, company.value).map((section) => ({
     ...section,

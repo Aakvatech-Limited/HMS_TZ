@@ -46,7 +46,8 @@
    "fieldname": "insurance_company",
    "fieldtype": "Link",
    "label": "Insurance Company",
-   "options": "Healthcare Insurance Company"
+   "options": "Healthcare Insurance Company",
+   "link_filters": "[[\"Healthcare Insurance Company\", \"company\", \"=\", \"eval: doc.company\"], [\"Healthcare Insurance Company\", \"disabled\", \"=\", 0]]"
   },
   {
    "fetch_from": "insurance_company.insurance_company_name",
@@ -70,7 +71,8 @@
    "fieldname": "price_list",
    "fieldtype": "Link",
    "label": "Price List",
-   "options": "Price List"
+   "options": "Price List",
+   "link_filters": "[[\"Price List\", \"selling\", \"=\", 1], [\"Price List\", \"enabled\", \"=\", 1]]"
   },
   {
    "fieldname": "nhif_employername",
@@ -110,7 +112,8 @@
    "fieldname": "secondary_price_list",
    "fieldtype": "Link",
    "label": "Secondary Price List",
-   "options": "Price List"
+   "options": "Price List",
+   "link_filters": "[[\"Price List\", \"selling\", \"=\", 1], [\"Price List\", \"enabled\", \"=\", 1]]"
   },
   {
    "fieldname": "nhif_scheme_id",
@@ -136,7 +139,7 @@
   }
  ],
  "links": [],
- "modified": "2025-05-30 10:32:53.970367",
+ "modified": "2026-11-24 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "Hms Tz",
  "name": "Healthcare Insurance Coverage Plan",

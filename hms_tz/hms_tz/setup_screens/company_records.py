@@ -20,7 +20,8 @@ class CompanyRecords:
 	company_field = "company"
 	label = None
 	plural_label = None
-	# Fields asked besides the DocType's required ones, each with its screen rules, such as reqd or link_filters.
+	# Fields asked besides the DocType's required ones, each with its screen rules, such as reqd, link_filters
+	# or set_only_once for a field that names the record and stays fixed once it exists.
 	extra_fields = {}
 	# Values every record of the screen holds; they filter the list and are set on new records.
 	fixed_values = {}
@@ -86,7 +87,10 @@ class CompanyRecords:
 		if name and any(doc.get(field) != value for field, value in self.filters.items()):
 			frappe.throw(_("{0} is not one of the {1} of {2}.").format(name, self.plural_label, self.company))
 		# A template may leave out optional columns; those keep their current or default values.
-		doc.update({fieldname: values[fieldname] for fieldname in self.fieldnames if fieldname in values})
+		fixed = {field["fieldname"] for field in self.fields if name and field.get("set_only_once")}
+		doc.update(
+			{field: values[field] for field in self.fieldnames if field in values and field not in fixed}
+		)
 		doc.update(self.filters)
 		missing = [field["label"] for field in self.fields if is_missing(field, doc.as_dict())]
 		if missing:
