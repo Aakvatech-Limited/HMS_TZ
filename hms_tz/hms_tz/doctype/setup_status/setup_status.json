@@ -12,7 +12,8 @@
   "jubilee_prices_processed",
   "jubilee_coverages_processed",
   "steps",
-  "run_steps"
+  "run_steps",
+  "action_runs"
  ],
  "fields": [
   {
@@ -74,12 +75,19 @@
    "fieldtype": "Table",
    "label": "Run Steps",
    "options": "Setup Run Step"
+  },
+  {
+   "fieldname": "action_runs",
+   "fieldtype": "Table",
+   "label": "Action Runs",
+   "options": "Setup Action Run",
+   "read_only": 1
   }
  ],
  "in_create": 1,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-11-24 16:00:00.000000",
+ "modified": "2026-11-24 17:00:00.000000",
  "modified_by": "Administrator",
  "module": "Hms Tz",
  "name": "Setup Status",

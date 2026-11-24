@@ -45,6 +45,7 @@ def get_company_records(screen, company):
 		"settings_complete": setup["settings_complete"],
 		"records": records.records,
 		"action_groups": records.action_groups,
+		"action_runs": records.action_runs,
 	}
 
 
@@ -70,7 +71,7 @@ def import_company_records(screen, company, file_url):
 
 @frappe.whitelist(methods=["POST"])
 def run_screen_action(screen, company, action):
-	"""Run one action of the screen's action dropdowns for the company."""
+	"""Queue one action of the screen's action dropdowns for the company as a background job."""
 	records = get_screen(screen, company)
 	frappe.has_permission(records.doctype, "write", throw=True)
 	return records.run_action(action)

@@ -1,0 +1,86 @@
+{
+ "actions": [],
+ "creation": "2026-11-24 17:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "action",
+  "label",
+  "status",
+  "started_on",
+  "finished_on",
+  "result",
+  "error",
+  "error_log"
+ ],
+ "fields": [
+  {
+   "fieldname": "action",
+   "fieldtype": "Data",
+   "label": "Action",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "label",
+   "fieldtype": "Data",
+   "label": "Label",
+   "read_only": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Queued\nRunning\nDone\nFailed",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "started_on",
+   "fieldtype": "Datetime",
+   "label": "Started On",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "finished_on",
+   "fieldtype": "Datetime",
+   "label": "Finished On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "result",
+   "fieldtype": "Small Text",
+   "label": "Result",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "error",
+   "fieldtype": "Small Text",
+   "label": "Error",
+   "read_only": 1
+  },
+  {
+   "fieldname": "error_log",
+   "fieldtype": "Link",
+   "label": "Error Log",
+   "options": "Error Log",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-11-24 17:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Hms Tz",
+ "name": "Setup Action Run",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -75,14 +75,13 @@
               <Dropdown
                 v-for="group in records.data.action_groups"
                 :key="group.label"
-                :options="getActionOptions(group, runAction)"
+                :options="getActionOptions(group, actionRuns, runAction)"
               >
                 <Button
                   :label="group.label"
                   icon-left="list"
                   icon-right="chevron-down"
-                  :loading="isGroupRunning(group, runningAction)"
-                  :disabled="Boolean(runningAction)"
+                  :loading="isGroupRunning(group, actionRuns)"
                 />
               </Dropdown>
               <Dropdown :options="templateOptions">
@@ -161,6 +160,60 @@
             </table>
           </div>
         </section>
+
+        <section v-if="runRows.length" class="rounded-lg border bg-white">
+          <h2 class="border-b px-6 py-4 text-lg font-semibold text-gray-900">
+            Last runs
+          </h2>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-base">
+              <thead class="border-b text-sm text-gray-600">
+                <tr>
+                  <th class="px-6 py-3 font-medium">Action</th>
+                  <th class="px-6 py-3 font-medium">Status</th>
+                  <th class="px-6 py-3 font-medium">Started</th>
+                  <th class="px-6 py-3 font-medium">Finished</th>
+                  <th class="px-6 py-3 font-medium">Result</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="row in runRows"
+                  :key="row.key"
+                  class="border-b last:border-b-0"
+                >
+                  <td class="px-6 py-3 text-gray-900">{{ row.label }}</td>
+                  <td class="px-6 py-3">
+                    <Badge
+                      :label="row.run?.status || 'Not run yet'"
+                      :theme="RUN_THEMES[row.run?.status] || 'gray'"
+                      variant="subtle"
+                    />
+                  </td>
+                  <td class="whitespace-nowrap px-6 py-3 text-gray-700">
+                    {{ row.run?.started_on || "" }}
+                  </td>
+                  <td class="whitespace-nowrap px-6 py-3 text-gray-700">
+                    {{ row.run?.finished_on || "" }}
+                  </td>
+                  <td class="px-6 py-3 text-gray-700">
+                    <template v-if="row.run?.status === 'Failed'">
+                      {{ row.run.error }}
+                      <a
+                        v-if="row.run.error_log"
+                        class="underline"
+                        :href="`/desk/error-log/${row.run.error_log}`"
+                        target="_blank"
+                        >Error Log</a
+                      >
+                    </template>
+                    <template v-else>{{ row.run?.result || "" }}</template>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
       </template>
     </main>
 
@@ -188,9 +241,11 @@ import { serverErrorText, useToast } from "@/composables/useToast";
 import {
   capitalize,
   getActionOptions,
+  getRunRows,
   getCountText,
   getDialogFields,
   isGroupRunning,
+  isRunActive,
 } from "@/data/setupRecords";
 import {
   getSettingTabs,
@@ -206,7 +261,7 @@ import {
   createResource,
   usePageMeta,
 } from "frappe-ui";
-import { computed, reactive, ref } from "vue";
+import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 /** One setup screen of company records, such as "doctors"; the server holds its DocType and fields. */
@@ -224,7 +279,14 @@ const dialogOpen = ref(false);
 const editing = ref(null);
 const saving = ref(false);
 const importing = ref(false);
-const runningAction = ref(null);
+const RUN_POLL_MS = 3000;
+const RUN_THEMES = {
+  Queued: "blue",
+  Running: "blue",
+  Done: "green",
+  Failed: "red",
+};
+let runPoll = null;
 const importResult = ref(null);
 
 const screen = createResource({
@@ -238,6 +300,21 @@ const records = createResource({
   makeParams: () => ({ screen: props.screen, company: company.value }),
   auto: Boolean(company.value),
 });
+
+const actionRuns = computed(() => records.data?.action_runs || {});
+const runRows = computed(() =>
+  getRunRows(records.data?.action_groups || [], actionRuns.value)
+);
+
+// Keep the runs current while one is queued or running; the job writes its status as it goes.
+watch(
+  () => runRows.value.some((row) => isRunActive(row.run)),
+  (isActive) => {
+    clearInterval(runPoll);
+    if (isActive) runPoll = setInterval(() => records.reload(), RUN_POLL_MS);
+  }
+);
+onBeforeUnmount(() => clearInterval(runPoll));
 
 const title = computed(() => capitalize(screen.data?.plural_label) || "Setup");
 usePageMeta(() => ({ title: `${title.value} - HMS TZ` }));
@@ -331,18 +408,16 @@ function downloadTemplate(samples) {
 }
 
 async function runAction(action) {
-  runningAction.value = action.key;
   try {
     await call(`${API}.run_screen_action`, {
       screen: props.screen,
       company: company.value,
       action: action.key,
     });
-    showSuccess(`${action.label}: done`);
+    showSuccess(`${action.label}: queued`);
+    await records.reload();
   } catch (error) {
     showError(serverErrorText(error));
-  } finally {
-    runningAction.value = null;
   }
 }
 
