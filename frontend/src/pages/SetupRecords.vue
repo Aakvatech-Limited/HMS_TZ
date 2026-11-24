@@ -69,7 +69,13 @@
         <section class="rounded-lg border bg-white">
           <div class="flex items-center justify-between border-b px-6 py-4">
             <h2 class="text-lg font-semibold text-gray-900">
-              {{ getCountText(records.data.records.length, screen.data) }}
+              {{
+                getCountText(
+                  records.data.records.length,
+                  screen.data,
+                  records.data.has_more
+                )
+              }}
             </h2>
             <div class="flex flex-wrap items-center gap-2">
               <Dropdown
@@ -115,6 +121,9 @@
                 @click="openRecord()"
               />
             </div>
+          </div>
+          <div v-if="filterSections.length" class="border-b px-6 py-4">
+            <FieldMap :sections="filterSections" :data="filterData" />
           </div>
           <p
             v-if="!records.data.records.length"
@@ -289,17 +298,45 @@ const RUN_THEMES = {
 let runPoll = null;
 const importResult = ref(null);
 
+const filterData = reactive({});
+
 const screen = createResource({
   url: `${API}.get_screen_fields`,
   params: { screen: props.screen },
   auto: true,
+  onSuccess: resetFilters,
 });
 
 const records = createResource({
   url: `${API}.get_company_records`,
-  makeParams: () => ({ screen: props.screen, company: company.value }),
+  makeParams: () => ({
+    screen: props.screen,
+    company: company.value,
+    list_filters: filterData[screen.data?.doctype] || {},
+  }),
   auto: Boolean(company.value),
 });
+
+const filterSections = computed(() => {
+  const doctype = screen.data?.doctype;
+  const [tab] = getSettingTabs(screen.data?.list_filters || []);
+  if (!tab || !filterData[doctype]) return [];
+  return getVisibleSections(tab, filterData, company.value).map((section) => ({
+    ...section,
+    hideLabel: true,
+    hideBorder: true,
+  }));
+});
+
+// A changed filter, such as a picked coverage plan, lists the matching records.
+watch(
+  () => JSON.stringify(filterData),
+  () => company.value && records.reload()
+);
+
+function resetFilters() {
+  Object.assign(filterData, toSettingForm(screen.data?.list_filters || []));
+}
 
 const actionRuns = computed(() => records.data?.action_runs || {});
 const runRows = computed(() =>
@@ -352,6 +389,7 @@ function selectCompany(value) {
   company.value = value;
   router.replace({ query: { company: value } });
   importResult.value = null;
+  resetFilters();
   records.reset();
   records.fetch();
 }
