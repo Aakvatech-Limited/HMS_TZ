@@ -35,6 +35,16 @@ class CompanyRecords:
 	page_length = None
 	# Whether saving ticks the Setup Status step named after the DocType; False for a DocType with no step.
 	has_setup_step = True
+	# Whether users add records here, by hand or by template; False when records only come from an API.
+	has_add_actions = True
+	# Whether records are only viewed here, never added or changed; such a screen also sets has_add_actions False.
+	is_read_only = False
+	# List order; None sorts by the title field.
+	order_by = None
+	# Child table shown, read only, when a record is viewed, with the child fields it shows.
+	child_table = None
+	child_fields = ()
+	child_page_length = 500
 
 	def __init__(self, company):
 		self.company = company
@@ -83,7 +93,7 @@ class CompanyRecords:
 			self.doctype,
 			filters={**values, **self.filters},
 			fields=list(dict.fromkeys(["name", self.title_field, *self.fieldnames])),
-			order_by=f"{self.title_field} asc",
+			order_by=self.order_by or f"{self.title_field} asc",
 			limit_page_length=(self.page_length + 1) if self.page_length else 0,
 		)
 		has_more = bool(self.page_length) and len(records) > self.page_length
@@ -100,7 +110,11 @@ class CompanyRecords:
 
 	def save(self, values, name=None):
 		"""Add a record, or change one of the company's records, and tick the DocType's setup step."""
+		if self.is_read_only:
+			frappe.throw(_("{0} are not changed on this screen.").format(self.plural_label))
 		setting = self.unlocked_setting
+		if not name:
+			self.validate_add_actions()
 		name = self.save_record(values, name)
 		if self.has_setup_step:
 			complete_setup_step(setting, self.doctype)
@@ -144,8 +158,42 @@ class CompanyRecords:
 	def validate(self, doc):
 		"""Screen rules beyond the required fields; a subclass overrides it."""
 
+	def get_child_rows(self, name, start=0):
+		"""One page of a record's child table rows, read only, with their fields and the total row count."""
+		if not self.child_table:
+			frappe.throw(_("{0} have no rows to view.").format(self.plural_label))
+		if not frappe.db.exists(self.doctype, {**self.filters, "name": name}):
+			frappe.throw(_("{0} is not one of the {1} of {2}.").format(name, self.plural_label, self.company))
+		child_doctype = frappe.get_meta(self.doctype).get_field(self.child_table).options
+		child_meta = frappe.get_meta(child_doctype)
+		filters = {"parenttype": self.doctype, "parentfield": self.child_table, "parent": name}
+		return {
+			"fields": [
+				{
+					"fieldname": field,
+					"label": child_meta.get_label(field),
+					"fieldtype": child_meta.get_field(field).fieldtype,
+				}
+				for field in self.child_fields
+			],
+			"rows": frappe.get_all(
+				child_doctype,
+				filters=filters,
+				fields=list(self.child_fields),
+				order_by="idx asc",
+				limit_start=cint(start),
+				limit_page_length=self.child_page_length,
+			),
+			"total": frappe.db.count(child_doctype, filters),
+		}
+
+	def validate_add_actions(self):
+		if not self.has_add_actions:
+			frappe.throw(_("{0} are not added on this screen.").format(self.plural_label))
+
 	def download_template(self, samples="0", file_type="Excel"):
 		"""Frappe's import template with the screen fields and, as samples, "all" or that many records."""
+		self.validate_add_actions()
 		exporter = Exporter(
 			self.doctype,
 			export_fields={self.doctype: self.fieldnames},
@@ -158,6 +206,7 @@ class CompanyRecords:
 
 	def import_file(self, file_url):
 		"""Add or change records from a filled template; a failed row is reported and skipped."""
+		self.validate_add_actions()
 		setting = self.unlocked_setting
 		import_file = ImportFile(self.doctype, file_url, import_type="Insert or Update Records")
 		result = {"added": 0, "changed": 0, "errors": []}
