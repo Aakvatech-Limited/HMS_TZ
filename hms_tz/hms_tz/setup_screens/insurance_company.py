@@ -1,10 +1,12 @@
+from hms_tz.hms_tz.insurance_actions import InsuranceActions
 from hms_tz.hms_tz.setup_screens.company_records import CompanyRecords
 
 
 class InsuranceCompany(CompanyRecords):
 	"""Setup screen of the company's insurers, where the manager confirms and changes them.
 
-	The account fields take their company filters from the DocType JSON link_filters.
+	The account fields take their company filters from the DocType JSON link_filters. The NHIF and Jubilee
+	actions of the insurer form are offered as dropdowns for the connections switched on.
 	"""
 
 	doctype = "Healthcare Insurance Company"
@@ -20,3 +22,10 @@ class InsuranceCompany(CompanyRecords):
 		"disabled": {},
 	}
 	match_field = "insurance_company_name"
+
+	@property
+	def action_groups(self):
+		return InsuranceActions(self.company).groups
+
+	def run_action(self, key):
+		return InsuranceActions(self.company).run(key)
