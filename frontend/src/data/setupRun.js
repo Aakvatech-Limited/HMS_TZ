@@ -31,6 +31,12 @@ export const getRunReport = (steps) => {
   }: ${names.join(", ")}.`;
 };
 
+/** Badge text of a step another app registered, for example "Polyclinic step"; "" for HMS TZ steps. */
+export const getStepOwner = (step) =>
+  step.app && step.app !== "hms_tz"
+    ? `${step.app_title || step.app} step`
+    : "";
+
 /** How far one step is, as a percentage; a finished step is full. */
 export const getStepPercent = (step) => {
   if (step.status === "Done") return 100;

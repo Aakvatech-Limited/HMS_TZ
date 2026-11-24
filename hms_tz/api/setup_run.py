@@ -9,7 +9,7 @@ from hms_tz.hms_tz.doctype.setup_status.setup_runner import (
 )
 from hms_tz.hms_tz.doctype.setup_status.setup_status import get_setup_status
 
-STEP_FIELDS = ("step", "label", "status", "done", "total", "added", "result", "error")
+STEP_FIELDS = ("step", "label", "app", "status", "done", "total", "added", "result", "error")
 
 
 @frappe.whitelist()
@@ -26,8 +26,14 @@ def get_setup_run(company):
 	sync_run_steps(status)
 	run["has_rooms"] = bool(status.get_step(ROOMS_STEP).completed)
 	run["is_running"] = is_setup_running(setup["setting"])
-	run["steps"] = [{field: row.get(field) for field in STEP_FIELDS} for row in status.run_steps]
+	run["steps"] = [get_step_values(row) for row in status.run_steps]
 	return run
+
+
+def get_step_values(row):
+	"""A run step for the page, with the title of the app that registered it."""
+	app_title = frappe.get_hooks("app_title", app_name=row.app)[0] if row.app else None
+	return {**{field: row.get(field) for field in STEP_FIELDS}, "app_title": app_title}
 
 
 @frappe.whitelist(methods=["POST"])

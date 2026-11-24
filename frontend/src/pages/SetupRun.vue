@@ -97,6 +97,12 @@
                     ]"
                   />
                   {{ step.label }}
+                  <Badge
+                    v-if="getStepOwner(step)"
+                    :label="getStepOwner(step)"
+                    theme="blue"
+                    variant="subtle"
+                  />
                 </div>
                 <span class="text-sm text-gray-600">{{
                   getStepState(step)
@@ -146,6 +152,7 @@ import {
   applyStepProgress,
   getLockReason,
   getRunReport,
+  getStepOwner,
   getStepPercent,
   getStepState,
 } from "@/data/setupRun";
