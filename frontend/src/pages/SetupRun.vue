@@ -45,6 +45,11 @@
           icon-left="layers"
           :route="{ name: 'NHIFSchemes', query: { company } }"
         />
+        <Button
+          label="NHIF updates"
+          icon-left="refresh-cw"
+          :route="{ name: 'NHIFUpdates', query: { company } }"
+        />
         <div class="w-72">
           <Link
             doctype="Company"
