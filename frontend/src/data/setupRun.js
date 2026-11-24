@@ -7,13 +7,28 @@ export const getLockReason = (run) => {
   return "";
 };
 
-/** Right-hand text of a step: its result, its progress while running, or its status. */
+const getAddedText = (added) => (added ? `${added} added` : "nothing missing");
+
+/** Right-hand text of a step: its result and what it added, its progress while running, or its status. */
 export const getStepState = (step) => {
-  if (step.status === "Done") return step.result || "done";
+  if (step.status === "Done") {
+    return `${step.result || "done"}, ${getAddedText(step.added)}`;
+  }
   if (step.status === "Running") {
     return step.total ? `${step.done} of ${step.total}` : "running";
   }
   return step.status.toLowerCase();
+};
+
+/** Health check of the last run once every step is done: what it added, or that nothing was missing. */
+export const getRunReport = (steps) => {
+  if (!steps.length || steps.some((step) => step.status !== "Done")) return "";
+  const added = steps.reduce((sum, step) => sum + (step.added || 0), 0);
+  if (!added) return "Nothing missing. The last run changed nothing.";
+  const names = steps.filter((step) => step.added).map((step) => step.label);
+  return `The last run added ${added} missing ${
+    added === 1 ? "record" : "records"
+  }: ${names.join(", ")}.`;
 };
 
 /** How far one step is, as a percentage; a finished step is full. */
