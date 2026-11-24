@@ -28,6 +28,10 @@ class CompanyRecords:
 	fixed_values = {}
 	# Field that finds an existing record when a template row is imported again.
 	match_field = None
+	# Fields the list can be filtered by, shown above it; a screen with many records sets them and page_length.
+	list_filters = ()
+	# Most records the list shows at once; None shows all.
+	page_length = None
 
 	def __init__(self, company):
 		self.company = company
@@ -59,13 +63,26 @@ class CompanyRecords:
 		return frappe.get_meta(self.doctype).title_field or "name"
 
 	@property
-	def records(self):
-		return frappe.get_all(
+	def list_filter_fields(self):
+		return [{**field, "reqd": 0} for field in self.fields if field["fieldname"] in self.list_filters]
+
+	def get_records(self, list_filters=None):
+		"""The company's records matching the list filters, at most page_length, and whether more match."""
+		values = {field: value for field, value in (list_filters or {}).items() if value}
+		unknown = set(values) - set(self.list_filters)
+		if unknown:
+			frappe.throw(
+				_("{0} cannot filter the {1}.").format(", ".join(sorted(unknown)), self.plural_label)
+			)
+		records = frappe.get_all(
 			self.doctype,
-			filters=self.filters,
+			filters={**values, **self.filters},
 			fields=list(dict.fromkeys(["name", self.title_field, *self.fieldnames])),
 			order_by=f"{self.title_field} asc",
+			limit_page_length=(self.page_length + 1) if self.page_length else 0,
 		)
+		has_more = bool(self.page_length) and len(records) > self.page_length
+		return {"records": records[: self.page_length] if has_more else records, "has_more": has_more}
 
 	@property
 	def unlocked_setting(self):
