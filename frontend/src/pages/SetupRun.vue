@@ -40,6 +40,11 @@
           icon-left="check-square"
           :route="{ name: 'Coverages', query: { company } }"
         />
+        <Button
+          label="NHIF schemes"
+          icon-left="layers"
+          :route="{ name: 'NHIFSchemes', query: { company } }"
+        />
         <div class="w-72">
           <Link
             doctype="Company"
