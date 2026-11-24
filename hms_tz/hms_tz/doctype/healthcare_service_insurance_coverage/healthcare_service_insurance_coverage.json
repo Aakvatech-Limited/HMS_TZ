@@ -70,6 +70,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Coverage Plan",
+   "link_filters": "[[\"Healthcare Insurance Coverage Plan\", \"company\", \"=\", \"eval: doc.company\"]]",
    "options": "Healthcare Insurance Coverage Plan",
    "reqd": 1,
    "search_index": 1
@@ -173,7 +174,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-03-11 23:37:51.653357",
+ "modified": "2026-11-24 18:30:00.000000",
  "modified_by": "Administrator",
  "module": "Hms Tz",
  "name": "Healthcare Service Insurance Coverage",
