@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
   capitalize,
+  getActionOptions,
   getCountText,
   getDialogFields,
+  isGroupRunning,
 } from "../src/data/setupRecords.js";
 
 const doctors = { label: "doctor", plural_label: "doctors" };
@@ -29,5 +31,25 @@ describe("setup records screen", () => {
       getDialogFields(fields, isEditing).map((field) => field.read_only);
     assert.deepEqual(readOnly(false), [false, false]);
     assert.deepEqual(readOnly(true), [true, false]);
+  });
+
+  test("an action dropdown runs the clicked action and spins while it runs", () => {
+    const group = {
+      label: "NHIF actions",
+      actions: [
+        { key: "nhif_schemes", label: "Get NHIF Schemes" },
+        { key: "nhif_items", label: "Get NHIF Items" },
+      ],
+    };
+    const ran = [];
+    const options = getActionOptions(group, (action) => ran.push(action.key));
+    assert.deepEqual(
+      options.map((option) => option.label),
+      ["Get NHIF Schemes", "Get NHIF Items"]
+    );
+    options[1].onClick();
+    assert.deepEqual(ran, ["nhif_items"]);
+    assert.equal(isGroupRunning(group, "nhif_items"), true);
+    assert.equal(isGroupRunning(group, "jubilee_packages"), false);
   });
 });

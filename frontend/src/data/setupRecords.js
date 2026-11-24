@@ -12,3 +12,14 @@ export const getDialogFields = (fields, isEditing) =>
     ...field,
     read_only: field.read_only || (isEditing && Boolean(field.set_only_once)),
   }));
+
+/** Dropdown options of one action group; a click runs that action. */
+export const getActionOptions = (group, runAction) =>
+  group.actions.map((action) => ({
+    label: action.label,
+    onClick: () => runAction(action),
+  }));
+
+/** Whether the running action belongs to this group, so its dropdown shows the spinner. */
+export const isGroupRunning = (group, runningKey) =>
+  group.actions.some((action) => action.key === runningKey);
