@@ -1,6 +1,7 @@
 [
  {
   "schedule_name": "Weekdays 08:00 - 17:00",
+  "default": 1,
   "slot_minutes": 60,
   "hours": [
    {"days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"], "from_time": "08:00:00", "to_time": "17:00:00"}
