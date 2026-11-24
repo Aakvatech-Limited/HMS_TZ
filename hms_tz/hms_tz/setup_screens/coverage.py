@@ -7,8 +7,8 @@ from hms_tz.hms_tz.setup_screens.company_records import CompanyRecords
 class Coverage(CompanyRecords):
 	"""Setup screen of the company's Healthcare Service Insurance Coverages: which plan covers which service.
 
-	A company can hold tens of thousands of coverages, so the list is filtered by plan and service type and
-	shows at most page_length rows. The plan filter comes from the DocType JSON link_filters.
+	A company can hold tens of thousands of coverages, so the list is filtered by service type, service and
+	plan and shows at most page_length rows. The plan filter comes from the DocType JSON link_filters.
 	"""
 
 	doctype = "Healthcare Service Insurance Coverage"
@@ -23,7 +23,7 @@ class Coverage(CompanyRecords):
 		"maximum_quantity_outpatient": {},
 		"maximum_quantity_inpatient": {},
 	}
-	list_filters = ("healthcare_insurance_coverage_plan", "healthcare_service")
+	list_filters = ("healthcare_service", "healthcare_service_template", "healthcare_insurance_coverage_plan")
 	page_length = 500
 
 	def validate(self, doc):
