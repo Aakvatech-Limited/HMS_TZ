@@ -52,6 +52,12 @@ const routes = [
     props: { screen: "coverage_plans" },
   },
   {
+    path: "/setup/coverages",
+    name: "Coverages",
+    component: () => import("@/pages/SetupRecords.vue"),
+    props: { screen: "coverages" },
+  },
+  {
     path: "/setup/run",
     name: "SetupRun",
     component: () => import("@/pages/SetupRun.vue"),
