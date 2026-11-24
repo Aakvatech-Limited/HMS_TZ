@@ -30,6 +30,11 @@
           icon-left="file-text"
           :route="{ name: 'CoveragePlans', query: { company } }"
         />
+        <Button
+          label="Coverages"
+          icon-left="check-square"
+          :route="{ name: 'Coverages', query: { company } }"
+        />
         <div class="w-72">
           <Link
             doctype="Company"
