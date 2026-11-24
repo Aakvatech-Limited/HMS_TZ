@@ -99,6 +99,15 @@ class CompanyRecords:
 		doc.save()
 		return doc.name
 
+	@property
+	def action_groups(self):
+		"""Dropdowns of actions the screen offers for the company, as [{"label", "actions": [{"key", "label"}]}]."""
+		return []
+
+	def run_action(self, key):
+		"""Run one action of action_groups; a screen with actions overrides it."""
+		frappe.throw(_("The {0} screen has no action {1}.").format(self.plural_label, key))
+
 	def validate(self, doc):
 		"""Screen rules beyond the required fields; a subclass overrides it."""
 
