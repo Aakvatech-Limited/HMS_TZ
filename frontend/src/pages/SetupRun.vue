@@ -15,6 +15,11 @@
           icon-left="grid"
           :route="{ name: 'Rooms', query: { company } }"
         />
+        <Button
+          label="Doctors"
+          icon-left="users"
+          :route="{ name: 'Doctors', query: { company } }"
+        />
         <div class="w-72">
           <Link
             doctype="Company"
