@@ -70,6 +70,12 @@ const routes = [
     props: { screen: "nhif_schemes" },
   },
   {
+    path: "/setup/nhif-updates",
+    name: "NHIFUpdates",
+    component: () => import("@/pages/SetupRecords.vue"),
+    props: { screen: "nhif_updates" },
+  },
+  {
     path: "/setup/run",
     name: "SetupRun",
     component: () => import("@/pages/SetupRun.vue"),
