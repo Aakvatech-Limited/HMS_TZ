@@ -6,6 +6,7 @@ from hms_tz.hms_tz.setup_screens.appointment_type import AppointmentType
 from hms_tz.hms_tz.setup_screens.coverage import Coverage
 from hms_tz.hms_tz.setup_screens.coverage_plan import CoveragePlan
 from hms_tz.hms_tz.setup_screens.insurance_company import InsuranceCompany
+from hms_tz.hms_tz.setup_screens.nhif_scheme import NHIFScheme
 from hms_tz.hms_tz.setup_screens.practitioner import Practitioner
 
 # Setup screens of company records, by the key the page route passes.
@@ -15,6 +16,7 @@ SCREENS = {
 	"coverage_plans": CoveragePlan,
 	"visit_types": AppointmentType,
 	"coverages": Coverage,
+	"nhif_schemes": NHIFScheme,
 }
 
 
