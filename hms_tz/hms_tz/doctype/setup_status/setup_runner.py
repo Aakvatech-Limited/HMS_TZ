@@ -11,6 +11,10 @@ from hms_tz.hms_tz.standard_records.standard_records import get_standard_record_
 # A step runs only once a room exists unless it sets "needs_rooms": False.
 SETUP_RUNNER_STEPS = [*get_standard_record_steps()]
 
+# Other installed apps add steps of the same shape to their hooks.py; they run after the HMS TZ steps:
+# hms_tz_setup_steps = [{"key": "clinic_rules", "label": "Clinic rules", "method": "app.setup.set_rules"}]
+STEPS_HOOK = "hms_tz_setup_steps"
+
 ROOMS_STEP = "Healthcare Service Unit"
 PROGRESS_EVENT = "hms_tz_setup_progress"
 
@@ -33,8 +37,21 @@ class StepProgress:
 		set_run_step(self.row, done=self.done, added=self.added)
 
 
+def get_runner_steps():
+	"""The HMS TZ steps, then the steps each other installed app registers, each marked with its app."""
+	steps = [{**step, "app": "hms_tz"} for step in SETUP_RUNNER_STEPS]
+	for app in frappe.get_installed_apps():
+		if app != "hms_tz":
+			steps += [{**step, "app": app} for step in frappe.get_hooks(STEPS_HOOK, app_name=app)]
+	keys = [step["key"] for step in steps]
+	duplicates = sorted({key for key in keys if keys.count(key) > 1})
+	if duplicates:
+		frappe.throw(_("Setup steps registered more than once: {0}").format(", ".join(duplicates)))
+	return steps
+
+
 def get_runner_step(key):
-	for step in SETUP_RUNNER_STEPS:
+	for step in get_runner_steps():
 		if step["key"] == key:
 			return step
 	frappe.throw(_("{0} is not a setup runner step").format(key))
@@ -43,13 +60,15 @@ def get_runner_step(key):
 def sync_run_steps(status):
 	"""Keep one run step row per runner step, in runner order, without losing the results of earlier runs."""
 	rows = {row.step: row for row in status.run_steps}
-	before = [(row.step, row.label) for row in status.run_steps]
+	before = [(row.step, row.label, row.app) for row in status.run_steps]
 	status.set("run_steps", [])
-	for step in SETUP_RUNNER_STEPS:
+	for step in get_runner_steps():
 		row = rows.get(step["key"])
 		status.append("run_steps", row.as_dict() if row else {"step": step["key"], "status": "Waiting"})
-		status.run_steps[-1].update({"label": step["label"], "idx": len(status.run_steps)})
-	if [(row.step, row.label) for row in status.run_steps] != before:
+		status.run_steps[-1].update(
+			{"label": step["label"], "app": step["app"], "idx": len(status.run_steps)}
+		)
+	if [(row.step, row.label, row.app) for row in status.run_steps] != before:
 		status.save(ignore_permissions=True)
 
 
