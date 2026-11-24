@@ -49,6 +49,12 @@
         />
         <Button
           v-if="company"
+          label="NHIF updates"
+          icon-left="refresh-cw"
+          :route="{ name: 'NHIFUpdates', query: { company } }"
+        />
+        <Button
+          v-if="company"
           label="Run setup"
           icon-left="play"
           :route="{ name: 'SetupRun', query: { company } }"

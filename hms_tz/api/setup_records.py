@@ -7,6 +7,7 @@ from hms_tz.hms_tz.setup_screens.coverage import Coverage
 from hms_tz.hms_tz.setup_screens.coverage_plan import CoveragePlan
 from hms_tz.hms_tz.setup_screens.insurance_company import InsuranceCompany
 from hms_tz.hms_tz.setup_screens.nhif_scheme import NHIFScheme
+from hms_tz.hms_tz.setup_screens.nhif_update import NHIFUpdate
 from hms_tz.hms_tz.setup_screens.practitioner import Practitioner
 
 # Setup screens of company records, by the key the page route passes.
@@ -17,6 +18,7 @@ SCREENS = {
 	"visit_types": AppointmentType,
 	"coverages": Coverage,
 	"nhif_schemes": NHIFScheme,
+	"nhif_updates": NHIFUpdate,
 }
 
 
@@ -36,6 +38,9 @@ def get_screen_fields(screen):
 		"label": records.label,
 		"plural_label": records.plural_label,
 		"title_field": records.title_field,
+		"has_add_actions": records.has_add_actions,
+		"is_read_only": records.is_read_only,
+		"has_child_rows": bool(records.child_table),
 		"fields": records.fields,
 		"list_filters": records.list_filter_fields,
 	}
@@ -82,3 +87,11 @@ def run_screen_action(screen, company, action):
 	records = get_screen(screen, company)
 	frappe.has_permission(records.doctype, "write", throw=True)
 	return records.run_action(action)
+
+
+@frappe.whitelist()
+def get_record_child_rows(screen, company, name, start=0):
+	"""One page of the child table rows of one of the company's records, read only."""
+	records = get_screen(screen, company)
+	frappe.has_permission(records.doctype, "read", doc=name, throw=True)
+	return records.get_child_rows(name, start)
