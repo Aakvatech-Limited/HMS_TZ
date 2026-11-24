@@ -97,7 +97,8 @@
    "in_list_view": 1,
    "label": "Billed But Not Claimed Account",
    "options": "Account",
-   "reqd": 1
+   "reqd": 1,
+   "link_filters": "[[\"Account\", \"company\", \"=\", \"eval: doc.company\"], [\"Account\", \"is_group\", \"=\", 0], [\"Account\", \"account_type\", \"=\", \"Receivable\"]]"
   },
   {
    "fieldname": "approved_claim_receivable_account",
@@ -105,7 +106,8 @@
    "in_list_view": 1,
    "label": "Approved Claim Receivable Account",
    "options": "Account",
-   "reqd": 1
+   "reqd": 1,
+   "link_filters": "[[\"Account\", \"company\", \"=\", \"eval: doc.company\"], [\"Account\", \"is_group\", \"=\", 0], [\"Account\", \"account_type\", \"=\", \"Receivable\"]]"
   },
   {
    "fieldname": "column_break_14",
@@ -116,11 +118,12 @@
    "fieldtype": "Link",
    "label": "Rejected Claims Account",
    "options": "Account",
-   "reqd": 1
+   "reqd": 1,
+   "link_filters": "[[\"Account\", \"company\", \"=\", \"eval: doc.company\"], [\"Account\", \"is_group\", \"=\", 0], [\"Account\", \"root_type\", \"=\", \"Expense\"]]"
   }
  ],
  "links": [],
- "modified": "2021-03-21 11:45:55.753826",
+ "modified": "2026-11-24 13:30:00.000000",
  "modified_by": "Administrator",
  "module": "Hms Tz",
  "name": "Healthcare Insurance Company",
