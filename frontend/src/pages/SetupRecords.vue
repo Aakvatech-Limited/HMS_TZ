@@ -90,36 +90,38 @@
                   :loading="isGroupRunning(group, actionRuns)"
                 />
               </Dropdown>
-              <Dropdown :options="templateOptions">
-                <Button
-                  label="Download template"
-                  icon-left="download"
-                  icon-right="chevron-down"
-                />
-              </Dropdown>
-              <FileUploader
-                :file-types="['.csv', '.xlsx']"
-                :upload-args="{ private: true }"
-                @success="importFile"
-                @failure="(error) => showError(serverErrorText(error))"
-              >
-                <template #default="{ openFileSelector, uploading }">
+              <template v-if="screen.data.has_add_actions">
+                <Dropdown :options="templateOptions">
                   <Button
-                    label="Import"
-                    icon-left="upload"
-                    :loading="uploading || importing"
-                    :disabled="!records.data.settings_complete"
-                    @click="openFileSelector()"
+                    label="Download template"
+                    icon-left="download"
+                    icon-right="chevron-down"
                   />
-                </template>
-              </FileUploader>
-              <Button
-                variant="solid"
-                :label="`Add ${screen.data.label}`"
-                icon-left="plus"
-                :disabled="!records.data.settings_complete"
-                @click="openRecord()"
-              />
+                </Dropdown>
+                <FileUploader
+                  :file-types="['.csv', '.xlsx']"
+                  :upload-args="{ private: true }"
+                  @success="importFile"
+                  @failure="(error) => showError(serverErrorText(error))"
+                >
+                  <template #default="{ openFileSelector, uploading }">
+                    <Button
+                      label="Import"
+                      icon-left="upload"
+                      :loading="uploading || importing"
+                      :disabled="!records.data.settings_complete"
+                      @click="openFileSelector()"
+                    />
+                  </template>
+                </FileUploader>
+                <Button
+                  variant="solid"
+                  :label="`Add ${screen.data.label}`"
+                  icon-left="plus"
+                  :disabled="!records.data.settings_complete"
+                  @click="openRecord()"
+                />
+              </template>
             </div>
           </div>
           <div v-if="filterSections.length" class="border-b px-6 py-4">
@@ -150,7 +152,9 @@
                   :key="record.name"
                   class="cursor-pointer border-b last:border-b-0 hover:bg-gray-50"
                   :class="{
-                    'pointer-events-none': !records.data.settings_complete,
+                    'pointer-events-none':
+                      !records.data.settings_complete &&
+                      !screen.data.is_read_only,
                   }"
                   @click="openRecord(record)"
                 >
@@ -229,15 +233,54 @@
     <Dialog
       v-model="dialogOpen"
       :options="{
-        title: editing
-          ? `Change ${editing[screen.data.title_field] || editing.name}`
-          : `Add ${screen.data.label}`,
-        size: '2xl',
+        title: getDialogTitle(screen.data, editing),
+        size: screen.data.has_child_rows ? '5xl' : '2xl',
         actions: dialogActions,
       }"
     >
       <template #body-content>
         <FieldMap :sections="dialogSections" :data="data" />
+        <section v-if="screen.data.has_child_rows" class="mt-6 space-y-3">
+          <p class="text-base font-semibold text-gray-900">
+            {{ childRows.rows.length }} of {{ childRows.total }} rows
+          </p>
+          <div class="max-h-96 overflow-auto rounded border">
+            <table class="w-full text-left text-sm">
+              <thead class="sticky top-0 border-b bg-gray-50 text-gray-600">
+                <tr>
+                  <th
+                    v-for="field in childRows.fields"
+                    :key="field.fieldname"
+                    class="whitespace-nowrap px-3 py-2 font-medium"
+                  >
+                    {{ field.label }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="(row, index) in childRows.rows"
+                  :key="index"
+                  class="border-b last:border-b-0"
+                >
+                  <td
+                    v-for="field in childRows.fields"
+                    :key="field.fieldname"
+                    class="px-3 py-2 align-top text-gray-900"
+                  >
+                    {{ row[field.fieldname] }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <Button
+            v-if="childRows.rows.length < childRows.total"
+            label="Show more"
+            :loading="loadingChildRows"
+            @click="loadChildRows(childRows.rows.length)"
+          />
+        </section>
       </template>
     </Dialog>
   </div>
@@ -253,6 +296,7 @@ import {
   getRunRows,
   getCountText,
   getDialogFields,
+  getDialogTitle,
   isGroupRunning,
   isRunActive,
 } from "@/data/setupRecords";
@@ -297,6 +341,8 @@ const RUN_THEMES = {
 };
 let runPoll = null;
 const importResult = ref(null);
+const childRows = ref({ fields: [], rows: [], total: 0 });
+const loadingChildRows = ref(false);
 
 const filterData = reactive({});
 
@@ -360,7 +406,8 @@ const dialogSections = computed(() => {
   const doctype = screen.data?.doctype;
   const fields = getDialogFields(
     screen.data?.fields || [],
-    Boolean(editing.value)
+    Boolean(editing.value),
+    Boolean(screen.data?.is_read_only)
   );
   const [tab] = getSettingTabs(fields);
   if (!tab || !data[doctype]) return [];
@@ -373,17 +420,19 @@ const dialogSections = computed(() => {
 
 const dialogActions = computed(() => [
   {
-    label: "Cancel",
+    label: screen.data?.is_read_only ? "Close" : "Cancel",
     variant: "subtle",
     onClick: () => (dialogOpen.value = false),
   },
-  {
-    label: editing.value ? "Save" : `Add ${screen.data.label}`,
-    variant: "solid",
-    loading: saving.value,
-    onClick: save,
-  },
+  ...(screen.data?.is_read_only ? [] : [saveAction.value]),
 ]);
+
+const saveAction = computed(() => ({
+  label: editing.value ? "Save" : `Add ${screen.data.label}`,
+  variant: "solid",
+  loading: saving.value,
+  onClick: save,
+}));
 
 function selectCompany(value) {
   company.value = value;
@@ -399,6 +448,28 @@ function openRecord(record) {
   const values = record ? { [screen.data.doctype]: record } : {};
   Object.assign(data, toSettingForm(screen.data.fields, values));
   dialogOpen.value = true;
+  childRows.value = { fields: [], rows: [], total: 0 };
+  if (record && screen.data.has_child_rows) loadChildRows(0);
+}
+
+async function loadChildRows(start) {
+  loadingChildRows.value = true;
+  try {
+    const page = await call(`${API}.get_record_child_rows`, {
+      screen: props.screen,
+      company: company.value,
+      name: editing.value.name,
+      start,
+    });
+    childRows.value = {
+      ...page,
+      rows: [...childRows.value.rows, ...page.rows],
+    };
+  } catch (error) {
+    showError(serverErrorText(error));
+  } finally {
+    loadingChildRows.value = false;
+  }
 }
 
 async function save() {
