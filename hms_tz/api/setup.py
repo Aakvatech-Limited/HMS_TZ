@@ -1,11 +1,13 @@
 import re
 
 import frappe
+from frappe import _
 from frappe.utils import cstr
 
 from hms_tz.hms_tz.doctype.setup_status.setup_status import get_setup_status
 
 SETTING_DOCTYPE = "HMS TZ Setting"
+DEFAULTS_HOOK = "hms_tz_setting_defaults"
 BILLING_DOCTYPE = "Healthcare Settings"
 
 # Healthcare Settings tab and section shown in the Billing tab.
@@ -48,8 +50,9 @@ def get_setting_fields():
 	"""Editable setup fields in form order: HMS TZ Setting, then the Billing tab from Healthcare Settings."""
 	frappe.has_permission(SETTING_DOCTYPE, "read", throw=True)
 	billing_tab = {"fieldname": "billing_tab", "fieldtype": "Tab Break", "label": "Billing"}
+	setting_fields = get_editable_fields(SETTING_DOCTYPE, frappe.get_meta(SETTING_DOCTYPE).fields)
 	return [
-		*get_editable_fields(SETTING_DOCTYPE, frappe.get_meta(SETTING_DOCTYPE).fields),
+		*apply_setting_defaults(setting_fields),
 		{**billing_tab, "doctype": BILLING_DOCTYPE},
 		*get_editable_fields(BILLING_DOCTYPE, get_billing_docfields()),
 	]
@@ -62,6 +65,17 @@ def save_company_setup(company, values):
 	save_setting(company, values.get(SETTING_DOCTYPE) or {})
 	save_billing(company, values.get(BILLING_DOCTYPE) or {})
 	return get_company_setup(company)
+
+
+def apply_setting_defaults(fields):
+	"""Defaults other installed apps register for a new HMS TZ Setting, for example in hooks.py:
+	hms_tz_setting_defaults = [{"fieldname": "enable_nhif_api", "value": 1}]"""
+	by_fieldname = {field["fieldname"]: field for field in fields if field["fieldtype"] not in LAYOUT_TYPES}
+	for default in frappe.get_hooks(DEFAULTS_HOOK):
+		if default["fieldname"] not in by_fieldname:
+			frappe.throw(_("{0} is not an editable HMS TZ Setting field").format(default["fieldname"]))
+		by_fieldname[default["fieldname"]]["default"] = default["value"]
+	return fields
 
 
 def get_editable_fields(doctype, docfields):
