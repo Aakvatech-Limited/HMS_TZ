@@ -13,6 +13,12 @@
         />
         <Button
           v-if="company"
+          label="Doctors"
+          icon-left="users"
+          :route="{ name: 'Doctors', query: { company } }"
+        />
+        <Button
+          v-if="company"
           label="Run setup"
           icon-left="play"
           :route="{ name: 'SetupRun', query: { company } }"
