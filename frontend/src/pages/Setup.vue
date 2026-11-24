@@ -43,6 +43,12 @@
         />
         <Button
           v-if="company"
+          label="NHIF schemes"
+          icon-left="layers"
+          :route="{ name: 'NHIFSchemes', query: { company } }"
+        />
+        <Button
+          v-if="company"
           label="Run setup"
           icon-left="play"
           :route="{ name: 'SetupRun', query: { company } }"
