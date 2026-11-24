@@ -9,6 +9,8 @@
   "settings_complete",
   "nhif_prices_processed",
   "nhif_coverages_processed",
+  "jubilee_prices_processed",
+  "jubilee_coverages_processed",
   "steps",
   "run_steps"
  ],
@@ -46,6 +48,22 @@
    "read_only": 1
   },
   {
+   "default": "0",
+   "description": "Ticked once the Jubilee prices of the company were processed into its Jubilee price list.",
+   "fieldname": "jubilee_prices_processed",
+   "fieldtype": "Check",
+   "label": "Jubilee Prices Processed",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "description": "Ticked once the Jubilee coverages of the company were processed into its Jubilee coverage plans.",
+   "fieldname": "jubilee_coverages_processed",
+   "fieldtype": "Check",
+   "label": "Jubilee Coverages Processed",
+   "read_only": 1
+  },
+  {
    "fieldname": "steps",
    "fieldtype": "Table",
    "label": "Steps",
@@ -61,7 +79,7 @@
  "in_create": 1,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-11-24 15:00:00.000000",
+ "modified": "2026-11-24 16:00:00.000000",
  "modified_by": "Administrator",
  "module": "Hms Tz",
  "name": "Setup Status",

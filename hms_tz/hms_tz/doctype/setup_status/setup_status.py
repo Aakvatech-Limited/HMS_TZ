@@ -93,14 +93,16 @@ def get_setup_status(hms_tz_setting):
 
 
 def mark_company_status(company, fieldname):
-	"""Tick one check of the company's Setup Status, such as nhif_prices_processed."""
+	"""Tick one check of the company's Setup Status, such as nhif_prices_processed.
+
+	Background jobs of one company run side by side, so the check is set with one update of the current row
+	rather than a save of a document a parallel job may have changed since it was read.
+	"""
 	setting = frappe.db.get_value("HMS TZ Setting", {"company": company})
 	if not setting:
 		return
-	status = get_setup_status(setting)
-	if not status.get(fieldname):
-		status.set(fieldname, 1)
-		status.save(ignore_permissions=True)
+	get_setup_status(setting)
+	frappe.db.set_value("Setup Status", setting, fieldname, 1)
 
 
 def complete_setup_step(hms_tz_setting, document_type):
