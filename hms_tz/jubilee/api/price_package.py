@@ -55,6 +55,12 @@ def process_jubilee_records(company):
 	frappe.msgprint("Processing Jubilee Coverages via backaground job", alert=True)
 
 
+def run_jubilee_records(company):
+	"""Process the Jubilee prices, then the coverages, of the company in the current job."""
+	run_jubilee_prices(company)
+	run_jubilee_coverages(company)
+
+
 def run_jubilee_prices(company):
 	"""Background job: process all Jubilee prices of the company, then tick Jubilee Prices Processed."""
 	process_jubilee_prices(company)
