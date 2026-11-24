@@ -19,6 +19,12 @@
         />
         <Button
           v-if="company"
+          label="Insurers"
+          icon-left="shield"
+          :route="{ name: 'InsuranceCompanies', query: { company } }"
+        />
+        <Button
+          v-if="company"
           label="Run setup"
           icon-left="play"
           :route="{ name: 'SetupRun', query: { company } }"
