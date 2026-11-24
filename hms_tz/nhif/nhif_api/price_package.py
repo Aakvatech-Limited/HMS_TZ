@@ -72,6 +72,13 @@ def process_nhif_records(company):
 	frappe.msgprint("Processing NHIF Coverages via background job", alert=True)
 
 
+def run_nhif_records(company):
+	"""Process the NHIF prices, then the coverages, of the company in the current job."""
+	facility_code = frappe.get_cached_value("HMS TZ Setting", company, "facility_code")
+	run_nhif_prices(company, facility_code)
+	run_nhif_coverages(company, facility_code)
+
+
 def run_nhif_prices(company, facility_code):
 	"""Background job: process all NHIF prices of the company, then tick NHIF Prices Processed."""
 	process_nhif_prices(company, facility_code)
