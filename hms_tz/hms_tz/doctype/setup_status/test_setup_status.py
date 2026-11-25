@@ -8,6 +8,7 @@ from hms_tz.api.setup import (
 	get_company_setup,
 	get_setting_fields,
 	get_settings_groups,
+	get_setup_navigation,
 	is_rule_true,
 	save_billing,
 	save_setting,
@@ -87,6 +88,25 @@ class TestSetupStatus(FrappeTestCase):
 		setup = get_company_setup(SETTING)
 		self.assertEqual(setup["setting"], SETTING)
 		self.assertEqual([step["document_type"] for step in setup["steps"]], list(SETUP_STEPS))
+
+	def test_setup_navigation_has_the_steps_and_the_nhif_codes_to_review(self):
+		frappe.db.delete("NHIF Template Mapping", {"nhif_code": "T-NAV"})
+		frappe.get_doc(
+			{
+				"doctype": "NHIF Template Mapping",
+				"nhif_code": "T-NAV",
+				"proposed_doctype": "Item Only",
+				"status": "Review",
+			}
+		).insert(ignore_permissions=True)
+		navigation = get_setup_navigation(SETTING)
+		self.assertEqual([step["document_type"] for step in navigation["steps"]], list(SETUP_STEPS))
+		self.assertEqual(navigation["settings_complete"], get_company_setup(SETTING)["settings_complete"])
+		self.assertEqual(
+			navigation["nhif_templates_to_review"],
+			frappe.db.count("NHIF Template Mapping", {"status": "Review"}),
+		)
+		self.assertGreaterEqual(navigation["nhif_templates_to_review"], 1)
 
 	def test_setting_fields_follow_the_doctype_layout(self):
 		fields = {field["fieldname"]: field for field in get_setting_fields()}
