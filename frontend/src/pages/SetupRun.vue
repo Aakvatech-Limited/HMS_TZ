@@ -80,6 +80,11 @@
           icon-left="heart"
           :route="{ name: 'TherapyTypes', query: { company } }"
         />
+        <Button
+          label="Medications"
+          icon-left="thermometer"
+          :route="{ name: 'Medications', query: { company } }"
+        />
         <div class="w-72">
           <Link
             doctype="Company"
