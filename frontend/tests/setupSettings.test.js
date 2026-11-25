@@ -173,6 +173,17 @@ describe("setup settings form", () => {
     );
   });
 
+  test("an eval rule may end with a semicolon", () => {
+    assert.equal(
+      evaluateDependsOn("eval:doc.is_billable;", { is_billable: 1 }),
+      true
+    );
+    assert.equal(
+      evaluateDependsOn("eval:doc.is_billable; ", { is_billable: 0 }),
+      false
+    );
+  });
+
   test("link filters read eval values from the doc", () => {
     const [account] = getVisibleSections(tabs[3], form(), "Clinic")
       .at(-1)
