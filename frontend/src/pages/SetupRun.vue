@@ -1,104 +1,7 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
-    <header
-      class="flex flex-wrap items-center justify-between gap-4 border-b bg-white px-6 py-4"
-    >
+  <SetupLayout :company="company" @select-company="selectCompany">
+    <header class="border-b bg-white px-6 py-4">
       <h1 class="text-xl font-semibold text-gray-900">Run setup</h1>
-      <div class="flex flex-wrap items-center justify-end gap-3">
-        <Button
-          label="Settings"
-          icon-left="arrow-left"
-          :route="{ name: 'Setup', query: { company } }"
-        />
-        <Button
-          label="Rooms"
-          icon-left="grid"
-          :route="{ name: 'Rooms', query: { company } }"
-        />
-        <Button
-          label="Doctors"
-          icon-left="users"
-          :route="{ name: 'Doctors', query: { company } }"
-        />
-        <Button
-          label="Insurers"
-          icon-left="shield"
-          :route="{ name: 'InsuranceCompanies', query: { company } }"
-        />
-        <Button
-          label="Plans"
-          icon-left="file-text"
-          :route="{ name: 'CoveragePlans', query: { company } }"
-        />
-        <Button
-          label="Visit types"
-          icon-left="calendar"
-          :route="{ name: 'VisitTypes', query: { company } }"
-        />
-        <Button
-          label="Coverages"
-          icon-left="check-square"
-          :route="{ name: 'Coverages', query: { company } }"
-        />
-        <Button
-          label="NHIF schemes"
-          icon-left="layers"
-          :route="{ name: 'NHIFSchemes', query: { company } }"
-        />
-        <Button
-          label="NHIF updates"
-          icon-left="refresh-cw"
-          :route="{ name: 'NHIFUpdates', query: { company } }"
-        />
-        <Button
-          label="Jubilee updates"
-          icon-left="rotate-cw"
-          :route="{ name: 'JubileeUpdates', query: { company } }"
-        />
-        <Button
-          label="NHIF items"
-          icon-left="package"
-          :route="{ name: 'NHIFItems', query: { company } }"
-        />
-        <Button
-          label="Lab templates"
-          icon-left="droplet"
-          :route="{ name: 'LabTemplates', query: { company } }"
-        />
-        <Button
-          label="Radiology templates"
-          icon-left="aperture"
-          :route="{ name: 'RadiologyTemplates', query: { company } }"
-        />
-        <Button
-          label="Procedure templates"
-          icon-left="scissors"
-          :route="{ name: 'ProcedureTemplates', query: { company } }"
-        />
-        <Button
-          label="Therapy types"
-          icon-left="heart"
-          :route="{ name: 'TherapyTypes', query: { company } }"
-        />
-        <Button
-          label="Medications"
-          icon-left="thermometer"
-          :route="{ name: 'Medications', query: { company } }"
-        />
-        <Button
-          label="NHIF templates"
-          icon-left="git-merge"
-          :route="{ name: 'NHIFTemplates', query: { company } }"
-        />
-        <div class="w-72">
-          <Link
-            doctype="Company"
-            :value="company"
-            placeholder="Select company"
-            @change="selectCompany"
-          />
-        </div>
-      </div>
     </header>
 
     <main class="mx-auto max-w-5xl space-y-6 p-6">
@@ -217,11 +120,11 @@
         </section>
       </template>
     </main>
-  </div>
+  </SetupLayout>
 </template>
 
 <script setup>
-import Link from "@/components/controls/Link.vue";
+import SetupLayout from "@/components/setup/SetupLayout.vue";
 import { serverErrorText, useToast } from "@/composables/useToast";
 import {
   applyStepProgress,
