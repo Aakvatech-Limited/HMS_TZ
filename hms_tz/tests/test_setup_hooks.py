@@ -16,7 +16,6 @@ CLINIC_STEP = {
 	"key": "clinic_rules",
 	"label": "Clinic rules",
 	"method": "hms_tz.tests.test_setup_hooks.run_clinic_step",
-	"needs_rooms": False,
 }
 RUN_ORDER = []
 
