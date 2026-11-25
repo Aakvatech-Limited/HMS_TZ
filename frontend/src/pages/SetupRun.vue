@@ -70,6 +70,11 @@
           icon-left="aperture"
           :route="{ name: 'RadiologyTemplates', query: { company } }"
         />
+        <Button
+          label="Procedure templates"
+          icon-left="scissors"
+          :route="{ name: 'ProcedureTemplates', query: { company } }"
+        />
         <div class="w-72">
           <Link
             doctype="Company"

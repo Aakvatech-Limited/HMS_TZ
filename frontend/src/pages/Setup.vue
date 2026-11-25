@@ -79,6 +79,12 @@
         />
         <Button
           v-if="company"
+          label="Procedure templates"
+          icon-left="scissors"
+          :route="{ name: 'ProcedureTemplates', query: { company } }"
+        />
+        <Button
+          v-if="company"
           label="Run setup"
           icon-left="play"
           :route="{ name: 'SetupRun', query: { company } }"

@@ -3,6 +3,7 @@ from frappe import _
 
 from hms_tz.api.setup import get_company_setup
 from hms_tz.hms_tz.setup_screens.appointment_type import AppointmentType
+from hms_tz.hms_tz.setup_screens.clinical_procedure_template import ClinicalProcedureTemplate
 from hms_tz.hms_tz.setup_screens.coverage import Coverage
 from hms_tz.hms_tz.setup_screens.coverage_plan import CoveragePlan
 from hms_tz.hms_tz.setup_screens.insurance_company import InsuranceCompany
@@ -27,6 +28,7 @@ SCREENS = {
 	"nhif_items": NHIFItem,
 	"lab_templates": LabTestTemplate,
 	"radiology_templates": RadiologyExaminationTemplate,
+	"procedure_templates": ClinicalProcedureTemplate,
 }
 
 
