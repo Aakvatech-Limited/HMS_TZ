@@ -85,6 +85,12 @@
         />
         <Button
           v-if="company"
+          label="Therapy types"
+          icon-left="heart"
+          :route="{ name: 'TherapyTypes', query: { company } }"
+        />
+        <Button
+          v-if="company"
           label="Run setup"
           icon-left="play"
           :route="{ name: 'SetupRun', query: { company } }"
