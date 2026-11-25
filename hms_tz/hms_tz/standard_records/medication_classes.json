@@ -1,0 +1,482 @@
+[
+ {
+  "medication_class": "Alkalinizing Agent",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Anaesthetic",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Anaesthetic, Antiseptic & Antiprotozoal",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Analgesics",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Anesthetics",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Anti Acne",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Anti Hemerrhoids",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Anti septic",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Anti-Diabetic",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Anti-Inflammatory",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Anti-Parkinsonian",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Anti-hemorrhagic",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Anti-resorptives",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Antiacid",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Antianginal",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Anticholinergics",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Anticholinesterases",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Anticoagulant",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Anticoagulants",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Antidepressant",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Antidiarrheals",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Antidote",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Antidote, Calcium Salt",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Antidote, Heparin Antagonist",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Antidysarythmic, Electrolyte replacement agent",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Antidysrythmic",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Antiemetic",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Antiepileptic",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Antifibrinolytic",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Antiglaucoma",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Antigout agents",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Antihistamine",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Antihistamines",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Antihypertensive",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Antimalarial",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Antimicrobial+Proton Pump Inhibitor",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Antimicrobial, corticosteroid",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Antimicrobial, keratolytic",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Antimicrobials",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Antimigraine agents",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Antineoplastics",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Antiplatelet",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Antipsychotics",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Antiseptic",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Antispasmodic",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Antithyroid",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Artificial tears",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Astringent",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Astringent, antipruritic",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "BPH Medication",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Bronchodilator+Anti-inflammatory",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Bronchodilator, Corticosteroid",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Bronchodilators",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Choleretics",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Consumables",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Corticosteroids",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Earwax Remover",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Electrolyte Supplement",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Emollient",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Enzyme",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Ergot Oxytocic",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Expectorant",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Fibrinolytic",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Gastrointestinal Agents",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Glucose Strips",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Hematinics",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Hematopoetic Agent",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Hemorrheologic Agents",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Hormone",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Hormone Analog",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Hormones",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Hyperprolactinemia",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Hypolipidaemics",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Immunoglobulin",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Immunosupressant",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Laxative",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Macular Degeneration Agents",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Mitotic",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Mucolytics",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Mucomyst",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Mydriatic",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "NSAID",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "NSAID & Analgesic",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "NSAID, Analgesic, Muscle Relaxants",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Nasal Decongestant",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Neurologics",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Nucleoside analogs",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Nursing Item",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Nutrition",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Opiod Analgesic",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Opiod Antagonist",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Orthopedic Appliances",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Ovulatory Stimulant",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Oxyticic Agent",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Probiotic",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Prostaglandin analog",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Protectant, Anti Ulcer",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Proton Pump Inhibitor",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Proton Pump Inhibitors",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Sapicidal",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Scabicide",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Sedative-Hypnotic",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Skeletal muscle relaxants",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Somatostatin Analogue",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Steroid, keratolytic",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Supplement",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Sympathomimmetic",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Thyroid hormones",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Vaccine",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "Volume Expander",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "bandage",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "carotenoids",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "cycloplegic",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "infusion drips",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "medical item",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "nasal drops",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "surfactant",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "syringe",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "thrombolytic",
+  "prescribed_after": 0
+ },
+ {
+  "medication_class": "water for inj",
+  "prescribed_after": 0
+ }
+]
