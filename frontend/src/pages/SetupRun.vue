@@ -4,7 +4,7 @@
       class="flex flex-wrap items-center justify-between gap-4 border-b bg-white px-6 py-4"
     >
       <h1 class="text-xl font-semibold text-gray-900">Run setup</h1>
-      <div class="flex items-center gap-3">
+      <div class="flex flex-wrap items-center justify-end gap-3">
         <Button
           label="Settings"
           icon-left="arrow-left"
@@ -54,6 +54,11 @@
           label="Jubilee updates"
           icon-left="rotate-cw"
           :route="{ name: 'JubileeUpdates', query: { company } }"
+        />
+        <Button
+          label="NHIF items"
+          icon-left="package"
+          :route="{ name: 'NHIFItems', query: { company } }"
         />
         <div class="w-72">
           <Link
