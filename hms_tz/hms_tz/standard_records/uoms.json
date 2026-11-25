@@ -1,0 +1,65 @@
+[
+ {
+  "uom_name": "Ampoule"
+ },
+ {
+  "uom_name": "Bottle"
+ },
+ {
+  "uom_name": "Box"
+ },
+ {
+  "uom_name": "Can"
+ },
+ {
+  "uom_name": "Capsule"
+ },
+ {
+  "uom_name": "Kit"
+ },
+ {
+  "uom_name": "Nos"
+ },
+ {
+  "uom_name": "Pack"
+ },
+ {
+  "uom_name": "Pair"
+ },
+ {
+  "uom_name": "Pen"
+ },
+ {
+  "uom_name": "Pessary"
+ },
+ {
+  "uom_name": "Respule"
+ },
+ {
+  "uom_name": "Sachet"
+ },
+ {
+  "uom_name": "Spray"
+ },
+ {
+  "uom_name": "Strip"
+ },
+ {
+  "uom_name": "Suppository"
+ },
+ {
+  "uom_name": "Syringe"
+ },
+ {
+  "uom_name": "Tablet"
+ },
+ {
+  "uom_name": "Tube"
+ },
+ {
+  "uom_name": "Unit"
+ },
+ {
+  "uom_name": "Vial"
+ }
+]
