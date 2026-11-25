@@ -1,24 +1,7 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
-    <header
-      class="flex flex-wrap items-center justify-between gap-4 border-b bg-white px-6 py-4"
-    >
+  <SetupLayout :company="company" @select-company="selectCompany">
+    <header class="border-b bg-white px-6 py-4">
       <h1 class="text-xl font-semibold text-gray-900">Rooms</h1>
-      <div class="flex items-center gap-3">
-        <Button
-          label="Setup"
-          icon-left="arrow-left"
-          :route="{ name: 'Setup', query: { company } }"
-        />
-        <div class="w-72">
-          <Link
-            doctype="Company"
-            :value="company"
-            placeholder="Select company"
-            @change="selectCompany"
-          />
-        </div>
-      </div>
     </header>
 
     <main class="mx-auto max-w-screen-2xl space-y-6 p-6">
@@ -163,12 +146,12 @@
         <FieldMap :sections="dialogSections" :data="data" />
       </template>
     </Dialog>
-  </div>
+  </SetupLayout>
 </template>
 
 <script setup>
 import FieldMap from "@/components/controls/FieldMap.vue";
-import Link from "@/components/controls/Link.vue";
+import SetupLayout from "@/components/setup/SetupLayout.vue";
 import { serverErrorText, useToast } from "@/composables/useToast";
 import {
   getSettingTabs,
