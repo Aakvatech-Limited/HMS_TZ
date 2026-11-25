@@ -94,6 +94,12 @@ const routes = [
     props: { screen: "lab_templates" },
   },
   {
+    path: "/setup/radiology-templates",
+    name: "RadiologyTemplates",
+    component: () => import("@/pages/SetupRecords.vue"),
+    props: { screen: "radiology_templates" },
+  },
+  {
     path: "/setup/run",
     name: "SetupRun",
     component: () => import("@/pages/SetupRun.vue"),
