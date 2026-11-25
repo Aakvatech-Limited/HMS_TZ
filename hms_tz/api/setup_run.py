@@ -2,7 +2,6 @@ import frappe
 
 from hms_tz.api.setup import get_company_setup
 from hms_tz.hms_tz.doctype.setup_status.setup_runner import (
-	ROOMS_STEP,
 	is_setup_running,
 	start_setup,
 	sync_run_steps,
@@ -17,14 +16,12 @@ def get_setup_run(company):
 	"""The setup page banner, whether the runner is unlocked, and each runner step with its progress."""
 	setup = get_company_setup(company)
 	run = {"setting": setup["setting"], "settings_complete": setup["settings_complete"]}
-	run.update(rooms=frappe.db.count("Healthcare Service Unit", {"company": company, "is_group": 0}))
 	run.update(standard_records=get_standard_record_counts(company), steps=[], is_running=False)
 	if not setup["setting"]:
 		return run
 
 	status = get_setup_status(setup["setting"])
 	sync_run_steps(status)
-	run["has_rooms"] = bool(status.get_step(ROOMS_STEP).completed)
 	run["is_running"] = is_setup_running(setup["setting"])
 	run["steps"] = [get_step_values(row) for row in status.run_steps]
 	return run
