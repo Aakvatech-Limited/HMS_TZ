@@ -196,7 +196,9 @@ class CompanyRecords:
 		return {field: row.get(field) for field in self.company_table_fields}
 
 	def validate_missing(self, doc, company_row):
-		values = {**doc.as_dict(), **company_row}
+		# as_dict turns a blank number into 0, so the screen fields are read as they were given.
+		screen_values = {fieldname: doc.get(fieldname) for fieldname in self.fieldnames}
+		values = {**doc.as_dict(), **screen_values, **company_row}
 		missing = [field["label"] for field in self.fields if is_missing(field, values)]
 		if missing:
 			frappe.throw(_("Fill in {0} before saving the {1}.").format(", ".join(missing), self.label))

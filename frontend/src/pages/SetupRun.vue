@@ -65,6 +65,11 @@
           icon-left="droplet"
           :route="{ name: 'LabTemplates', query: { company } }"
         />
+        <Button
+          label="Radiology templates"
+          icon-left="aperture"
+          :route="{ name: 'RadiologyTemplates', query: { company } }"
+        />
         <div class="w-72">
           <Link
             doctype="Company"
