@@ -89,15 +89,22 @@ class CompanyRecords:
 			frappe.throw(
 				_("{0} cannot filter the {1}.").format(", ".join(sorted(unknown)), self.plural_label)
 			)
+		conditions = {field: self.get_filter_condition(field, value) for field, value in values.items()}
 		records = frappe.get_all(
 			self.doctype,
-			filters={**values, **self.filters},
+			filters={**conditions, **self.filters},
 			fields=list(dict.fromkeys(["name", self.title_field, *self.fieldnames])),
 			order_by=self.order_by or f"{self.title_field} asc",
 			limit_page_length=(self.page_length + 1) if self.page_length else 0,
 		)
 		has_more = bool(self.page_length) and len(records) > self.page_length
 		return {"records": records[: self.page_length] if has_more else records, "has_more": has_more}
+
+	def get_filter_condition(self, fieldname, value):
+		"""A text filter matches any part of the field, so a name or code can be searched; others match exactly."""
+		if frappe.get_meta(self.doctype).get_field(fieldname).fieldtype == "Data":
+			return ["like", f"%{value}%"]
+		return value
 
 	@property
 	def unlocked_setting(self):

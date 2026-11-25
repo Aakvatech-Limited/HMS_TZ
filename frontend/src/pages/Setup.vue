@@ -4,7 +4,7 @@
       class="flex flex-wrap items-center justify-between gap-4 border-b bg-white px-6 py-4"
     >
       <h1 class="text-xl font-semibold text-gray-900">HMS TZ Setup</h1>
-      <div class="flex items-center gap-3">
+      <div class="flex flex-wrap items-center justify-end gap-3">
         <Button
           v-if="company"
           label="Rooms"
@@ -58,6 +58,12 @@
           label="Jubilee updates"
           icon-left="rotate-cw"
           :route="{ name: 'JubileeUpdates', query: { company } }"
+        />
+        <Button
+          v-if="company"
+          label="NHIF items"
+          icon-left="package"
+          :route="{ name: 'NHIFItems', query: { company } }"
         />
         <Button
           v-if="company"
