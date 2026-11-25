@@ -46,6 +46,17 @@ def get_company_setup(company):
 
 
 @frappe.whitelist()
+def get_setup_navigation(company):
+	"""What the setup sidebar marks on each screen: whether its setup step is done, and the NHIF codes to review."""
+	setup = get_company_setup(company)
+	return {
+		"settings_complete": setup["settings_complete"],
+		"steps": setup["steps"],
+		"nhif_templates_to_review": frappe.db.count("NHIF Template Mapping", {"status": "Review"}),
+	}
+
+
+@frappe.whitelist()
 def get_setting_fields():
 	"""Editable setup fields in form order: HMS TZ Setting, then the Billing tab from Healthcare Settings."""
 	frappe.has_permission(SETTING_DOCTYPE, "read", throw=True)
