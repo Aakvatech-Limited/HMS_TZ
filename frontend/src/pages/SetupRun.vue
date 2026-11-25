@@ -75,6 +75,11 @@
           icon-left="scissors"
           :route="{ name: 'ProcedureTemplates', query: { company } }"
         />
+        <Button
+          label="Therapy types"
+          icon-left="heart"
+          :route="{ name: 'TherapyTypes', query: { company } }"
+        />
         <div class="w-72">
           <Link
             doctype="Company"
