@@ -7,7 +7,6 @@ FOUNDATION_STEP = {
 	"key": "foundation",
 	"label": "Foundation",
 	"method": "hms_tz.hms_tz.doctype.setup_status.foundation.check_foundation",
-	"needs_rooms": False,
 }
 
 # Healthcare Insurance Company account field -> the account the foundation step creates for it,

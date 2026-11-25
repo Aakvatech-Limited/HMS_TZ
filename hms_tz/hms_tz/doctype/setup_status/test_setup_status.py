@@ -108,6 +108,16 @@ class TestSetupStatus(FrappeTestCase):
 		)
 		self.assertGreaterEqual(navigation["nhif_templates_to_review"], 1)
 
+	def test_insurer_customers_are_not_needed_to_complete_the_settings(self):
+		values = {"HMS TZ Setting": {"enable_nhif_api": 1, "enable_jubilee_api": 1}}
+		fields = get_setting_fields()
+		missing = [label for group in get_settings_groups(fields, values) for label in group["missing"]]
+		self.assertNotIn("NHIF Customer Name", missing)
+		self.assertNotIn("Jubilee Customer Name", missing)
+		by_fieldname = {field["fieldname"]: field for field in fields}
+		self.assertFalse(by_fieldname["nhif_customer_name"]["mandatory_depends_on"])
+		self.assertFalse(by_fieldname["jubilee_customer_name"]["reqd"])
+
 	def test_setting_fields_follow_the_doctype_layout(self):
 		fields = {field["fieldname"]: field for field in get_setting_fields()}
 		self.assertEqual(fields["nhif_tab"]["fieldtype"], "Tab Break")

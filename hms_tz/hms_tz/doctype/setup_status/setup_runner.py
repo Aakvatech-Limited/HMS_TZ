@@ -9,13 +9,11 @@ from hms_tz.hms_tz.standard_records.standard_records import get_standard_record_
 # Steps that Start setup runs in order. Each method takes (hms_tz_setting, progress, **kwargs) and
 # returns a short text of what it holds. A step must only add what is missing and never change
 # existing records, so it is safe to run again; it counts what it adds with progress.advance(added=).
-# A step runs only once a room exists unless it sets "needs_rooms": False.
 # Needs the NHIF items and price package, which the Insurers screen downloads, and the standard masters.
 NHIF_TEMPLATES_STEP = {
 	"key": "nhif_templates",
 	"label": "NHIF templates",
 	"method": "hms_tz.hms_tz.doctype.nhif_template_mapping.nhif_template_mapping.create_nhif_templates",
-	"needs_rooms": False,
 }
 SETUP_RUNNER_STEPS = [FOUNDATION_STEP, *get_standard_record_steps(), NHIF_TEMPLATES_STEP]
 
@@ -23,7 +21,6 @@ SETUP_RUNNER_STEPS = [FOUNDATION_STEP, *get_standard_record_steps(), NHIF_TEMPLA
 # hms_tz_setup_steps = [{"key": "clinic_rules", "label": "Clinic rules", "method": "app.setup.set_rules"}]
 STEPS_HOOK = "hms_tz_setup_steps"
 
-ROOMS_STEP = "Healthcare Service Unit"
 PROGRESS_EVENT = "hms_tz_setup_progress"
 
 
@@ -128,8 +125,6 @@ def run_step(setting, row):
 	set_run_step(row, status="Running", done=0, total=0, added=0, result=None, error=None)
 	step = get_runner_step(row.step)
 	try:
-		if step.get("needs_rooms", True) and not get_setup_status(setting).get_step(ROOMS_STEP).completed:
-			frappe.throw(_("Add at least one room on the rooms screen, then try again."))
 		result = frappe.get_attr(step["method"])(setting, StepProgress(row), **step.get("kwargs", {}))
 	except Exception as error:
 		frappe.db.rollback()

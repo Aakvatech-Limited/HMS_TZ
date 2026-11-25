@@ -1,4 +1,4 @@
-/** Why Start setup is locked, or "" once the settings are complete. Steps that need rooms wait for one. */
+/** Why Start setup is locked, or "" once the settings are complete. */
 export const getLockReason = (run) => {
   if (!run.setting)
     return "Create the HMS TZ Setting on the settings page first.";

@@ -92,18 +92,14 @@ class TestSetupRunner(FrappeTestCase):
 			setup_runner.start_setup(COMPANY)
 		self.enqueue.assert_not_called()
 
-	def test_steps_that_need_rooms_wait_for_a_room(self):
+	def test_steps_run_before_any_room_exists(self):
 		status = get_setup_status(COMPANY)
 		status.get_step("Healthcare Service Unit").completed = 0
 		status.save()
-		steps = [{**STEPS[0], "needs_rooms": False}, *STEPS[1:]]
-		with patch.object(setup_runner, "SETUP_RUNNER_STEPS", steps):
-			setup_runner.start_setup(COMPANY)
-			setup_runner.run_setup(COMPANY)
-		rows = self.get_steps()
-		self.assertEqual(rows["count"].status, "Done")
-		self.assertEqual(rows["flaky"].status, "Failed")
-		self.assertIn("room", rows["flaky"].error)
+		BROKEN["is_broken"] = False
+		setup_runner.start_setup(COMPANY)
+		setup_runner.run_setup(COMPANY)
+		self.assertEqual({row.status for row in self.get_steps().values()}, {"Done"})
 
 	def test_a_running_setup_is_not_started_twice(self):
 		with patch.object(setup_runner, "is_setup_running", return_value=True):
@@ -121,7 +117,8 @@ class TestSetupRunner(FrappeTestCase):
 
 	def test_setup_page_gets_the_banner_and_the_steps(self):
 		run = get_setup_run(COMPANY)
-		self.assertTrue(run["settings_complete"] and run["has_rooms"])
+		self.assertTrue(run["settings_complete"])
+		self.assertNotIn("has_rooms", run)
 		self.assertEqual([step["step"] for step in run["steps"]], ["count", "flaky", "last"])
 		self.assertIn("insurers", run["standard_records"])
 
