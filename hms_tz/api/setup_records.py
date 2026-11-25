@@ -12,6 +12,7 @@ from hms_tz.hms_tz.setup_screens.nhif_item import NHIFItem
 from hms_tz.hms_tz.setup_screens.nhif_scheme import NHIFScheme
 from hms_tz.hms_tz.setup_screens.nhif_update import NHIFUpdate
 from hms_tz.hms_tz.setup_screens.practitioner import Practitioner
+from hms_tz.hms_tz.setup_screens.radiology_examination_template import RadiologyExaminationTemplate
 
 # Setup screens of company records, by the key the page route passes.
 SCREENS = {
@@ -25,6 +26,7 @@ SCREENS = {
 	"jubilee_updates": JubileeUpdate,
 	"nhif_items": NHIFItem,
 	"lab_templates": LabTestTemplate,
+	"radiology_templates": RadiologyExaminationTemplate,
 }
 
 
