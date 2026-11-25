@@ -91,6 +91,12 @@
         />
         <Button
           v-if="company"
+          label="Medications"
+          icon-left="thermometer"
+          :route="{ name: 'Medications', query: { company } }"
+        />
+        <Button
+          v-if="company"
           label="Run setup"
           icon-left="play"
           :route="{ name: 'SetupRun', query: { company } }"
