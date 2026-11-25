@@ -88,6 +88,12 @@ const routes = [
     props: { screen: "nhif_items" },
   },
   {
+    path: "/setup/lab-templates",
+    name: "LabTemplates",
+    component: () => import("@/pages/SetupRecords.vue"),
+    props: { screen: "lab_templates" },
+  },
+  {
     path: "/setup/run",
     name: "SetupRun",
     component: () => import("@/pages/SetupRun.vue"),

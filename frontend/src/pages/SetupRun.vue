@@ -60,6 +60,11 @@
           icon-left="package"
           :route="{ name: 'NHIFItems', query: { company } }"
         />
+        <Button
+          label="Lab templates"
+          icon-left="droplet"
+          :route="{ name: 'LabTemplates', query: { company } }"
+        />
         <div class="w-72">
           <Link
             doctype="Company"

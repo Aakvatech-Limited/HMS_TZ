@@ -45,27 +45,49 @@ class CompanyRecords:
 	child_table = None
 	child_fields = ()
 	child_page_length = 500
+	# Child table of a DocType shared by all companies, holding one row per company, such as company_options.
+	# The screen shows its company_table_fields as fields and saves them as the screen company's row.
+	company_table = None
+	company_table_fields = {}
+	# Child tables, with their fields, that the import template holds; an imported row replaces their rows.
+	import_tables = {}
 
 	def __init__(self, company):
 		self.company = company
 
 	@cached_property
 	def fields(self):
-		hidden = {self.company_field, *self.fixed_values}
-		fields = []
-		for docfield in frappe.get_meta(self.doctype).fields:
-			if docfield.fieldname in hidden or not (docfield.reqd or docfield.fieldname in self.extra_fields):
-				continue
-			field = {key: docfield.get(key) for key in FIELD_KEYS}
-			field.update(self.extra_fields.get(docfield.fieldname, {}), doctype=self.doctype)
-			if isinstance(field["link_filters"], list):
-				field["link_filters"] = frappe.as_json(field["link_filters"], indent=None)
-			fields.append(field)
+		hidden = {self.company_field, self.company_table, *self.fixed_values}
+		fields = [
+			self.get_screen_field(docfield, self.extra_fields.get(docfield.fieldname, {}))
+			for docfield in frappe.get_meta(self.doctype).fields
+			if docfield.fieldname not in hidden and (docfield.reqd or docfield.fieldname in self.extra_fields)
+		]
+		if self.company_table:
+			child_meta = frappe.get_meta(self.company_table_doctype)
+			fields += [
+				self.get_screen_field(child_meta.get_field(fieldname), rules)
+				for fieldname, rules in self.company_table_fields.items()
+			]
 		return fields
+
+	def get_screen_field(self, docfield, rules):
+		field = {key: docfield.get(key) for key in FIELD_KEYS}
+		field.update(rules, doctype=self.doctype)
+		if isinstance(field["link_filters"], list):
+			field["link_filters"] = frappe.as_json(field["link_filters"], indent=None)
+		return field
 
 	@cached_property
 	def fieldnames(self):
-		return [field["fieldname"] for field in self.fields]
+		"""The screen fields stored on the DocType itself, without the company table fields."""
+		return [
+			field["fieldname"] for field in self.fields if field["fieldname"] not in self.company_table_fields
+		]
+
+	@cached_property
+	def company_table_doctype(self):
+		return frappe.get_meta(self.doctype).get_field(self.company_table).options
 
 	@property
 	def filters(self):
@@ -98,7 +120,27 @@ class CompanyRecords:
 			limit_page_length=(self.page_length + 1) if self.page_length else 0,
 		)
 		has_more = bool(self.page_length) and len(records) > self.page_length
-		return {"records": records[: self.page_length] if has_more else records, "has_more": has_more}
+		records = records[: self.page_length] if has_more else records
+		if self.company_table:
+			self.add_company_rows(records)
+		return {"records": records, "has_more": has_more}
+
+	def add_company_rows(self, records):
+		"""Set each record's company table fields from the screen company's row; empty when it has none."""
+		rows = frappe.get_all(
+			self.company_table_doctype,
+			filters={
+				"parenttype": self.doctype,
+				"parentfield": self.company_table,
+				"company": self.company,
+				"parent": ["in", [record.name for record in records] or [""]],
+			},
+			fields=["parent", *self.company_table_fields],
+		)
+		rows_by_parent = {row.parent: row for row in rows}
+		for record in records:
+			row = rows_by_parent.get(record.name, {})
+			record.update({fieldname: row.get(fieldname) for fieldname in self.company_table_fields})
 
 	def get_filter_condition(self, fieldname, value):
 		"""A text filter matches any part of the field, so a name or code can be searched; others match exactly."""
@@ -137,12 +179,27 @@ class CompanyRecords:
 			{field: values[field] for field in self.fieldnames if field in values and field not in fixed}
 		)
 		doc.update(self.filters)
-		missing = [field["label"] for field in self.fields if is_missing(field, doc.as_dict())]
-		if missing:
-			frappe.throw(_("Fill in {0} before saving the {1}.").format(", ".join(missing), self.label))
+		doc.update({table: values[table] for table in self.import_tables if table in values})
+		self.validate_missing(doc, self.set_company_row(doc, values))
 		self.validate(doc)
 		doc.save()
 		return doc.name
+
+	def set_company_row(self, doc, values):
+		"""Set the screen company's company table row from the values, adding the row when it is missing."""
+		if not self.company_table:
+			return {}
+		row = next((row for row in doc.get(self.company_table) if row.company == self.company), None)
+		if not row:
+			row = doc.append(self.company_table, {"company": self.company})
+		row.update({field: values[field] for field in self.company_table_fields if field in values})
+		return {field: row.get(field) for field in self.company_table_fields}
+
+	def validate_missing(self, doc, company_row):
+		values = {**doc.as_dict(), **company_row}
+		missing = [field["label"] for field in self.fields if is_missing(field, values)]
+		if missing:
+			frappe.throw(_("Fill in {0} before saving the {1}.").format(", ".join(missing), self.label))
 
 	@property
 	def action_groups(self):
@@ -201,15 +258,21 @@ class CompanyRecords:
 	def download_template(self, samples="0", file_type="Excel"):
 		"""Frappe's import template with the screen fields and, as samples, "all" or that many records."""
 		self.validate_add_actions()
-		exporter = Exporter(
+		self.get_exporter(samples, file_type).build_response()
+
+	def get_exporter(self, samples="0", file_type="Excel"):
+		"""The template exporter: screen fields, company table and import tables, with the sample records."""
+		export_fields = {self.doctype: self.fieldnames, **self.import_tables}
+		if self.company_table:
+			export_fields[self.company_table] = ["company", *self.company_table_fields]
+		return Exporter(
 			self.doctype,
-			export_fields={self.doctype: self.fieldnames},
+			export_fields=export_fields,
 			export_data=samples == "all" or cint(samples) > 0,
 			export_filters=self.filters,
 			export_page_length=None if samples == "all" else cint(samples),
 			file_type=file_type,
 		)
-		exporter.build_response()
 
 	def import_file(self, file_url):
 		"""Add or change records from a filled template; a failed row is reported and skipped."""
@@ -227,13 +290,28 @@ class CompanyRecords:
 		frappe.db.savepoint("setup_import_row")
 		try:
 			name = self.get_existing_name(payload.doc)
-			self.save_record(payload.doc, name)
+			self.save_record(self.get_import_values(payload.doc), name)
 			result["changed" if name else "added"] += 1
 		except frappe.ValidationError as error:
 			frappe.db.rollback(save_point="setup_import_row")
 			result["errors"].append({"row": payload.rows[0].row_number, "message": strip_html(str(error))})
 		finally:
 			frappe.clear_messages()
+
+	def get_import_values(self, doc):
+		"""A template row's values, with the screen company's company table row as screen fields.
+
+		The import fills a blank company with the default company, so a single company table row stands for
+		the screen company. Company table rows of other companies are left as they are.
+		"""
+		if not self.company_table:
+			return doc
+		rows = doc.get(self.company_table) or []
+		matches = [row for row in rows if row.get("company") == self.company] or (
+			rows if len(rows) == 1 else []
+		)
+		row = matches[0] if matches else {}
+		return {**doc, **{field: row[field] for field in self.company_table_fields if field in row}}
 
 	def get_existing_name(self, values):
 		"""The company's record with the row's match field value, so a re-import changes it."""
