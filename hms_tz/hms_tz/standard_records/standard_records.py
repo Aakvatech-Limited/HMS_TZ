@@ -102,14 +102,13 @@ PLANS_FILE = "coverage_plans.json"
 
 
 def get_standard_record_steps():
-	"""One setup runner step per standard record group; none of them needs a room."""
+	"""One setup runner step per standard record group."""
 	return [
 		{
 			"key": group["file"].removesuffix(".json"),
 			"label": group["label"][0].upper() + group["label"][1:],
 			"method": "hms_tz.hms_tz.standard_records.standard_records.create_standard_records",
 			"kwargs": {"doctype": group["doctype"]},
-			"needs_rooms": False,
 		}
 		for group in STANDARD_RECORDS
 	]
