@@ -10,7 +10,14 @@ from hms_tz.hms_tz.standard_records.standard_records import get_standard_record_
 # returns a short text of what it holds. A step must only add what is missing and never change
 # existing records, so it is safe to run again; it counts what it adds with progress.advance(added=).
 # A step runs only once a room exists unless it sets "needs_rooms": False.
-SETUP_RUNNER_STEPS = [FOUNDATION_STEP, *get_standard_record_steps()]
+# Needs the NHIF items and price package, which the Insurers screen downloads, and the standard masters.
+NHIF_TEMPLATES_STEP = {
+	"key": "nhif_templates",
+	"label": "NHIF templates",
+	"method": "hms_tz.hms_tz.doctype.nhif_template_mapping.nhif_template_mapping.create_nhif_templates",
+	"needs_rooms": False,
+}
+SETUP_RUNNER_STEPS = [FOUNDATION_STEP, *get_standard_record_steps(), NHIF_TEMPLATES_STEP]
 
 # Other installed apps add steps of the same shape to their hooks.py; they run after the HMS TZ steps:
 # hms_tz_setup_steps = [{"key": "clinic_rules", "label": "Clinic rules", "method": "app.setup.set_rules"}]
