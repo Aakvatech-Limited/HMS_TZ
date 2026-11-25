@@ -97,6 +97,12 @@
         />
         <Button
           v-if="company"
+          label="NHIF templates"
+          icon-left="git-merge"
+          :route="{ name: 'NHIFTemplates', query: { company } }"
+        />
+        <Button
+          v-if="company"
           label="Run setup"
           icon-left="play"
           :route="{ name: 'SetupRun', query: { company } }"
