@@ -73,6 +73,12 @@
         />
         <Button
           v-if="company"
+          label="Radiology templates"
+          icon-left="aperture"
+          :route="{ name: 'RadiologyTemplates', query: { company } }"
+        />
+        <Button
+          v-if="company"
           label="Run setup"
           icon-left="play"
           :route="{ name: 'SetupRun', query: { company } }"
