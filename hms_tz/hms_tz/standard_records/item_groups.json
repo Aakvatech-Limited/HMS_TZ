@@ -1,0 +1,26 @@
+[
+ {
+  "item_group_name": "Clinical Procedure",
+  "parent_item_group": "All Item Groups"
+ },
+ {
+  "item_group_name": "Consultations/Service Charges",
+  "parent_item_group": "All Item Groups"
+ },
+ {
+  "item_group_name": "Laboratory",
+  "parent_item_group": "All Item Groups"
+ },
+ {
+  "item_group_name": "Medication",
+  "parent_item_group": "All Item Groups"
+ },
+ {
+  "item_group_name": "Physiotherapy",
+  "parent_item_group": "All Item Groups"
+ },
+ {
+  "item_group_name": "Radiology",
+  "parent_item_group": "All Item Groups"
+ }
+]
