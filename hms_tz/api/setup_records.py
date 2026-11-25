@@ -14,6 +14,7 @@ from hms_tz.hms_tz.setup_screens.nhif_scheme import NHIFScheme
 from hms_tz.hms_tz.setup_screens.nhif_update import NHIFUpdate
 from hms_tz.hms_tz.setup_screens.practitioner import Practitioner
 from hms_tz.hms_tz.setup_screens.radiology_examination_template import RadiologyExaminationTemplate
+from hms_tz.hms_tz.setup_screens.therapy_type import TherapyType
 
 # Setup screens of company records, by the key the page route passes.
 SCREENS = {
@@ -29,6 +30,7 @@ SCREENS = {
 	"lab_templates": LabTestTemplate,
 	"radiology_templates": RadiologyExaminationTemplate,
 	"procedure_templates": ClinicalProcedureTemplate,
+	"therapy_types": TherapyType,
 }
 
 
