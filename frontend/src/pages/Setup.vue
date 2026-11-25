@@ -67,6 +67,12 @@
         />
         <Button
           v-if="company"
+          label="Lab templates"
+          icon-left="droplet"
+          :route="{ name: 'LabTemplates', query: { company } }"
+        />
+        <Button
+          v-if="company"
           label="Run setup"
           icon-left="play"
           :route="{ name: 'SetupRun', query: { company } }"
