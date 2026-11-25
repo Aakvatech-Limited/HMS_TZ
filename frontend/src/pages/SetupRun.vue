@@ -192,12 +192,6 @@ const banner = computed(() => {
         : "Settings incomplete",
     },
     {
-      ok: run.data.rooms > 0,
-      label: `${run.data.rooms} ${
-        run.data.rooms === 1 ? "room" : "rooms"
-      } added`,
-    },
-    {
       ok: true,
       label:
         `Standard records from HMS TZ: ${records.insurers} insurers, ${records.plans} plans, ` +
