@@ -65,6 +65,36 @@ STANDARD_RECORDS = [
 		"name_field": "coverage_plan_name",
 		"label": "coverage plans",
 	},
+	{
+		"doctype": "Item Group",
+		"file": "item_groups.json",
+		"name_field": "item_group_name",
+		"label": "item groups",
+	},
+	{
+		"doctype": "Modality Type",
+		"file": "modality_types.json",
+		"name_field": "modality_type",
+		"label": "modality types",
+	},
+	{
+		"doctype": "UOM",
+		"file": "uoms.json",
+		"name_field": "uom_name",
+		"label": "units of measure",
+	},
+	{
+		"doctype": "Dosage Form",
+		"file": "dosage_forms.json",
+		"name_field": "dosage_form",
+		"label": "dosage forms",
+	},
+	{
+		"doctype": "Medication Class",
+		"file": "medication_classes.json",
+		"name_field": "medication_class",
+		"label": "medication classes",
+	},
 ]
 
 INSURERS_FILE = "insurance_companies.json"
@@ -89,6 +119,27 @@ def create_standard_records(setting, progress, doctype):
 	"""Setup runner step: add the missing records of one standard group for the setting's company."""
 	company = frappe.db.get_value("HMS TZ Setting", setting, "company")
 	return StandardRecords(company, progress).create(doctype)
+
+
+# Standard groups NHIF templates link to; NHIF downloads can need them before the setup runner has run.
+TEMPLATE_MASTERS = ("Item Group", "Modality Type", "UOM", "Dosage Form", "Medication Class")
+
+
+def create_template_masters(company):
+	"""Add the missing masters NHIF templates link to, outside the setup runner."""
+	records = StandardRecords(company, UntrackedProgress())
+	for doctype in TEMPLATE_MASTERS:
+		records.create(doctype)
+
+
+class UntrackedProgress:
+	"""Progress of a run that no setup page follows."""
+
+	def set_total(self, total):
+		pass
+
+	def advance(self, count=1, added=0):
+		pass
 
 
 def get_group(doctype):
