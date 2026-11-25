@@ -1,0 +1,227 @@
+{
+ "actions": [],
+ "creation": "2026-11-25 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "nhif_code",
+  "nhif_item_name",
+  "item_type_id",
+  "service_type_id",
+  "strength",
+  "dosage",
+  "column_break_status",
+  "status",
+  "method",
+  "score",
+  "confirmed_by",
+  "confirmed_on",
+  "proposal_section",
+  "proposed_doctype",
+  "sub_kind",
+  "medication_class",
+  "modality_type",
+  "column_break_matches",
+  "matched_template_name",
+  "nearest_templates",
+  "result_section",
+  "created_records",
+  "error"
+ ],
+ "fields": [
+  {
+   "fieldname": "nhif_code",
+   "fieldtype": "Data",
+   "label": "NHIF Code",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "nhif_item_name",
+   "fieldtype": "Data",
+   "label": "NHIF Item Name",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "item_type_id",
+   "fieldtype": "Int",
+   "label": "Item Type ID",
+   "in_standard_filter": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "service_type_id",
+   "fieldtype": "Int",
+   "label": "Service Type ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "strength",
+   "fieldtype": "Data",
+   "label": "Strength",
+   "read_only": 1
+  },
+  {
+   "fieldname": "dosage",
+   "fieldtype": "Data",
+   "label": "Dosage",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_status",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Proposed\nReview\nConfirmed\nCreated\nIgnored\nFailed",
+   "default": "Review",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "method",
+   "fieldtype": "Select",
+   "label": "Method",
+   "options": "Rule\nKnown code\nName match\nManual",
+   "read_only": 1
+  },
+  {
+   "fieldname": "score",
+   "fieldtype": "Int",
+   "label": "Score",
+   "read_only": 1
+  },
+  {
+   "fieldname": "confirmed_by",
+   "fieldtype": "Link",
+   "label": "Confirmed By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "confirmed_on",
+   "fieldtype": "Datetime",
+   "label": "Confirmed On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "proposal_section",
+   "fieldtype": "Section Break",
+   "label": "Proposal"
+  },
+  {
+   "fieldname": "proposed_doctype",
+   "fieldtype": "Select",
+   "label": "Proposed DocType",
+   "options": "\nLab Test Template\nRadiology Examination Template\nClinical Procedure Template\nMedication\nTherapy Type\nConsultation Item\nBed Item\nItem Only\nIgnore",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "sub_kind",
+   "fieldtype": "Select",
+   "label": "Sub Kind",
+   "options": "\nDrug\nConsumable",
+   "depends_on": "eval:doc.proposed_doctype == 'Medication'"
+  },
+  {
+   "fieldname": "medication_class",
+   "fieldtype": "Link",
+   "label": "Medication Class",
+   "options": "Medication Class",
+   "depends_on": "eval:doc.proposed_doctype == 'Medication'"
+  },
+  {
+   "fieldname": "modality_type",
+   "fieldtype": "Link",
+   "label": "Modality Type",
+   "options": "Modality Type",
+   "depends_on": "eval:doc.proposed_doctype == 'Radiology Examination Template'"
+  },
+  {
+   "fieldname": "column_break_matches",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "matched_template_name",
+   "fieldtype": "Small Text",
+   "label": "Matched Templates",
+   "read_only": 1
+  },
+  {
+   "fieldname": "nearest_templates",
+   "fieldtype": "Small Text",
+   "label": "Nearest Templates",
+   "read_only": 1
+  },
+  {
+   "fieldname": "result_section",
+   "fieldtype": "Section Break",
+   "label": "Result"
+  },
+  {
+   "fieldname": "created_records",
+   "fieldtype": "Table",
+   "label": "Created Records",
+   "options": "NHIF Template Mapping Record",
+   "read_only": 1
+  },
+  {
+   "fieldname": "error",
+   "fieldtype": "Small Text",
+   "label": "Error",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-11-25 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Hms Tz",
+ "name": "NHIF Template Mapping",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Healthcare Administrator",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "autoname": "field:nhif_code",
+ "naming_rule": "By fieldname",
+ "title_field": "nhif_item_name",
+ "show_title_field_in_link": 1,
+ "search_fields": "nhif_item_name",
+ "track_changes": 1
+}
