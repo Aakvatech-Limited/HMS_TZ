@@ -47,6 +47,13 @@ def delete_templates(doctype, names, item_codes):
 	for table in frappe.get_meta(doctype).get_table_fields():
 		frappe.db.delete(table.options, {"parenttype": doctype, "parent": ["in", names]})
 	frappe.db.delete(doctype, {"name": ["in", names]})
+	delete_items(item_codes)
+
+
+def delete_items(item_codes):
+	"""Remove Items with their child rows and prices; child rows left behind would load into a new Item."""
+	for table in frappe.get_meta("Item").get_table_fields():
+		frappe.db.delete(table.options, {"parenttype": "Item", "parent": ["in", item_codes]})
 	frappe.db.delete("Item Price", {"item_code": ["in", item_codes]})
 	frappe.db.delete("Item", {"name": ["in", item_codes]})
 
