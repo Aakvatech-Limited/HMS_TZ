@@ -106,6 +106,12 @@ const routes = [
     props: { screen: "procedure_templates" },
   },
   {
+    path: "/setup/therapy-types",
+    name: "TherapyTypes",
+    component: () => import("@/pages/SetupRecords.vue"),
+    props: { screen: "therapy_types" },
+  },
+  {
     path: "/setup/run",
     name: "SetupRun",
     component: () => import("@/pages/SetupRun.vue"),

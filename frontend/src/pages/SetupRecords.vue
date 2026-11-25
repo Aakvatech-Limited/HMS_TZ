@@ -231,6 +231,7 @@
     </main>
 
     <Dialog
+      v-if="screen.data"
       v-model="dialogOpen"
       :options="{
         title: getDialogTitle(screen.data, editing),

@@ -16,8 +16,12 @@ export const evaluateDependsOn = (expression, doc) => {
   return Boolean(evaluate(expression, doc));
 };
 
+// A desk rule may end its statement with a semicolon, which cannot sit inside return ( ... ).
 const evaluate = (expression, doc) =>
-  new Function("doc", `return (${expression.slice(5)});`)(doc);
+  new Function(
+    "doc",
+    `return (${expression.slice(5).trim().replace(/;$/, "")});`
+  )(doc);
 
 /** Tabs of sections in server order; the fields before the first tab break form the Details tab. */
 export const getSettingTabs = (fields) => {
