@@ -12,6 +12,7 @@ from hms_tz.hms_tz.setup_screens.lab_test_template import LabTestTemplate
 from hms_tz.hms_tz.setup_screens.medication import Medication
 from hms_tz.hms_tz.setup_screens.nhif_item import NHIFItem
 from hms_tz.hms_tz.setup_screens.nhif_scheme import NHIFScheme
+from hms_tz.hms_tz.setup_screens.nhif_template_mapping import NHIFTemplateMapping
 from hms_tz.hms_tz.setup_screens.nhif_update import NHIFUpdate
 from hms_tz.hms_tz.setup_screens.practitioner import Practitioner
 from hms_tz.hms_tz.setup_screens.radiology_examination_template import RadiologyExaminationTemplate
@@ -33,6 +34,7 @@ SCREENS = {
 	"procedure_templates": ClinicalProcedureTemplate,
 	"therapy_types": TherapyType,
 	"medications": Medication,
+	"nhif_templates": NHIFTemplateMapping,
 }
 
 

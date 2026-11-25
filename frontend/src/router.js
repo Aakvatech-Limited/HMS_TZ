@@ -118,6 +118,12 @@ const routes = [
     props: { screen: "medications" },
   },
   {
+    path: "/setup/nhif-templates",
+    name: "NHIFTemplates",
+    component: () => import("@/pages/SetupRecords.vue"),
+    props: { screen: "nhif_templates" },
+  },
+  {
     path: "/setup/run",
     name: "SetupRun",
     component: () => import("@/pages/SetupRun.vue"),

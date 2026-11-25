@@ -1,0 +1,32 @@
+[
+ {
+  "modality_type": "CT Scan"
+ },
+ {
+  "modality_type": "ECG"
+ },
+ {
+  "modality_type": "EEG"
+ },
+ {
+  "modality_type": "Echo"
+ },
+ {
+  "modality_type": "Fluoroscopy"
+ },
+ {
+  "modality_type": "MRI"
+ },
+ {
+  "modality_type": "Mammography"
+ },
+ {
+  "modality_type": "UltraSound (Soft Tissue)"
+ },
+ {
+  "modality_type": "Ultrasound"
+ },
+ {
+  "modality_type": "X-Ray"
+ }
+]

@@ -1,0 +1,175 @@
+{
+ "item_groups": {
+  "Lab Test Template": "Laboratory",
+  "Radiology Examination Template": "Radiology",
+  "Clinical Procedure Template": "Clinical Procedure",
+  "Medication": "Medication",
+  "Therapy Type": "Physiotherapy",
+  "Item": "Consultations/Service Charges"
+ },
+ "consumable_classes": [
+  "Consumables",
+  "Nursing Item",
+  "bandage",
+  "infusion drips",
+  "Glucose Strips",
+  "Orthopedic Appliances"
+ ],
+ "dosages": {
+  "tablet": {
+   "default_dosage_form": "Tablet",
+   "stock_uom": "Tablet"
+  },
+  "tablets": {
+   "default_dosage_form": "Tablet",
+   "stock_uom": "Tablet"
+  },
+  "tabs": {
+   "default_dosage_form": "Tablet",
+   "stock_uom": "Tablet"
+  },
+  "tablest": {
+   "default_dosage_form": "Tablet",
+   "stock_uom": "Tablet"
+  },
+  "capsule": {
+   "default_dosage_form": "Capsule",
+   "stock_uom": "Capsule"
+  },
+  "capsules": {
+   "default_dosage_form": "Capsule",
+   "stock_uom": "Capsule"
+  },
+  "vial": {
+   "default_dosage_form": "Injection",
+   "stock_uom": "Vial"
+  },
+  "vial/flexpen": {
+   "default_dosage_form": "Injection",
+   "stock_uom": "Vial"
+  },
+  "vial/ampule": {
+   "default_dosage_form": "Injection",
+   "stock_uom": "Vial"
+  },
+  "injection": {
+   "default_dosage_form": "Injection",
+   "stock_uom": "Vial"
+  },
+  "injectable": {
+   "default_dosage_form": "Injection",
+   "stock_uom": "Vial"
+  },
+  "ampoule": {
+   "default_dosage_form": "Injection",
+   "stock_uom": "Ampoule"
+  },
+  "amp": {
+   "default_dosage_form": "Injection",
+   "stock_uom": "Ampoule"
+  },
+  "bottle": {
+   "stock_uom": "Bottle"
+  },
+  "oral liquid solution": {
+   "default_dosage_form": "Syrup",
+   "stock_uom": "Bottle"
+  },
+  "liquid oral suspension": {
+   "default_dosage_form": "Syrup",
+   "stock_uom": "Bottle"
+  },
+  "suspension": {
+   "default_dosage_form": "Syrup",
+   "stock_uom": "Bottle"
+  },
+  "tube": {
+   "stock_uom": "Tube"
+  },
+  "sachet": {
+   "stock_uom": "Sachet"
+  },
+  "pack": {
+   "stock_uom": "Pack"
+  },
+  "suppositories": {
+   "default_dosage_form": "Suppository",
+   "stock_uom": "Suppository"
+  },
+  "pcs": {
+   "stock_uom": "Nos"
+  },
+  "stick": {
+   "stock_uom": "Nos"
+  }
+ },
+ "modalities": [
+  [
+   "\\bmri\\b|magnetic resonance",
+   "MRI"
+  ],
+  [
+   "\\bct\\b|computed tomography",
+   "CT Scan"
+  ],
+  [
+   "mammogra",
+   "Mammography"
+  ],
+  [
+   "\\becho",
+   "Echo"
+  ],
+  [
+   "\\becg\\b|electro ?cardio",
+   "ECG"
+  ],
+  [
+   "\\beeg\\b|electro ?encephalo",
+   "EEG"
+  ],
+  [
+   "\\bhsg\\b|fluoroscop|contrast|barium|urethrogra|pyelogra",
+   "Fluoroscopy"
+  ],
+  [
+   "\\buss\\b|ultrasound|ultra sound|doppler|sonogra",
+   "Ultrasound"
+  ],
+  [
+   "x ?- ?ray|xray",
+   "X-Ray"
+  ]
+ ],
+ "consultations": {
+  "appointment_type": "Normal Visit",
+  "levels": [
+   [
+    "super specialist",
+    "super_specialist"
+   ],
+   [
+    "specialist",
+    "specialist"
+   ],
+   [
+    "assistant medical",
+    "assistant_md"
+   ],
+   [
+    "general practitioner|medical officer",
+    "gp"
+   ]
+  ],
+  "kinds": [
+   [
+    "follow",
+    "followup"
+   ],
+   [
+    "fast",
+    "fasttrack"
+   ]
+  ]
+ }
+}
