@@ -19,6 +19,9 @@ COMPANY_ACCOUNTS = {
 	"receivable_account": [["Account", "account_type", "=", "Receivable"]],
 }
 
+# Customers of the insurers that Run setup creates; the settings cannot need them before it runs.
+SET_BY_SETUP = ("nhif_customer_name", "jubilee_customer_name")
+
 LAYOUT_TYPES = ("Tab Break", "Section Break", "Column Break")
 FIELD_KEYS = ("fieldname", "fieldtype", "label", "options", "default", "reqd")
 FIELD_KEYS += ("depends_on", "mandatory_depends_on", "link_filters")
@@ -61,7 +64,10 @@ def get_setting_fields():
 	"""Editable setup fields in form order: HMS TZ Setting, then the Billing tab from Healthcare Settings."""
 	frappe.has_permission(SETTING_DOCTYPE, "read", throw=True)
 	billing_tab = {"fieldname": "billing_tab", "fieldtype": "Tab Break", "label": "Billing"}
-	setting_fields = get_editable_fields(SETTING_DOCTYPE, frappe.get_meta(SETTING_DOCTYPE).fields)
+	setting_fields = [
+		{**field, "reqd": 0, "mandatory_depends_on": None} if field["fieldname"] in SET_BY_SETUP else field
+		for field in get_editable_fields(SETTING_DOCTYPE, frappe.get_meta(SETTING_DOCTYPE).fields)
+	]
 	return [
 		*apply_setting_defaults(setting_fields),
 		{**billing_tab, "doctype": BILLING_DOCTYPE},
