@@ -9,6 +9,7 @@ from hms_tz.hms_tz.setup_screens.coverage_plan import CoveragePlan
 from hms_tz.hms_tz.setup_screens.insurance_company import InsuranceCompany
 from hms_tz.hms_tz.setup_screens.jubilee_update import JubileeUpdate
 from hms_tz.hms_tz.setup_screens.lab_test_template import LabTestTemplate
+from hms_tz.hms_tz.setup_screens.medication import Medication
 from hms_tz.hms_tz.setup_screens.nhif_item import NHIFItem
 from hms_tz.hms_tz.setup_screens.nhif_scheme import NHIFScheme
 from hms_tz.hms_tz.setup_screens.nhif_update import NHIFUpdate
@@ -31,6 +32,7 @@ SCREENS = {
 	"radiology_templates": RadiologyExaminationTemplate,
 	"procedure_templates": ClinicalProcedureTemplate,
 	"therapy_types": TherapyType,
+	"medications": Medication,
 }
 
 
