@@ -216,4 +216,6 @@ def is_rule_true(rule, doc):
 		rule[5:].replace("===", "==").replace("!==", "!=").replace("&&", " and ").replace("||", " or ")
 	)
 	expression = re.sub(r"!(?!=)", " not ", expression)
-	return bool(frappe.safe_eval(expression.strip(), None, {"doc": frappe._dict(doc)}))
+	# Desk rules are JavaScript, where a statement may end with a semicolon.
+	expression = expression.strip().rstrip(";")
+	return bool(frappe.safe_eval(expression, None, {"doc": frappe._dict(doc)}))
