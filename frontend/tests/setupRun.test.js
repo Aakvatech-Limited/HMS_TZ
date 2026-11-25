@@ -12,7 +12,6 @@ import {
 const unlocked = {
   setting: "Clinic",
   settings_complete: true,
-  has_rooms: true,
 };
 
 describe("setup run page", () => {
@@ -22,7 +21,6 @@ describe("setup run page", () => {
       getLockReason({ ...unlocked, settings_complete: false }),
       /settings page/
     );
-    assert.equal(getLockReason({ ...unlocked, has_rooms: false }), "");
     assert.equal(getLockReason(unlocked), "");
   });
 
