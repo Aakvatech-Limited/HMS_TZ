@@ -85,6 +85,11 @@
           icon-left="thermometer"
           :route="{ name: 'Medications', query: { company } }"
         />
+        <Button
+          label="NHIF templates"
+          icon-left="git-merge"
+          :route="{ name: 'NHIFTemplates', query: { company } }"
+        />
         <div class="w-72">
           <Link
             doctype="Company"
