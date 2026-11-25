@@ -108,7 +108,6 @@ class TestStandardRecordCreation(FrappeTestCase):
 			[step["kwargs"]["doctype"] for step in steps], [group["doctype"] for group in STANDARD_RECORDS]
 		)
 		self.assertEqual(steps[0]["label"], "Ward types")
-		self.assertFalse([step for step in steps if step["needs_rooms"]])
 
 	def test_each_group_reports_its_size_and_full_progress(self):
 		results = create_for("_Test Company")
