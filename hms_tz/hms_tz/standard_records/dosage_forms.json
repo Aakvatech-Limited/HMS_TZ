@@ -1,0 +1,50 @@
+[
+ {
+  "dosage_form": "Capsule"
+ },
+ {
+  "dosage_form": "Cream"
+ },
+ {
+  "dosage_form": "Drops"
+ },
+ {
+  "dosage_form": "Ear Drops"
+ },
+ {
+  "dosage_form": "Eye Drops"
+ },
+ {
+  "dosage_form": "Eye Ointment"
+ },
+ {
+  "dosage_form": "Gel"
+ },
+ {
+  "dosage_form": "Inhaler"
+ },
+ {
+  "dosage_form": "Injection"
+ },
+ {
+  "dosage_form": "Lotion"
+ },
+ {
+  "dosage_form": "Ointment"
+ },
+ {
+  "dosage_form": "Pessaries"
+ },
+ {
+  "dosage_form": "Shampoo"
+ },
+ {
+  "dosage_form": "Suppository"
+ },
+ {
+  "dosage_form": "Syrup"
+ },
+ {
+  "dosage_form": "Tablet"
+ }
+]
