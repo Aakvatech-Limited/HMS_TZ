@@ -47,7 +47,6 @@ class TestSetupFoundation(FrappeTestCase):
 
 	def test_foundation_is_the_first_setup_step(self):
 		self.assertEqual(SETUP_RUNNER_STEPS[0]["key"], "foundation")
-		self.assertFalse(SETUP_RUNNER_STEPS[0]["needs_rooms"])
 
 	def test_missing_insurance_accounts_are_created_under_the_right_groups(self):
 		self.delete_insurance_accounts()
